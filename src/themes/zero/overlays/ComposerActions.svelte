@@ -4,7 +4,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import type { OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
-	import SchedulePicker from '$lib/components/SchedulePicker.svelte';
+	import SchedulePicker from '$lib/components/mailbox/SchedulePicker.svelte';
 	import { t } from '$lib/i18n';
 
 	let {

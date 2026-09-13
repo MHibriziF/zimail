@@ -1,5 +1,5 @@
 <script lang="ts">
-	import MeetingsPage from '$lib/components/MeetingsPage.svelte';
+	import MeetingsPage from '$lib/components/meet/MeetingsPage.svelte';
 	import { t } from '$lib/i18n';
 	import { APP_NAME } from '$lib/constants';
 	import type { PageData } from './$types';

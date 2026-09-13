@@ -105,8 +105,8 @@ test('document head asks for a standalone home-screen app', () => {
 test('phone gestures follow the 900px shell, not desktop pointer type', () => {
 	for (const file of [
 		'src/lib/components/SwipeBack.svelte',
-		'src/lib/components/SwipeRow.svelte',
-		'src/lib/components/PullToRefresh.svelte'
+		'src/lib/components/mailbox/SwipeRow.svelte',
+		'src/lib/components/mailbox/PullToRefresh.svelte'
 	]) {
 		const source = readFileSync(join(root, file), 'utf8');
 		assert.doesNotMatch(source, /pointer:\s*fine/, file);
@@ -132,7 +132,7 @@ test('compose is not a centred reading column on desktop', () => {
 });
 
 test('composer fill layout is phone-only', () => {
-	const source = readFileSync(join(root, 'src/lib/components/RichTextEditor.svelte'), 'utf8');
+	const source = readFileSync(join(root, 'src/lib/components/mailbox/RichTextEditor.svelte'), 'utf8');
 	const style = source.split('<style>')[1] ?? '';
 	const desktop = style.split('@media (max-width: 900px)')[0] ?? '';
 	assert.doesNotMatch(desktop, /\.editor-shell-fill\s*\{/);

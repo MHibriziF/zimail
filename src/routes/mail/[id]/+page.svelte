@@ -2,10 +2,10 @@
 	import { goto, invalidate, invalidateAll } from '$app/navigation';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
-	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
-	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
-	import ThreadMessage from '$lib/components/ThreadMessage.svelte';
-	import SendButton from '$lib/components/SendButton.svelte';
+	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
+	import AttachmentPicker from '$lib/components/mailbox/AttachmentPicker.svelte';
+	import ThreadMessage from '$lib/components/mailbox/ThreadMessage.svelte';
+	import SendButton from '$lib/components/mailbox/SendButton.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import {
 		cancelScheduledSend,

@@ -3,9 +3,9 @@
 	import { t } from '$lib/i18n';
 	import Logo from '$lib/components/Logo.svelte';
 	import Icon from '$lib/components/Icon.svelte';
-	import CallStage from '$lib/components/CallStage.svelte';
-	import DeviceSelect from '$lib/components/DeviceSelect.svelte';
-	import BackgroundPickerModal from '$lib/components/BackgroundPickerModal.svelte';
+	import CallStage from '$lib/components/meet/CallStage.svelte';
+	import DeviceSelect from '$lib/components/meet/DeviceSelect.svelte';
+	import BackgroundPickerModal from '$lib/components/meet/BackgroundPickerModal.svelte';
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
 	import { APP_NAME } from '$lib/constants';
 	import { initials } from '$lib/mail/folders';

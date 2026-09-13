@@ -3,10 +3,10 @@
 	import { t } from '$lib/i18n';
 	import { goto } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
-	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
-	import AttachmentPicker from '$lib/components/AttachmentPicker.svelte';
-	import RecipientField from '$lib/components/RecipientField.svelte';
-	import SendButton from '$lib/components/SendButton.svelte';
+	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
+	import AttachmentPicker from '$lib/components/mailbox/AttachmentPicker.svelte';
+	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
+	import SendButton from '$lib/components/mailbox/SendButton.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { describeMailError, sendMessage } from '$lib/mail/client';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';

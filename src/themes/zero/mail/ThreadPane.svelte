@@ -2,8 +2,8 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto, invalidateAll } from '$app/navigation';
-	import EmailBody from '$lib/components/EmailBody.svelte';
-	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import EmailBody from '$lib/components/mailbox/EmailBody.svelte';
+	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { formatMailDate, formatMailTime, shouldShowSeparateTime } from '$lib/utils/date';

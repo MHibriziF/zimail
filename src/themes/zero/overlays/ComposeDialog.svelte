@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
-	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
-	import RecipientField from '$lib/components/RecipientField.svelte';
+	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
+	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { describeMailError, sendMessage } from '$lib/mail/client';
