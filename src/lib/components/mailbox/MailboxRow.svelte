@@ -2,6 +2,7 @@
 	import Icon from '../Icon.svelte';
 	import Check from '../Check.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
+	import LabelChip from './LabelChip.svelte';
 	import SwipeRow from './SwipeRow.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { t } from '$lib/i18n';
@@ -150,6 +151,9 @@
 			</span>
 
 			<span class="body">
+				{#each thread.labels as label (label.id)}
+					<LabelChip {label} />
+				{/each}
 				<span class="subject">{thread.subject || '(no subject)'}</span>
 				{#if thread.preview}
 					<span class="preview">— {thread.preview}</span>

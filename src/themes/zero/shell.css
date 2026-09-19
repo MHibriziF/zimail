@@ -319,6 +319,15 @@
 	--icon-color: #8f8f8f;
 }
 
+/* Sized to sit where a 16px nav icon would. */
+[data-ui-theme='zero'] .z-label-dot {
+	flex-shrink: 0;
+	width: 10px;
+	height: 10px;
+	margin: 0 3px;
+	border-radius: 999px;
+}
+
 [data-ui-theme='zero'] .z-nav-link + .z-nav-link {
 	margin-top: 0.25rem;
 }
@@ -969,6 +978,13 @@
 [data-ui-theme='zero'] .z-thread-count {
 	color: var(--z-muted);
 	font-weight: 400;
+}
+
+[data-ui-theme='zero'] .z-thread-labels {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.375rem;
+	margin-top: 0.5rem;
 }
 
 [data-ui-theme='zero'] .z-people {

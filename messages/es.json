@@ -67,7 +67,8 @@
 		"openSidebar": "Abrir barra lateral",
 		"closeSidebar": "Cerrar barra lateral",
 		"security": "Seguridad",
-		"cleanup": "Limpieza"
+		"cleanup": "Limpieza",
+		"allMail": "Todos"
 	},
 	"account": {
 		"menu": "Menú de la cuenta",
@@ -205,7 +206,8 @@
 			"zero": "Está vacío aquí",
 			"zeroHint": "Busca otro correo o",
 			"clearFiltersLink": "borra los filtros",
-			"search": "Ningún mensaje coincide con esa búsqueda"
+			"search": "Ningún mensaje coincide con esa búsqueda",
+			"all": "Aún no hay nada aquí."
 		},
 		"noSubject": "(sin asunto)",
 		"noRecipient": "Sin destinatario",
@@ -794,5 +796,31 @@
 		"emptyHint": "Las reuniones que crees aparecen aquí, listas para reutilizarse — el código no cambia hasta que pidas uno nuevo.",
 		"open": "Abrir",
 		"or": "o"
+	},
+	"labels": {
+		"title": "Etiquetas",
+		"apply": "Etiquetas",
+		"searchOrCreate": "Buscar o crear una etiqueta",
+		"create": "Crear «{name}»",
+		"none": "Aún no hay etiquetas.",
+		"manage": "Gestionar etiquetas",
+		"settingsHint": "Etiqueta conversaciones para encontrarlas después. La etiqueta se aplica a toda la conversación, incluidas las respuestas posteriores.",
+		"newName": "Nombre de la nueva etiqueta",
+		"color": "Color",
+		"add": "Añadir etiqueta",
+		"emptySettings": "Todavía no has creado etiquetas.",
+		"rename": "Cambiar nombre",
+		"delete": "Eliminar",
+		"deleteConfirm": "¿Quitar esta etiqueta de todas las conversaciones?",
+		"colors": {
+			"gray": "Gris",
+			"red": "Rojo",
+			"orange": "Naranja",
+			"yellow": "Amarillo",
+			"green": "Verde",
+			"teal": "Verde azulado",
+			"blue": "Azul",
+			"purple": "Morado"
+		}
 	}
 }

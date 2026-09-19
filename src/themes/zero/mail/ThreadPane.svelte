@@ -3,6 +3,9 @@
 	import { page } from '$app/stores';
 	import { goto, invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/mailbox/EmailBody.svelte';
+	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
+	import LabelPicker from '$lib/components/mailbox/LabelPicker.svelte';
+	import type { Label } from '$lib/mail/labels';
 	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -41,6 +44,7 @@
 	type ThreadPayload = {
 		threadId: string;
 		subject: string;
+		labels: Label[];
 		messages: ThreadMessage[];
 	};
 
@@ -485,6 +489,19 @@
 						</button>
 					</Tooltip>
 				{/if}
+				{#if thread.messages.length > 0}
+					<LabelPicker
+						emailId={thread.messages[thread.messages.length - 1].id}
+						labels={($page.data.labels ?? []) as Label[]}
+						applied={thread.labels}
+						buttonClass="z-thread-icon"
+						onchange={(next) => {
+							if (thread) thread = { ...thread, labels: next };
+							// The list beside this pane shows the chips too.
+							void invalidateAll();
+						}}
+					/>
+				{/if}
 				<div class="z-thread-menu">
 					<Tooltip text={t('thread.more')}>
 						<button
@@ -527,6 +544,13 @@
 						<span class="z-thread-count">[{thread.messages.length}]</span>
 					{/if}
 				</h1>
+				{#if thread.labels.length > 0}
+					<div class="z-thread-labels">
+						{#each thread.labels as label (label.id)}
+							<LabelChip {label} href="/all?label={label.id}" />
+						{/each}
+					</div>
+				{/if}
 				{#if people.length > 0}
 					{@const chips = visiblePeople(people)}
 					<div class="z-people">

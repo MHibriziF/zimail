@@ -67,7 +67,8 @@
 		"openSidebar": "Buka bilah sisi",
 		"closeSidebar": "Tutup bilah sisi",
 		"security": "Keamanan",
-		"cleanup": "Pembersihan"
+		"cleanup": "Pembersihan",
+		"allMail": "Semua email"
 	},
 	"account": {
 		"menu": "Menu akun",
@@ -205,7 +206,8 @@
 			"zero": "Kosong di sini",
 			"zeroHint": "Cari surel lain atau",
 			"clearFiltersLink": "bersihkan filter",
-			"search": "Tidak ada pesan yang cocok dengan pencarian itu"
+			"search": "Tidak ada pesan yang cocok dengan pencarian itu",
+			"all": "Belum ada apa pun di sini."
 		},
 		"noSubject": "(tanpa subjek)",
 		"noRecipient": "Tanpa penerima",
@@ -794,5 +796,31 @@
 		"emptyHint": "Rapat yang Anda buat muncul di sini dan bisa dipakai lagi — kodenya tetap sama sampai Anda membuat kode baru.",
 		"open": "Buka",
 		"or": "atau"
+	},
+	"labels": {
+		"title": "Label",
+		"apply": "Label",
+		"searchOrCreate": "Cari atau buat label",
+		"create": "Buat \"{name}\"",
+		"none": "Belum ada label.",
+		"manage": "Kelola label",
+		"settingsHint": "Tandai percakapan agar mudah ditemukan. Label berlaku untuk seluruh percakapan, termasuk balasan yang datang kemudian.",
+		"newName": "Nama label baru",
+		"color": "Warna",
+		"add": "Tambah label",
+		"emptySettings": "Anda belum membuat label.",
+		"rename": "Ganti nama label",
+		"delete": "Hapus",
+		"deleteConfirm": "Hapus label ini dari semua percakapan?",
+		"colors": {
+			"gray": "Abu-abu",
+			"red": "Merah",
+			"orange": "Oranye",
+			"yellow": "Kuning",
+			"green": "Hijau",
+			"teal": "Hijau kebiruan",
+			"blue": "Biru",
+			"purple": "Ungu"
+		}
 	}
 }

@@ -7,6 +7,7 @@
 	import { initials, participantName } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
@@ -369,6 +370,9 @@
 							</span>
 							<span class="z-row-subject">
 								{thread.subject || t('mailbox.noSubject')}
+								{#each thread.labels as label (label.id)}
+									<LabelChip {label} />
+								{/each}
 								{#if thread.has_attachments}
 									<Icon name="Paper" size={12} />
 								{/if}
