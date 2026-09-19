@@ -90,30 +90,47 @@ export function buildTelegramMessage(payload: TelegramNotification, appUrl?: str
 		lines.push('<i>No mailbox matched this address.</i>');
 	}
 
-	const body = tidyBody(payload.body ?? '');
-	if (body) {
-		const shown = clamp(body, MAX_MESSAGE_LENGTH);
-		// An expandable quote keeps a long message from flooding the chat while
-		// still letting it be read in place.
-		const expandable = shown.length > COLLAPSE_BODY_OVER ? ' expandable' : '';
-		lines.push('', `<blockquote${expandable}>${escapeHtml(shown)}</blockquote>`);
-	}
-
+	const tail: string[] = [];
 	const attachments = payload.attachments ?? [];
 	if (attachments.length > 0) {
-		lines.push('');
+		tail.push('');
 		for (const file of attachments) {
-			lines.push(
-				`📎 ${escapeHtml(clamp(file.filename, 80))} · ${formatBytes(file.sizeBytes)}`
-			);
+			tail.push(`📎 ${escapeHtml(clamp(file.filename, 80))} · ${formatBytes(file.sizeBytes)}`);
 		}
 	}
 
 	const link = messageLink(appUrl, payload.emailId);
-	if (link) lines.push('', `<a href="${link}">Open the message</a>`);
+	if (link) tail.push('', `<a href="${link}">Open the message</a>`);
 
-	const text = lines.join('\n');
-	return text.length <= TELEGRAM_TEXT_LIMIT ? text : `${text.slice(0, TELEGRAM_TEXT_LIMIT - 1)}…`;
+	// The body is sized to whatever room the rest leaves, measured after
+	// escaping (which can grow it five-fold). Cutting the finished HTML instead
+	// could split a tag or entity, and Telegram rejects the whole message.
+	const body = tidyBody(payload.body ?? '');
+	if (body) {
+		const markup = '\n\n<blockquote expandable></blockquote>'.length;
+		const budget = TELEGRAM_TEXT_LIMIT - [...lines, ...tail].join('\n').length - markup;
+		const shown = fitEscaped(body, Math.min(MAX_MESSAGE_LENGTH, budget));
+		if (shown) {
+			// An expandable quote keeps a long message from flooding the chat while
+			// still letting it be read in place.
+			const expandable = shown.length > COLLAPSE_BODY_OVER ? ' expandable' : '';
+			lines.push('', `<blockquote${expandable}>${shown}</blockquote>`);
+		}
+	}
+
+	return [...lines, ...tail].join('\n');
+}
+
+/** The escaped text, truncated on the raw side so it fits `budget` characters once escaped. */
+function fitEscaped(text: string, budget: number): string {
+	let length = Math.min(text.length, budget);
+	while (length > 0) {
+		const escaped = escapeHtml(clamp(text, length));
+		if (escaped.length <= budget) return escaped;
+		// Shrink in proportion to the overflow; always by at least one so the loop ends.
+		length = Math.min(length - 1, Math.floor((length * budget) / escaped.length));
+	}
+	return '';
 }
 
 /**

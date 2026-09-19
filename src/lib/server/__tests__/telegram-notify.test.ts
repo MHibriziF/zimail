@@ -104,6 +104,19 @@ describe('buildTelegramMessage', () => {
 		assert.ok(subject.length < 200);
 	});
 
+	test('a body that grows when escaped still fits, with its markup intact', () => {
+		// 3500 raw '&' become 17500 characters of '&amp;' — sizing the body before
+		// escaping, then slicing the result, used to cut through the closing tags.
+		const text = buildTelegramMessage(
+			{ ...notification, body: '&<'.repeat(3000) },
+			'https://mail.example.com'
+		);
+		assert.ok(text.length <= 4096);
+		assert.match(text, /<\/blockquote>/);
+		assert.match(text, /<a href="https:\/\/mail\.example\.com">Open the message<\/a>$/);
+		assert.doesNotMatch(text, /&(?!amp;|lt;|gt;)/);
+	});
+
 	test('keeps the complete fallback message within Telegram’s 4096 limit', () => {
 		const text = buildTelegramMessage({
 			...notification,
