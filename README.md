@@ -29,18 +29,18 @@ no servers to maintain.
 
 On top of everything upstream ships:
 
+- **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat. **Compose → New meeting**, or the **Meetings** view.
+- **Two interfaces** — Zero, the two-pane shell with a command palette and keyboard shortcuts, or Classic, the original stacked layout. Per account, in **Settings → Interface**.
 - **Scheduled send** — pick any future date and time, or one of the presets, from the caret beside **Send**. The message waits in your own outbox and a [cron trigger](#scheduled-send) delivers it, so it works on either mail provider and is not capped at a provider's hold-until horizon. Recall it back to a draft any time before it goes.
 - **Two-factor authentication** — TOTP from any authenticator app, with single-use backup codes, asked for at sign-in. **Settings → Two-factor authentication**.
 - **Recovery address** — link a second mailbox you already own to the account. It is where security notices land and where forgotten-password links are sent, so losing access to this inbox does not lock you out of it. **Settings → Recovery address**.
-- **Recipient suggestions** — the composer offers addresses you have written to before as you type.
-- **Recipient chips** — To, Cc and Bcc turn what you have typed into a chip on space, comma, semicolon, <kbd>Enter</kbd> or <kbd>Tab</kbd>, so a mistyped address is visible before you send rather than after.
-- **Editable display name** — change the name recipients see on your mail without touching the database. **Settings → Account**.
-- **Time zone** — pick the zone your mail and your scheduled sends are read in, rather than trusting whatever the browser reports. **Settings → Time zone**.
-- **Broader deletion** — trash that empties itself on a retention period you choose, plus a sweep that moves mail older than a given age to the trash. Drafts and scheduled messages are never swept, and a count is always shown before anything moves. **Settings → Cleanup**.
-- **Bahasa Indonesia**, alongside English, French, Spanish and Simplified Chinese. **Settings → Language**.
-- **Two interfaces** — Zero, the two-pane shell with a command palette and keyboard shortcuts, or Classic, the original stacked layout. Per account, in **Settings → Interface**.
-- **[Video meetings](#video-meetings-optional)** — start a LiveKit call and share the link; guests join from it with no account. Camera and mic preview before joining, screen sharing, a participants list and chat. **Compose → New meeting**, or the **Meetings** view.
 - **[Migrations that apply themselves](#database-migrations)** — the Deploy to Cloudflare button never runs them, so upstream's one-click deploy lands on an empty database. Here the Worker brings its own schema up to date.
+- **Broader deletion** — trash that empties itself on a retention period you choose, plus a sweep that moves mail older than a given age to the trash. Drafts and scheduled messages are never swept, and a count is always shown before anything moves. **Settings → Cleanup**.
+- **Recipient chips** — To, Cc and Bcc turn what you have typed into a chip on space, comma, semicolon, <kbd>Enter</kbd> or <kbd>Tab</kbd>, so a mistyped address is visible before you send rather than after.
+- **Recipient suggestions** — the composer offers addresses you have written to before as you type.
+- **Time zone** — pick the zone your mail and your scheduled sends are read in, rather than trusting whatever the browser reports. **Settings → Time zone**.
+- **Editable display name** — change the name recipients see on your mail without touching the database. **Settings → Account**.
+- **Bahasa Indonesia**, alongside English, French, Spanish and Simplified Chinese. **Settings → Language**.
 
 ## Quick start
 
