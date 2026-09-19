@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { t } from '$lib/i18n';
+	import { DEFAULT_LOCALE, intlLocale } from '$lib/i18n/locales';
 	import StackHeader from '../StackHeader.svelte';
 	import Icon from '../Icon.svelte';
 	import { startMeeting } from '$lib/mail/meetings';
@@ -27,7 +28,15 @@
 	let editRequireApproval = $state(false);
 	let savingEdit = $state(false);
 
-	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+	// The app's language and saved time zone, not the browser's — and the same on
+	// server and client, so the SSR'd date doesn't change on hydration.
+	const dateFormat = $derived(
+		new Intl.DateTimeFormat(intlLocale($page.data.locale ?? DEFAULT_LOCALE), {
+			dateStyle: 'medium',
+			timeStyle: 'short',
+			timeZone: $page.data.timeZone ?? undefined
+		})
+	);
 
 	function formatDate(iso: string): string {
 		return dateFormat.format(new Date(iso));
