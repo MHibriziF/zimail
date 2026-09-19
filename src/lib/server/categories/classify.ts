@@ -40,17 +40,45 @@ const FORUM_DOMAINS = ['googlegroups.com', 'groups.io', 'discoursemail.com', 'fr
 /** Headers bulk-mail platforms add to marketing sends. */
 const MARKETING_HEADERS = ['x-mailchimp-campaign', 'x-campaign', 'x-campaignid', 'x-mc-user', 'x-sg-eid', 'x-mailgun-tag'];
 
-const PROMOTION_LOCALS = /^(news(letter)?s?|marketing|promo(tions?)?|offers?|deals?|sales?|hello|info|shop|store)([._+-]|$)/;
-const AUTOMATED_LOCALS = /^(no-?reply|do-?not-?reply|notifications?|alerts?|updates?|mailer-daemon|account|security|billing|receipts?|orders?|support)([._+-]|$)/;
-const TRANSACTIONAL_SUBJECT =
-	/\b(receipt|invoice|order|shipped|shipping|delivery|delivered|payment|statement|verify|verification|confirm|password|sign-?in|security alert|login|reset|booking|reservation|your account)\b/i;
+/** Sender names that mean a mailing, matched as a whole word at the start (`news@`, `news.eu@`). */
+const PROMOTION_LOCALS = [
+	'news', 'newsletter', 'newsletters', 'marketing', 'promo', 'promos', 'promotion', 'promotions',
+	'offer', 'offers', 'deal', 'deals', 'sale', 'sales', 'hello', 'info', 'shop', 'store'
+];
 
+/** Sender names that mean a machine, matched the same way. */
+const AUTOMATED_LOCALS = [
+	'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'notification', 'notifications', 'alert', 'alerts',
+	'update', 'updates', 'mailer-daemon', 'account', 'security', 'billing', 'receipt', 'receipts',
+	'order', 'orders', 'support'
+];
+
+const TRANSACTIONAL_WORDS = new Set([
+	'receipt', 'invoice', 'order', 'shipped', 'shipping', 'delivery', 'delivered', 'payment', 'statement',
+	'verify', 'verification', 'confirm', 'password', 'signin', 'login', 'reset', 'booking', 'reservation'
+]);
+const TRANSACTIONAL_PHRASES = ['security alert', 'your account', 'sign in', 'sign-in'];
+
+/** `news` matches `news@` and `news.eu@`, but not `newsom@`. */
+function hasLocalPrefix(local: string, prefixes: readonly string[]): boolean {
+	return prefixes.some((prefix) => local === prefix || (local.startsWith(prefix) && '._+-'.includes(local[prefix.length])));
+}
+
+function isTransactionalSubject(subject: string): boolean {
+	const lower = subject.toLowerCase();
+	if (TRANSACTIONAL_PHRASES.some((phrase) => lower.includes(phrase))) return true;
+	return lower.split(/[^a-z]+/).some((word) => TRANSACTIONAL_WORDS.has(word));
+}
+
+/** An address without an `@` has no domain, and all of it is the local part. */
 function domainOf(address: string): string {
-	return address.slice(address.lastIndexOf('@') + 1).trim().toLowerCase();
+	const at = address.lastIndexOf('@');
+	return at === -1 ? '' : address.slice(at + 1).trim().toLowerCase();
 }
 
 function localPartOf(address: string): string {
-	return address.slice(0, address.lastIndexOf('@')).trim().toLowerCase();
+	const at = address.lastIndexOf('@');
+	return (at === -1 ? address : address.slice(0, at)).trim().toLowerCase();
 }
 
 /** `mail.linkedin.com` matches `linkedin.com`, but `notlinkedin.com` doesn't. */
@@ -81,7 +109,7 @@ function isBulk(headers: ClassifyInput['headers']): boolean {
 
 function isAutomated(local: string, headers: ClassifyInput['headers']): boolean {
 	const autoSubmitted = headers['auto-submitted']?.trim().toLowerCase();
-	return Boolean(autoSubmitted && autoSubmitted !== 'no') || AUTOMATED_LOCALS.test(local);
+	return Boolean(autoSubmitted && autoSubmitted !== 'no') || hasLocalPrefix(local, AUTOMATED_LOCALS);
 }
 
 export function classifyMail({ from, subject, headers }: ClassifyInput): MailCategory {
@@ -91,8 +119,8 @@ export function classifyMail({ from, subject, headers }: ClassifyInput): MailCat
 
 	if (isForum(domain, headers)) return 'forums';
 	if (onDomain(domain, SOCIAL_DOMAINS)) return 'social';
-	if (bulk && (PROMOTION_LOCALS.test(local) || hasMarketingHeaders(headers))) return 'promotions';
-	if (isAutomated(local, headers) || (bulk && TRANSACTIONAL_SUBJECT.test(subject))) return 'updates';
+	if (bulk && (hasLocalPrefix(local, PROMOTION_LOCALS) || hasMarketingHeaders(headers))) return 'promotions';
+	if (isAutomated(local, headers) || (bulk && isTransactionalSubject(subject))) return 'updates';
 	// Bulk mail that isn't clearly transactional is still a mailing.
 	return bulk ? 'promotions' : 'primary';
 }

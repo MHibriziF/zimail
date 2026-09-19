@@ -1,7 +1,14 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { MAIL_CATEGORIES, type MailCategory } from '../../mail/categories';
 
-export type UncategorizedMessage = { id: string; from: string; subject: string; conversationId: string };
+export type UncategorizedMessage = {
+	id: string;
+	from: string;
+	subject: string;
+	conversationId: string;
+	/** A tab some other message of the conversation already has — kept, so it stays in one tab. */
+	existingCategory: MailCategory | null;
+};
 
 export type CategoriesRepository = {
 	senderCategory(userId: string, address: string): Promise<MailCategory | null>;
@@ -9,7 +16,7 @@ export type CategoriesRepository = {
 	inboundSenders(userId: string, emailIds: string[]): Promise<string[]>;
 	tabsEnabled(userId: string): Promise<boolean>;
 	setTabsEnabled(userId: string, enabled: boolean): Promise<void>;
-	/** The oldest inbound message of each conversation still without a tab. */
+	/** The oldest still-unsorted inbound message of each conversation that has one. */
 	uncategorized(userId: string, limit: number): Promise<UncategorizedMessage[]>;
 	countUncategorized(userId: string): Promise<number>;
 };
@@ -66,24 +73,28 @@ export function createD1CategoriesRepository(db: D1Database): CategoriesReposito
 		async uncategorized(userId, limit) {
 			const { results } = await db
 				.prepare(
-					`SELECT e.id, e.from_addr, e.subject, COALESCE(e.thread_id, e.id) AS conversation_id
+					`SELECT e.id, e.from_addr, e.subject, COALESCE(e.thread_id, e.id) AS conversation_id,
+					        (SELECT MAX(sorted.category) FROM emails sorted
+					         WHERE sorted.user_id = e.user_id
+					           AND COALESCE(sorted.thread_id, sorted.id) = COALESCE(e.thread_id, e.id)) AS existing_category
 					 FROM emails e
 					 WHERE e.user_id = ? AND e.direction = 'inbound' AND e.category IS NULL
 					   AND NOT EXISTS (
 					     SELECT 1 FROM emails older
-					     WHERE older.user_id = e.user_id AND older.direction = 'inbound'
+					     WHERE older.user_id = e.user_id AND older.direction = 'inbound' AND older.category IS NULL
 					       AND COALESCE(older.thread_id, older.id) = COALESCE(e.thread_id, e.id)
 					       AND datetime(older.created_at) < datetime(e.created_at)
 					   )
 					 LIMIT ?`
 				)
 				.bind(userId, limit)
-				.all<{ id: string; from_addr: string; subject: string; conversation_id: string }>();
+				.all<{ id: string; from_addr: string; subject: string; conversation_id: string; existing_category: string | null }>();
 			return results.map((row) => ({
 				id: row.id,
 				from: row.from_addr,
 				subject: row.subject,
-				conversationId: row.conversation_id
+				conversationId: row.conversation_id,
+				existingCategory: MAIL_CATEGORIES.find((category) => category === row.existing_category) ?? null
 			}));
 		},
 

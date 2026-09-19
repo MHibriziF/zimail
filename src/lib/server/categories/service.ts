@@ -54,7 +54,9 @@ export function createCategoriesService(deps: CategoriesServiceDeps): Categories
 		async backfill(userId, limit = BACKFILL_BATCH) {
 			const pending = await repo.uncategorized(userId, limit);
 			for (const message of pending) {
-				const category = await categorizeInbound(userId, { from: message.from, subject: message.subject, headers: {} });
+				const category =
+					message.existingCategory ??
+					(await categorizeInbound(userId, { from: message.from, subject: message.subject, headers: {} }));
 				const ids = await expandToThreads(userId, [message.id]);
 				await setCategory(userId, ids, category);
 			}

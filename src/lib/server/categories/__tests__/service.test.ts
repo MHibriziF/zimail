@@ -91,9 +91,9 @@ describe('backfill', () => {
 	test('sorts old conversations by sender and subject, and reports what is left', async () => {
 		const { service, categoryOf } = setup({
 			uncategorized: [
-				{ id: 'a', from: 'notification@facebookmail.com', subject: 'New comment', conversationId: 'a' },
-				{ id: 'b', from: 'ada@example.com', subject: 'Lunch?', conversationId: 'b' },
-				{ id: 'c', from: 'no-reply@bank.test', subject: 'Statement', conversationId: 'c' }
+				{ id: 'a', from: 'notification@facebookmail.com', subject: 'New comment', conversationId: 'a', existingCategory: null },
+				{ id: 'b', from: 'ada@example.com', subject: 'Lunch?', conversationId: 'b', existingCategory: null },
+				{ id: 'c', from: 'no-reply@bank.test', subject: 'Statement', conversationId: 'c', existingCategory: null }
 			]
 		});
 		assert.deepEqual(await service.backfill('user-1', 2), { sorted: 2, remaining: 1 });
@@ -101,6 +101,16 @@ describe('backfill', () => {
 		assert.equal(categoryOf.get('a'), 'social');
 		assert.equal(categoryOf.get('b'), 'primary');
 		assert.equal(categoryOf.get('c-reply'), 'updates');
+	});
+});
+
+describe('backfill keeps a conversation in one tab', () => {
+	test("a conversation that already has a tab keeps it instead of being re-sorted", async () => {
+		const { service, categoryOf } = setup({
+			uncategorized: [{ id: 'late', from: 'ada@example.com', subject: 'Re: hi', conversationId: 'c1', existingCategory: 'updates' }]
+		});
+		await service.backfill('user-1');
+		assert.equal(categoryOf.get('late'), 'updates');
 	});
 });
 

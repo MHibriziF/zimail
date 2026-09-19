@@ -56,6 +56,15 @@ describe('classifyMail', () => {
 		assert.equal(classifyMail(mail('team@brand.test', { precedence: 'bulk' })), 'promotions');
 	});
 
+	test('an address without @ is read whole, not clipped', () => {
+		assert.equal(classifyMail(mail('noreply')), 'updates');
+		assert.equal(classifyMail(mail('ada')), 'primary');
+	});
+
+	test('a keyword followed by a separator still counts', () => {
+		assert.equal(classifyMail(mail('no-reply.eu@bank.test')), 'updates');
+	});
+
 	test('a person whose address merely contains a keyword stays Primary', () => {
 		assert.equal(classifyMail(mail('newsom@example.com')), 'primary');
 		assert.equal(classifyMail(mail('salesforce-fan@example.com')), 'primary');
