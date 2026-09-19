@@ -43,7 +43,7 @@ const MAX_HEADER_LENGTH = 150;
 const COLLAPSE_BODY_OVER = 280;
 
 function escapeHtml(value: string): string {
-	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
 function clamp(value: string, limit: number): string {
@@ -54,8 +54,10 @@ function clamp(value: string, limit: number): string {
 /** Collapse the runs of blank lines that quoted replies and signatures leave. */
 function tidyBody(body: string): string {
 	return body
-		.replace(/\r\n/g, '\n')
-		.replace(/[ \t]+$/gm, '')
+		.replaceAll('\r\n', '\n')
+		.split('\n')
+		.map((line) => line.trimEnd())
+		.join('\n')
 		.replace(/\n{3,}/g, '\n\n')
 		.trim();
 }
@@ -150,7 +152,7 @@ export function buildRichMessage(
 		const shown = clamp(body, MAX_MESSAGE_LENGTH);
 		const expandable = shown.length > COLLAPSE_BODY_OVER ? ' expandable' : '';
 		parts.push(
-			`<blockquote${expandable}>${escapeHtml(shown).replace(/\n/g, '<br>')}</blockquote>`
+			`<blockquote${expandable}>${escapeHtml(shown).replaceAll('\n', '<br>')}</blockquote>`
 		);
 	}
 
