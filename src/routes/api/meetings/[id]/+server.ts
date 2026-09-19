@@ -1,10 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getMeetingsService } from '$lib/server/meet/meetings';
+import { parseScreenShareMode, parseScreenSharePolicy } from '$lib/meet/screen-share';
 
 type UpdateMeetingBody = {
 	title?: unknown;
 	requireApproval?: unknown;
+	screenSharePolicy?: unknown;
+	screenShareMode?: unknown;
 };
 
 /** Owner-only — used by the in-call host settings panel to know the meeting's current admission mode. */
@@ -25,11 +28,18 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 	}
 
 	const body = (await request.json().catch(() => ({}))) as UpdateMeetingBody;
-	const meeting = await getMeetingsService(platform).update(locals.user.id, params.id, {
-		title: typeof body.title === 'string' ? body.title : undefined,
-		requireApproval: typeof body.requireApproval === 'boolean' ? body.requireApproval : undefined
-	});
+	try {
+		const meeting = await getMeetingsService(platform).update(locals.user.id, params.id, {
+			title: typeof body.title === 'string' ? body.title : undefined,
+			requireApproval: typeof body.requireApproval === 'boolean' ? body.requireApproval : undefined,
+			screenSharePolicy: parseScreenSharePolicy(body.screenSharePolicy),
+			screenShareMode: parseScreenShareMode(body.screenShareMode)
+		});
 
-	if (!meeting) return json({ error: 'Meeting not found' }, { status: 404 });
-	return json({ meeting });
+		if (!meeting) return json({ error: 'Meeting not found' }, { status: 404 });
+		return json({ meeting });
+	} catch {
+		// The setting is saved by now; what failed is pushing a policy change to the live call.
+		return json({ error: 'Saved, but people already in the call could not be updated' }, { status: 502 });
+	}
 };

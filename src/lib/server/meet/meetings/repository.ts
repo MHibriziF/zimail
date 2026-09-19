@@ -1,4 +1,11 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import {
+	DEFAULT_SCREEN_SHARE,
+	parseScreenShareMode,
+	parseScreenSharePolicy,
+	type ScreenShareMode,
+	type ScreenSharePolicy
+} from '../../../meet/screen-share';
 
 export type Meeting = {
 	id: string;
@@ -6,13 +13,24 @@ export type Meeting = {
 	code: string | null;
 	title: string | null;
 	require_approval: boolean;
+	screen_share_policy: ScreenSharePolicy;
+	screen_share_mode: ScreenShareMode;
 	created_at: string;
 };
 
-type MeetingRow = Omit<Meeting, 'require_approval'> & { require_approval: number };
+type MeetingRow = Omit<Meeting, 'require_approval' | 'screen_share_policy' | 'screen_share_mode'> & {
+	require_approval: number;
+	screen_share_policy: string;
+	screen_share_mode: string;
+};
 
 function toMeeting(row: MeetingRow): Meeting {
-	return { ...row, require_approval: !!row.require_approval };
+	return {
+		...row,
+		require_approval: !!row.require_approval,
+		screen_share_policy: parseScreenSharePolicy(row.screen_share_policy) ?? DEFAULT_SCREEN_SHARE.policy,
+		screen_share_mode: parseScreenShareMode(row.screen_share_mode) ?? DEFAULT_SCREEN_SHARE.mode
+	};
 }
 
 export type NewMeeting = {
@@ -25,7 +43,12 @@ export type NewMeeting = {
 	createdAt: string;
 };
 
-export type MeetingFieldPatch = { title?: string | null; requireApproval?: boolean };
+export type MeetingFieldPatch = {
+	title?: string | null;
+	requireApproval?: boolean;
+	screenSharePolicy?: ScreenSharePolicy;
+	screenShareMode?: ScreenShareMode;
+};
 
 /**
  * Raw D1 access for meetings — no retry-on-collision, no default-title
@@ -43,7 +66,8 @@ export type MeetingsRepository = {
 	updateCode(userId: string, id: string, code: string): Promise<boolean>;
 };
 
-const SELECT_FIELDS = 'id, user_id, code, title, require_approval, created_at';
+const SELECT_FIELDS =
+	'id, user_id, code, title, require_approval, screen_share_policy, screen_share_mode, created_at';
 
 export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 	return {
@@ -108,6 +132,14 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 			if (patch.requireApproval !== undefined) {
 				sets.push('require_approval = ?');
 				values.push(patch.requireApproval ? 1 : 0);
+			}
+			if (patch.screenSharePolicy !== undefined) {
+				sets.push('screen_share_policy = ?');
+				values.push(patch.screenSharePolicy);
+			}
+			if (patch.screenShareMode !== undefined) {
+				sets.push('screen_share_mode = ?');
+				values.push(patch.screenShareMode);
 			}
 			if (sets.length === 0) return false;
 

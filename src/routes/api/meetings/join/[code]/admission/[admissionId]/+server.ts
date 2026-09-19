@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ params, url, platform }) => {
 		if (outcome.type === 'waiting') {
 			return json({ status: outcome.status });
 		}
-		return json({ status: 'admitted', url: outcome.url, token: outcome.token, roomName: outcome.roomName });
+		return json({ status: 'admitted', url: outcome.url, token: outcome.token, roomName: outcome.roomName, screenShare: outcome.screenShare });
 	} catch (error) {
 		return json(
 			{ error: error instanceof Error ? error.message : 'Could not join meeting' },

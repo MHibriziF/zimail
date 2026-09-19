@@ -36,7 +36,7 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 		if (outcome.type === 'pending') {
 			return json({ pending: true, admissionId: outcome.admissionId });
 		}
-		return json({ url: outcome.url, token: outcome.token, roomName: outcome.roomName });
+		return json({ url: outcome.url, token: outcome.token, roomName: outcome.roomName, screenShare: outcome.screenShare });
 	} catch (error) {
 		return json(
 			{ error: error instanceof Error ? error.message : 'Could not join meeting' },

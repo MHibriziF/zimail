@@ -8,6 +8,7 @@
 	import { startMeeting } from '$lib/mail/meetings';
 	import { describeMailError } from '$lib/mail/client';
 	import type { Meeting } from '$lib/server/meet/meetings';
+	import { DEFAULT_SCREEN_SHARE } from '$lib/meet/screen-share';
 
 	let { meetings }: { meetings: Meeting[] } = $props();
 
@@ -62,6 +63,8 @@
 					code: meeting.code,
 					title: meeting.title,
 					require_approval: meeting.requireApproval,
+					screen_share_policy: DEFAULT_SCREEN_SHARE.policy,
+					screen_share_mode: DEFAULT_SCREEN_SHARE.mode,
 					created_at: new Date().toISOString()
 				},
 				...created
