@@ -482,6 +482,19 @@
 						<Icon name="Archive2" size={16} />
 					</button>
 				</Tooltip>
+				{#if view === 'spam'}
+					<Tooltip text={t('thread.notSpam')}>
+						<button type="button" class="z-thread-icon" aria-label={t('thread.notSpam')} onclick={() => act('notspam')}>
+							<Icon name="Inbox" size={16} />
+						</button>
+					</Tooltip>
+				{:else if view !== 'trash' && view !== 'sent' && view !== 'drafts'}
+					<Tooltip text={t('thread.reportSpam')}>
+						<button type="button" class="z-thread-icon" aria-label={t('thread.reportSpam')} onclick={() => act('spam')}>
+							<Icon name="ExclamationTriangle" size={16} />
+						</button>
+					</Tooltip>
+				{/if}
 				{#if view !== 'trash'}
 					<Tooltip text={t('nav.bin')}>
 						<button type="button" class="z-thread-trash" aria-label={t('nav.bin')} onclick={() => act('trash')}>

@@ -38,6 +38,11 @@ export type InsertEmailInput = {
 	status?: MailStatus | null;
 	scheduledAt?: string | null;
 	isRead?: boolean;
+	/**
+	 * The inbound path's verdict (blocked sender, failed authentication). Only
+	 * honoured for a message that starts a conversation — see insertEmail.
+	 */
+	spam?: boolean;
 	/** Disable fallback grouping when this message must start a conversation. */
 	subjectMatch?: boolean;
 };
@@ -200,6 +205,16 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 			subjectMatch: input.subjectMatch ?? input.status !== 'draft'
 		});
 
+		// A conversation is spam or not as a whole — every folder shows a
+		// conversation if any one message matches, so a split state would put it
+		// in both the inbox and Spam. A new message follows its conversation; a
+		// spam verdict only applies to a message that starts one, so a flagged
+		// reply can never pull a legitimate conversation out of the inbox.
+		const startsConversation = threadId === id;
+		const spam =
+			(startsConversation && input.spam === true) ||
+			(!startsConversation && (await repo.isConversationSpam(input.userId, threadId)));
+
 		await repo.insertRow({
 			id,
 			userId: input.userId,
@@ -223,11 +238,13 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 			providerId: input.providerId ?? null,
 			status: input.status ?? null,
 			scheduledAt: input.scheduledAt ?? null,
-			isRead: input.isRead ?? false
+			isRead: input.isRead ?? false,
+			spam
 		});
 
-		// A new inbound reply brings an archived conversation back to the inbox.
-		if (input.direction === 'inbound') {
+		// A new inbound reply brings an archived conversation back to the inbox —
+		// but a spam conversation stays where it is.
+		if (input.direction === 'inbound' && !spam) {
 			await repo.clearArchiveForThread(input.userId, threadId);
 		} else if (input.replyToEmailId) {
 			// Sending a reply from an archived conversation should not silently move

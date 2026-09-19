@@ -68,7 +68,8 @@
 		"closeSidebar": "Fermer la barre latérale",
 		"security": "Sécurité",
 		"cleanup": "Nettoyage",
-		"allMail": "Tous les messages"
+		"allMail": "Tous les messages",
+		"spam": "Spam"
 	},
 	"account": {
 		"menu": "Menu du compte",
@@ -207,7 +208,8 @@
 			"zeroHint": "Recherchez un autre e-mail ou",
 			"clearFiltersLink": "effacez les filtres",
 			"search": "Aucun message ne correspond à cette recherche",
-			"all": "Rien ici pour l’instant."
+			"all": "Rien ici pour l’instant.",
+			"spam": "Aucun spam. Les messages signalés, ceux des expéditeurs signalés ou qui échouent à l’authentification arrivent ici."
 		},
 		"noSubject": "(sans objet)",
 		"noRecipient": "Aucun destinataire",
@@ -345,7 +347,9 @@
 		"scheduledFor": "Envoi programmé {when}",
 		"scheduled": "Envoi programmé",
 		"recall": "Annuler l’envoi",
-		"couldNotRecall": "Impossible d’annuler l’envoi de ce message"
+		"couldNotRecall": "Impossible d’annuler l’envoi de ce message",
+		"reportSpam": "Signaler comme spam",
+		"notSpam": "Pas un spam"
 	},
 	"search": {
 		"title": "Recherche",

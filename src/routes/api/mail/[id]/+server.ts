@@ -7,6 +7,7 @@ import {
 } from '$lib/server/context';
 import { getMailStoreService } from '$lib/server/mail-store';
 import { getLabelsService } from '$lib/server/labels';
+import { getSpamService } from '$lib/server/spam';
 import { resolveReplyFromAddress, sendAndStore } from '$lib/server/outbound/outbox';
 import { buildReferences, displaySubject } from '$lib/server/mail-store/threads';
 import type { OutboundAttachmentInput } from '$lib/types';
@@ -55,9 +56,16 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		isStarred?: boolean;
 		archived?: boolean;
 		trashed?: boolean;
+		/** Report as spam (true) or move back out of Spam (false) — always the whole conversation. */
+		spam?: boolean;
 		/** Set to limit the change to this one message instead of the thread. */
 		messageOnly?: boolean;
 	};
+
+	if (typeof body.spam === 'boolean') {
+		const changed = await getSpamService(platform).setSpam(locals.user.id, [params.id!], body.spam);
+		return changed > 0 ? json({ ok: true }) : json({ error: 'Not found' }, { status: 404 });
+	}
 
 	// Archiving is always a conversation action — a half-archived thread would
 	// show up in both the inbox and the archive.

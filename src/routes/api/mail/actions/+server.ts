@@ -1,6 +1,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { authorizeMailAction, isMailAction, type MailAction } from '$lib/server/api-access';
 import { getMailStoreService } from '$lib/server/mail-store';
+import { getSpamService } from '$lib/server/spam';
 
 /** Actions that operate on the whole mailbox rather than a selection. */
 const WHOLE_MAILBOX: MailAction[] = ['read-all', 'empty-trash'];
@@ -63,6 +64,11 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 			break;
 		case 'unarchive':
 			affected = await mailStore.setEmailFlags(locals.user.id, ids, { archived: false });
+			break;
+		case 'spam':
+		case 'notspam':
+			// Also blocks or unblocks the senders, so it goes through the spam service.
+			affected = await getSpamService(platform).setSpam(locals.user.id, ids, action === 'spam');
 			break;
 		case 'trash':
 			affected = await mailStore.setEmailFlags(locals.user.id, ids, { trashed: true });

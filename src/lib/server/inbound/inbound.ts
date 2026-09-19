@@ -13,6 +13,7 @@ import {
 	type TelegramNotificationEnv
 } from '../telegram-notify';
 import { stripHtml } from '../util/html';
+import { isFiledAsSpam, spamServiceForDb } from '../spam';
 
 export type ResendWebhookEvent = {
 	type: string;
@@ -135,6 +136,11 @@ async function handleInboundEmail(
 		};
 	}
 
+	const spam = await spamServiceForDb(env.DB).isSpamInbound(route.userId, from, [
+		received.headers?.['authentication-results'],
+		received.headers?.['arc-authentication-results']
+	]);
+
 	const emailId = await insertEmail(env.DB, {
 		userId: route.userId,
 		direction: 'inbound',
@@ -153,10 +159,15 @@ async function handleInboundEmail(
 		references: received.headers?.['references'] ?? null,
 		domainId: route.domainId,
 		addressId: route.addressId,
-		providerId
+		providerId,
+		spam
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId);
+	// Mail filed in Spam is kept but never announced.
+	if (await isFiledAsSpam(env.DB, route.userId, emailId)) {
+		return { handled: true, note: `Filed ${providerId} as spam for ${route.address}` };
+	}
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,

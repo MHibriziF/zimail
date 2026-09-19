@@ -322,3 +322,12 @@ test('a draft cannot be written through an API key', () => {
 		);
 	}
 });
+
+describe('spam actions', () => {
+	test('reporting and un-reporting spam need mail:read, like archiving', () => {
+		for (const action of ['spam', 'notspam'] as const) {
+			assert.deepEqual(authorizeMailAction({ action, authMethod: 'api_token', scopes: ['mail:read'] }), { ok: true });
+			assert.equal(authorizeMailAction({ action, authMethod: 'api_token', scopes: ['mail:send'] }).ok, false);
+		}
+	});
+});

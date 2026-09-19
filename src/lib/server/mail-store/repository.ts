@@ -20,20 +20,22 @@ import type {
 function viewFilter(view: MailboxView): string {
 	switch (view) {
 		case 'inbox':
-			return "e.deleted_at IS NULL AND e.archived_at IS NULL AND e.direction = 'inbound'";
+			return "e.deleted_at IS NULL AND e.archived_at IS NULL AND e.spam_at IS NULL AND e.direction = 'inbound'";
 		case 'archive':
-			return "e.deleted_at IS NULL AND e.archived_at IS NOT NULL AND (e.status IS NULL OR e.status <> 'draft')";
+			return "e.deleted_at IS NULL AND e.archived_at IS NOT NULL AND e.spam_at IS NULL AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'sent':
 			return "e.deleted_at IS NULL AND e.direction = 'outbound' AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'drafts':
 			return "e.deleted_at IS NULL AND e.status = 'draft'";
 		case 'starred':
-			return "e.deleted_at IS NULL AND e.is_starred = 1 AND (e.status IS NULL OR e.status <> 'draft')";
+			return "e.deleted_at IS NULL AND e.is_starred = 1 AND e.spam_at IS NULL AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'trash':
 			return 'e.deleted_at IS NOT NULL';
 		case 'all':
 			// Every conversation that isn't trashed — what a label shows.
-			return "e.deleted_at IS NULL AND (e.status IS NULL OR e.status <> 'draft')";
+			return "e.deleted_at IS NULL AND e.spam_at IS NULL AND (e.status IS NULL OR e.status <> 'draft')";
+		case 'spam':
+			return 'e.deleted_at IS NULL AND e.spam_at IS NOT NULL';
 	}
 }
 
@@ -145,6 +147,34 @@ function buildScope(userId: string, query: MailboxQuery): { where: string; bindi
 	return { where: filters.join(' AND '), bindings };
 }
 
+/** Boolean flags stored as 0/1. */
+const FLAG_COLUMNS = [
+	['isRead', 'is_read'],
+	['isStarred', 'is_starred']
+] as const;
+
+/** State flags stored as the time they were set, NULL when cleared. */
+const TIMESTAMP_COLUMNS = [
+	['trashed', 'deleted_at'],
+	['archived', 'archived_at'],
+	['spam', 'spam_at']
+] as const;
+
+function flagAssignments(update: MailFlagUpdate): { assignments: string[]; bindings: unknown[] } {
+	const assignments: string[] = [];
+	const bindings: unknown[] = [];
+	for (const [key, column] of FLAG_COLUMNS) {
+		if (update[key] === undefined) continue;
+		assignments.push(`${column} = ?`);
+		bindings.push(update[key] ? 1 : 0);
+	}
+	for (const [key, column] of TIMESTAMP_COLUMNS) {
+		if (update[key] === undefined) continue;
+		assignments.push(update[key] ? `${column} = datetime('now')` : `${column} = NULL`);
+	}
+	return { assignments, bindings };
+}
+
 export type NewEmailRow = {
 	id: string;
 	userId: string;
@@ -169,6 +199,8 @@ export type NewEmailRow = {
 	status: MailStatus | null;
 	scheduledAt: string | null;
 	isRead: boolean;
+	/** Filed straight into Spam. */
+	spam: boolean;
 };
 
 export type MailFlagUpdate = {
@@ -176,6 +208,7 @@ export type MailFlagUpdate = {
 	isStarred?: boolean;
 	trashed?: boolean;
 	archived?: boolean;
+	spam?: boolean;
 };
 
 export type NewDraftRow = {
@@ -223,6 +256,7 @@ export type MailStoreRepository = {
 		domainId?: string | null
 	): Promise<{ messageCount: number; latestRowid: number }>;
 	getMailboxCounts(userId: string, domainId?: string | null): Promise<MailboxCounts>;
+	isConversationSpam(userId: string, threadId: string): Promise<boolean>;
 
 	expandToThreads(userId: string, ids: string[]): Promise<string[]>;
 	setFlags(userId: string, ids: string[], update: MailFlagUpdate): Promise<number>;
@@ -261,8 +295,9 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 						id, user_id, direction, from_addr, from_name, to_addr, cc_addr, bcc_addr, subject,
 						body_text, body_html, message_id, in_reply_to, references_header,
 						reply_to_email_id, thread_id, thread_key,
-						domain_id, address_id, provider_id, status, status_at, scheduled_at, is_read
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?)`
+						domain_id, address_id, provider_id, status, status_at, scheduled_at, is_read, spam_at
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?,
+						CASE WHEN ? THEN datetime('now') END)`
 				)
 				.bind(
 					row.id,
@@ -287,9 +322,21 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 					row.providerId,
 					row.status,
 					row.scheduledAt,
-					row.isRead ? 1 : 0
+					row.isRead ? 1 : 0,
+					row.spam ? 1 : 0
 				)
 				.run();
+		},
+
+		async isConversationSpam(userId, threadId) {
+			const row = await db
+				.prepare(
+					`SELECT 1 AS spam FROM emails
+					 WHERE user_id = ? AND COALESCE(thread_id, id) = ? AND spam_at IS NOT NULL LIMIT 1`
+				)
+				.bind(userId, threadId)
+				.first<{ spam: number }>();
+			return Boolean(row);
 		},
 
 		async clearArchiveForThread(userId, threadId) {
@@ -469,10 +516,11 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 			const row = await db
 				.prepare(
 					`SELECT
-						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NULL AND direction = 'inbound' THEN ${thread} END) AS inbox,
-						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NULL AND direction = 'inbound' AND is_read = 0 THEN ${thread} END) AS inbox_unread,
-						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NOT NULL AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS archive,
-						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND is_starred = 1 AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS starred,
+						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND direction = 'inbound' THEN ${thread} END) AS inbox,
+						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND direction = 'inbound' AND is_read = 0 THEN ${thread} END) AS inbox_unread,
+						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND archived_at IS NOT NULL AND spam_at IS NULL AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS archive,
+						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND is_starred = 1 AND spam_at IS NULL AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS starred,
+						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND spam_at IS NOT NULL THEN ${thread} END) AS spam,
 						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND status = 'draft' THEN ${thread} END) AS drafts,
 						COUNT(DISTINCT CASE WHEN deleted_at IS NULL AND direction = 'outbound' AND (status IS NULL OR status <> 'draft') THEN ${thread} END) AS sent,
 						COUNT(DISTINCT CASE WHEN deleted_at IS NOT NULL THEN ${thread} END) AS trash
@@ -488,7 +536,8 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 				starred: row?.starred ?? 0,
 				drafts: row?.drafts ?? 0,
 				sent: row?.sent ?? 0,
-				trash: row?.trash ?? 0
+				trash: row?.trash ?? 0,
+				spam: row?.spam ?? 0
 			};
 		},
 
@@ -513,24 +562,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 		async setFlags(userId, ids, update) {
 			if (ids.length === 0) return 0;
 
-			const assignments: string[] = [];
-			const bindings: unknown[] = [];
-
-			if (update.isRead !== undefined) {
-				assignments.push('is_read = ?');
-				bindings.push(update.isRead ? 1 : 0);
-			}
-			if (update.isStarred !== undefined) {
-				assignments.push('is_starred = ?');
-				bindings.push(update.isStarred ? 1 : 0);
-			}
-			if (update.trashed !== undefined) {
-				assignments.push(update.trashed ? "deleted_at = datetime('now')" : 'deleted_at = NULL');
-			}
-			if (update.archived !== undefined) {
-				assignments.push(update.archived ? "archived_at = datetime('now')" : 'archived_at = NULL');
-			}
-
+			const { assignments, bindings } = flagAssignments(update);
 			if (assignments.length === 0) return 0;
 
 			const placeholders = ids.map(() => '?').join(', ');

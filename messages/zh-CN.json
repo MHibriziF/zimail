@@ -68,7 +68,8 @@
 		"closeSidebar": "关闭侧边栏",
 		"security": "安全",
 		"cleanup": "清理",
-		"allMail": "所有邮件"
+		"allMail": "所有邮件",
+		"spam": "垃圾邮件"
 	},
 	"account": {
 		"menu": "账户菜单",
@@ -207,7 +208,8 @@
 			"zeroHint": "搜索其他邮件，或",
 			"clearFiltersLink": "清除筛选",
 			"search": "没有符合该搜索的邮件",
-			"all": "这里还没有内容。"
+			"all": "这里还没有内容。",
+			"spam": "没有垃圾邮件。你举报的邮件、来自已举报发件人的邮件或未通过发件人验证的邮件会放在这里。"
 		},
 		"noSubject": "（无主题）",
 		"noRecipient": "无收件人",
@@ -345,7 +347,9 @@
 		"scheduledFor": "将于 {when} 发送",
 		"scheduled": "已设定发送时间",
 		"recall": "撤回",
-		"couldNotRecall": "无法撤回该邮件"
+		"couldNotRecall": "无法撤回该邮件",
+		"reportSpam": "举报垃圾邮件",
+		"notSpam": "不是垃圾邮件"
 	},
 	"search": {
 		"title": "搜索",

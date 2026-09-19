@@ -89,6 +89,7 @@
 					badge: data.counts.archive || undefined,
 					shortcut: 'g a'
 				},
+				{ href: '/spam', icon: 'ExclamationTriangle', label: t('nav.spam'), badge: data.counts.spam || undefined },
 				{ href: '/trash', icon: 'Bin', label: t('nav.bin'), badge: data.counts.trash || undefined, shortcut: 'g b' }
 			]
 		}
