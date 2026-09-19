@@ -27,6 +27,12 @@
 	let editRequireApproval = $state(false);
 	let savingEdit = $state(false);
 
+	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+
+	function formatDate(iso: string): string {
+		return dateFormat.format(new Date(iso));
+	}
+
 	function joinUrlFor(code: string): string {
 		return `${$page.url.origin}/meet/${code}`;
 	}
@@ -137,64 +143,94 @@
 	}
 </script>
 
-<StackHeader title={t('meetings.heading')}>
-	<div class="meetings-page">
-		<div class="meetings-intro">
+<div class="meetings-page">
+	<StackHeader title={t('meetings.heading')} back={false} />
+
+	<section class="surface-lg meetings-card meetings-start">
+		<div>
+			<h2>{t('meetings.startHeading')}</h2>
 			<p class="meetings-hint">{t('meetings.hint')}</p>
-			<button type="button" class="meetings-new-btn" disabled={starting} onclick={startNewMeeting}>
+		</div>
+		<div class="meetings-start-actions">
+			<button type="button" class="btn-primary" disabled={starting} onclick={startNewMeeting}>
 				<Icon name="video-add-line" size={18} />
 				{starting ? t('meetings.creating') : t('meetings.newMeeting')}
 			</button>
+			<span class="meetings-or">{t('meetings.or')}</span>
+			<form class="meetings-join" onsubmit={submitJoin}>
+				<input
+					class="meetings-input"
+					type="text"
+					bind:value={joinCode}
+					placeholder={t('meetings.joinPlaceholder')}
+					aria-label={t('meetings.joinPlaceholder')}
+				/>
+				<button type="submit" class="meetings-btn" disabled={!joinCode.trim()}>{t('meetings.joinButton')}</button>
+			</form>
 		</div>
+	</section>
 
-		<form class="meetings-join" onsubmit={submitJoin}>
-			<input
-				class="meetings-join-input"
-				type="text"
-				bind:value={joinCode}
-				placeholder={t('meetings.joinPlaceholder')}
-				aria-label={t('meetings.joinPlaceholder')}
-			/>
-			<button type="submit" class="meetings-row-action" disabled={!joinCode.trim()}>{t('meetings.joinButton')}</button>
-		</form>
+	{#if error}
+		<p class="meetings-error" role="alert">{error}</p>
+	{/if}
 
-		{#if error}
-			<p class="meetings-error">{error}</p>
-		{/if}
+	<section class="meetings-list-section">
+		<h2 class="meetings-section-title">
+			{t('meetings.listHeading')}
+			{#if rows.length > 0}<span class="meetings-count">{rows.length}</span>{/if}
+		</h2>
 
 		{#if rows.length === 0}
-			<p class="meetings-empty">{t('meetings.empty')}</p>
+			<div class="surface-lg meetings-card meetings-empty">
+				<Icon name="vidicon-line" size={28} />
+				<p class="meetings-empty-title">{t('meetings.empty')}</p>
+				<p class="meetings-hint">{t('meetings.emptyHint')}</p>
+			</div>
 		{:else}
-			<ul class="meetings-list">
+			<ul class="surface-lg meetings-list">
 				{#each rows as meeting (meeting.id)}
 					<li class="meetings-item">
 						<div class="meetings-row">
+							<div class="meetings-row-icon" aria-hidden="true">
+								<Icon name="vidicon-line" size={18} />
+							</div>
 							<div class="meetings-row-info">
 								<span class="meetings-row-title">{meeting.title || t('meetings.untitled')}</span>
-								<span class="meetings-row-date">
-									{new Date(meeting.created_at).toLocaleString()}
+								<span class="meetings-row-meta">
+									{#if meeting.code}<code class="meetings-code">{meeting.code}</code>{/if}
+									<span>{formatDate(meeting.created_at)}</span>
 									{#if meeting.require_approval}
-										· {t('meetings.admissionBadge')}
+										<span class="meetings-badge">{t('meetings.admissionBadge')}</span>
 									{/if}
 								</span>
 							</div>
 							<div class="meetings-row-actions">
 								{#if meeting.code}
-									<code class="meetings-code">{meeting.code}</code>
-									<button type="button" class="meetings-row-action" onclick={() => copyLink(meeting.id, joinUrlFor(meeting.code!))}>
+									<a class="meetings-btn meetings-btn-accent" href="/meet/{meeting.code}">{t('meetings.open')}</a>
+									<button type="button" class="meetings-btn" onclick={() => copyLink(meeting.id, joinUrlFor(meeting.code!))}>
+										<Icon name={copiedId === meeting.id ? 'check-line' : 'link'} size={16} />
 										{copiedId === meeting.id ? t('meetings.linkCopied') : t('meetings.copyLink')}
 									</button>
 								{/if}
-								<button type="button" class="meetings-row-action" onclick={() => openEdit(meeting)}>
-									{t('meetings.edit')}
+								<button
+									type="button"
+									class="icon-btn"
+									title={t('meetings.edit')}
+									aria-label={t('meetings.edit')}
+									aria-expanded={editingId === meeting.id}
+									onclick={() => (editingId === meeting.id ? cancelEdit() : openEdit(meeting))}
+								>
+									<Icon name="pencil-line" size={16} />
 								</button>
 								<button
 									type="button"
-									class="meetings-row-action"
+									class="icon-btn"
+									title={t('meetings.regenerateCode')}
+									aria-label={t('meetings.regenerateCode')}
 									disabled={busyId === meeting.id}
 									onclick={() => regenerate(meeting.id)}
 								>
-									{t('meetings.regenerateCode')}
+									<Icon name="refresh-line" size={16} />
 								</button>
 							</div>
 						</div>
@@ -203,7 +239,7 @@
 							<div class="meetings-edit">
 								<label class="meetings-edit-field">
 									<span>{t('meetings.titleLabel')}</span>
-									<input class="meetings-join-input" type="text" bind:value={editTitle} maxlength={200} />
+									<input class="meetings-input" type="text" bind:value={editTitle} maxlength={200} />
 								</label>
 								<fieldset class="meetings-edit-field">
 									<legend>{t('meetings.admissionLabel')}</legend>
@@ -217,8 +253,8 @@
 									</label>
 								</fieldset>
 								<div class="meetings-edit-actions">
-									<button type="button" class="meetings-row-action" onclick={cancelEdit}>{t('common.cancel')}</button>
-									<button type="button" class="meetings-new-btn" disabled={savingEdit} onclick={() => saveEdit(meeting.id)}>
+									<button type="button" class="btn-ghost" onclick={cancelEdit}>{t('common.cancel')}</button>
+									<button type="button" class="btn-primary" disabled={savingEdit} onclick={() => saveEdit(meeting.id)}>
 										{savingEdit ? t('common.saving') : t('common.save')}
 									</button>
 								</div>
@@ -228,139 +264,272 @@
 				{/each}
 			</ul>
 		{/if}
-	</div>
-</StackHeader>
+	</section>
+</div>
 
 <style>
 	.meetings-page {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
-		padding: 1rem;
+		gap: 1.5rem;
+		max-width: 48rem;
 	}
 
-	.meetings-intro {
+	.meetings-page :global(.stack-header) {
+		margin-bottom: 0;
+	}
+
+	.meetings-card {
+		padding: 1.5rem;
+	}
+
+	.meetings-start {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: 1.25rem;
+	}
+
+	.meetings-start h2,
+	.meetings-section-title {
+		margin: 0;
+		font-size: 0.9375rem;
+		font-weight: 600;
 	}
 
 	.meetings-hint {
-		margin: 0;
-		font-size: 0.875rem;
-		color: var(--color-text-secondary);
+		margin: 0.375rem 0 0;
+		font-size: 0.8125rem;
+		line-height: 1.5;
+		color: var(--color-muted);
 	}
 
-	.meetings-new-btn {
+	.meetings-start-actions {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		flex-shrink: 0;
-		padding: 0.5rem 1rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		border: none;
-		border-radius: 0.5rem;
-		background: var(--color-accent);
-		color: var(--color-on-accent);
-		cursor: pointer;
+		gap: 0.75rem;
+		flex-wrap: wrap;
 	}
 
-	.meetings-new-btn:hover {
-		background: var(--color-accent-hover);
-	}
-
-	.meetings-new-btn:disabled {
-		opacity: 0.6;
-		cursor: default;
+	.meetings-or {
+		font-size: 0.8125rem;
+		color: var(--color-muted);
 	}
 
 	.meetings-join {
 		display: flex;
+		flex: 1;
 		gap: 0.5rem;
-		padding: 0.875rem;
-		border: 1px solid var(--color-line);
-		border-radius: 0.5rem;
+		min-width: 14rem;
 	}
 
-	.meetings-join-input {
+	.meetings-input {
 		flex: 1;
 		min-width: 0;
-		padding: 0.5rem 0.625rem;
-		font-size: 0.8125rem;
-		border: 1px solid var(--color-line);
-		border-radius: 0.375rem;
-		background: var(--color-surface);
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.625rem;
+		font-size: 0.875rem;
 		color: var(--color-text);
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+	}
+
+	.meetings-input:focus {
+		outline: none;
+		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
+	}
+
+	.meetings-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.375rem;
+		flex-shrink: 0;
+		padding: 0.4375rem 0.75rem;
+		border-radius: 0.625rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		white-space: nowrap;
+		text-decoration: none;
+		color: var(--color-text);
+		background: var(--color-surface);
+		box-shadow: inset 0 0 0 1px var(--color-focus-line);
+		transition: background 0.15s;
+	}
+
+	.meetings-btn:hover:not(:disabled) {
+		background: var(--color-surface-hover);
+	}
+
+	.meetings-btn:disabled {
+		opacity: 0.45;
+	}
+
+	.meetings-btn-accent {
+		color: var(--color-accent-text);
+		background: var(--color-accent-soft);
+		box-shadow: none;
 	}
 
 	.meetings-error {
+		margin: 0;
 		font-size: 0.875rem;
 		color: var(--color-danger);
 	}
 
-	.meetings-empty {
-		font-size: 0.875rem;
+	.meetings-list-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.meetings-section-title {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0 0.25rem;
+	}
+
+	.meetings-count {
+		padding: 0 0.4375rem;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		font-weight: 500;
 		color: var(--color-text-secondary);
+		background: var(--color-surface-muted);
+	}
+
+	.meetings-empty {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+		text-align: center;
+		color: var(--color-muted);
+	}
+
+	.meetings-empty-title {
+		margin: 0.5rem 0 0;
+		font-size: 0.9375rem;
+		font-weight: 500;
+		color: var(--color-text);
+	}
+
+	.meetings-empty .meetings-hint {
+		max-width: 26rem;
 	}
 
 	.meetings-list {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		list-style: none;
 		margin: 0;
 		padding: 0;
+		list-style: none;
+		overflow: hidden;
 	}
 
-	.meetings-item {
-		display: flex;
-		flex-direction: column;
-		gap: 0.625rem;
-		padding: 0.75rem;
-		border: 1px solid var(--color-line);
-		border-radius: 0.5rem;
+	.meetings-item + .meetings-item {
+		box-shadow: inset 0 1px 0 var(--color-line);
 	}
 
 	.meetings-row {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 0.875rem;
+		padding: 0.875rem 1.25rem;
+	}
+
+	.meetings-row-icon {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
+		justify-content: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		border-radius: 0.75rem;
+		color: var(--color-accent-text);
+		background: var(--color-accent-soft);
+	}
+
+	.meetings-row-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		min-width: 0;
+	}
+
+	.meetings-row-title {
+		font-size: 0.9375rem;
+		font-weight: 500;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.meetings-row-meta {
+		display: flex;
+		align-items: center;
 		flex-wrap: wrap;
+		gap: 0.25rem 0.625rem;
+		font-size: 0.75rem;
+		color: var(--color-muted);
+	}
+
+	.meetings-code {
+		font-family: var(--font-mono, ui-monospace, monospace);
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+	}
+
+	.meetings-badge {
+		padding: 0.0625rem 0.4375rem;
+		border-radius: 999px;
+		color: var(--color-accent-text);
+		background: var(--color-accent-soft);
+	}
+
+	.meetings-row-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	.meetings-row-actions .icon-btn:disabled {
+		opacity: 0.45;
 	}
 
 	.meetings-edit {
 		display: flex;
 		flex-direction: column;
-		gap: 0.625rem;
-		padding-top: 0.625rem;
-		border-top: 1px solid var(--color-line);
+		gap: 0.875rem;
+		margin: 0 1.25rem 1rem;
+		padding: 1rem;
+		border-radius: 0.75rem;
+		background: var(--color-surface-muted);
+	}
+
+	.meetings-edit .meetings-input {
+		background: var(--color-surface);
 	}
 
 	.meetings-edit-field {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.375rem;
 		margin: 0;
 		padding: 0;
 		border: none;
 		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
 	}
 
 	.meetings-edit-field legend {
+		margin-bottom: 0.375rem;
 		padding: 0;
-		font-size: 0.8125rem;
 	}
 
 	.meetings-edit-radio {
 		display: flex;
 		align-items: center;
-		gap: 0.375rem;
-		font-size: 0.8125rem;
-		font-weight: 400;
+		gap: 0.5rem;
+		color: var(--color-text);
 	}
 
 	.meetings-edit-actions {
@@ -369,52 +538,47 @@
 		gap: 0.5rem;
 	}
 
-	.meetings-row-info {
-		display: flex;
-		flex-direction: column;
-		gap: 0.125rem;
-		min-width: 0;
+	@media (max-width: 900px) {
+		.meetings-page {
+			max-width: none;
+			gap: 1rem;
+			padding-bottom: 1.5rem;
+		}
+
+		.meetings-card,
+		.meetings-list {
+			box-shadow: none;
+		}
+
+		.meetings-card {
+			padding: 1.25rem 1rem;
+		}
 	}
 
-	.meetings-row-title {
-		font-size: 0.9rem;
-		font-weight: 500;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
+	@media (max-width: 560px) {
+		.meetings-or {
+			display: none;
+		}
 
-	.meetings-row-date {
-		font-size: 0.75rem;
-		color: var(--color-text-secondary);
-	}
+		.meetings-start-actions > .btn-primary,
+		.meetings-join {
+			width: 100%;
+			min-width: 0;
+		}
 
-	.meetings-row-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-shrink: 0;
-	}
+		.meetings-row {
+			grid-template-columns: auto minmax(0, 1fr);
+			padding: 0.875rem 1rem;
+		}
 
-	.meetings-code {
-		padding: 0.25rem 0.5rem;
-		font-size: 0.8125rem;
-		font-family: var(--font-mono, monospace);
-		border-radius: 0.375rem;
-		background: var(--color-surface-2, var(--color-surface));
-	}
+		/* Actions drop under the title so the title never gets squeezed to nothing. */
+		.meetings-row-actions {
+			grid-column: 1 / -1;
+			flex-wrap: wrap;
+		}
 
-	.meetings-row-action {
-		flex-shrink: 0;
-		padding: 0.375rem 0.75rem;
-		font-size: 0.8125rem;
-		border: 1px solid var(--color-line);
-		border-radius: 0.375rem;
-		background: transparent;
-		cursor: pointer;
-	}
-
-	.meetings-row-action:hover {
-		background: var(--color-surface-hover);
+		.meetings-edit {
+			margin: 0 1rem 1rem;
+		}
 	}
 </style>

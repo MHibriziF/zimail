@@ -766,6 +766,11 @@
 		"admissionOpen": "任何持有代码或链接的人",
 		"admissionApproval": "我需要允许他人进入",
 		"admissionBadge": "需要批准",
-		"couldNotSave": "无法保存更改"
+		"couldNotSave": "无法保存更改",
+		"startHeading": "发起或加入通话",
+		"listHeading": "你的会议",
+		"emptyHint": "你创建的会议会显示在这里，可重复使用——除非你获取新代码，否则代码保持不变。",
+		"open": "打开",
+		"or": "或"
 	}
 }

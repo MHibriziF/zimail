@@ -766,6 +766,11 @@
 		"admissionOpen": "Toute personne avec le code ou le lien",
 		"admissionApproval": "Je dois laisser entrer les gens",
 		"admissionBadge": "Admission requise",
-		"couldNotSave": "Impossible d'enregistrer les modifications"
+		"couldNotSave": "Impossible d'enregistrer les modifications",
+		"startHeading": "Démarrer ou rejoindre un appel",
+		"listHeading": "Vos réunions",
+		"emptyHint": "Les réunions que vous créez apparaissent ici, prêtes à être réutilisées — le code reste le même jusqu’à ce que vous en demandiez un nouveau.",
+		"open": "Ouvrir",
+		"or": "ou"
 	}
 }
