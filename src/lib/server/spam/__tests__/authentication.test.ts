@@ -33,6 +33,19 @@ describe('authenticationFailed', () => {
 		assert.equal(authenticationFailed('mx.example.com; xdmarc=fail; spf=pass'), false);
 	});
 
+	test('one failing DKIM signature beside a passing one is not a failure', () => {
+		// Common with mailing lists that add their own signature.
+		assert.equal(authenticationFailed('mx.example.com; spf=fail; dkim=fail header.d=list.test; dkim=pass header.d=sender.test'), false);
+	});
+
+	test('a DMARC fail from one hop is outweighed by a pass from another', () => {
+		assert.equal(authenticationFailed('mx.example.com; dmarc=fail', 'arc.example.com; dmarc=pass'), false);
+	});
+
+	test('several results that all fail still count as failed', () => {
+		assert.equal(authenticationFailed('mx.example.com; spf=fail; dkim=fail header.d=a.test; dkim=fail header.d=b.test'), true);
+	});
+
 	test('softfail and none are not failures', () => {
 		assert.equal(authenticationFailed('mx.example.com; spf=softfail; dkim=none; dmarc=none'), false);
 	});

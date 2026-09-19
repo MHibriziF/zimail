@@ -147,6 +147,34 @@ function buildScope(userId: string, query: MailboxQuery): { where: string; bindi
 	return { where: filters.join(' AND '), bindings };
 }
 
+/** Boolean flags stored as 0/1. */
+const FLAG_COLUMNS = [
+	['isRead', 'is_read'],
+	['isStarred', 'is_starred']
+] as const;
+
+/** State flags stored as the time they were set, NULL when cleared. */
+const TIMESTAMP_COLUMNS = [
+	['trashed', 'deleted_at'],
+	['archived', 'archived_at'],
+	['spam', 'spam_at']
+] as const;
+
+function flagAssignments(update: MailFlagUpdate): { assignments: string[]; bindings: unknown[] } {
+	const assignments: string[] = [];
+	const bindings: unknown[] = [];
+	for (const [key, column] of FLAG_COLUMNS) {
+		if (update[key] === undefined) continue;
+		assignments.push(`${column} = ?`);
+		bindings.push(update[key] ? 1 : 0);
+	}
+	for (const [key, column] of TIMESTAMP_COLUMNS) {
+		if (update[key] === undefined) continue;
+		assignments.push(update[key] ? `${column} = datetime('now')` : `${column} = NULL`);
+	}
+	return { assignments, bindings };
+}
+
 export type NewEmailRow = {
 	id: string;
 	userId: string;
@@ -534,27 +562,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 		async setFlags(userId, ids, update) {
 			if (ids.length === 0) return 0;
 
-			const assignments: string[] = [];
-			const bindings: unknown[] = [];
-
-			if (update.isRead !== undefined) {
-				assignments.push('is_read = ?');
-				bindings.push(update.isRead ? 1 : 0);
-			}
-			if (update.isStarred !== undefined) {
-				assignments.push('is_starred = ?');
-				bindings.push(update.isStarred ? 1 : 0);
-			}
-			if (update.trashed !== undefined) {
-				assignments.push(update.trashed ? "deleted_at = datetime('now')" : 'deleted_at = NULL');
-			}
-			if (update.archived !== undefined) {
-				assignments.push(update.archived ? "archived_at = datetime('now')" : 'archived_at = NULL');
-			}
-			if (update.spam !== undefined) {
-				assignments.push(update.spam ? "spam_at = datetime('now')" : 'spam_at = NULL');
-			}
-
+			const { assignments, bindings } = flagAssignments(update);
 			if (assignments.length === 0) return 0;
 
 			const placeholders = ids.map(() => '?').join(', ');
