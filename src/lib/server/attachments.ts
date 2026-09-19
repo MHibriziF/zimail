@@ -1,5 +1,9 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
-import type { EmailAttachmentMeta, OutboundAttachmentInput } from '$lib/types';
+import type {
+	AttachmentDisposition,
+	EmailAttachmentMeta,
+	OutboundAttachmentInput
+} from '$lib/types';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from './constants';
 
 type StoredAttachmentRow = EmailAttachmentMeta & {
@@ -36,8 +40,9 @@ export async function insertAttachments(
 		await db
 			.prepare(
 				`INSERT INTO email_attachments (
-					id, email_id, filename, content_type, size_bytes, content_base64, storage_key
-				) VALUES (?, ?, ?, ?, ?, ?, ?)`
+					id, email_id, filename, content_type, size_bytes, content_base64, storage_key,
+					content_disposition, content_id
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 			)
 			.bind(
 				id,
@@ -46,7 +51,9 @@ export async function insertAttachments(
 				attachment.type,
 				bytes.byteLength,
 				'',
-				storageKey
+				storageKey,
+				normalizeDisposition(attachment.disposition),
+				normalizeContentId(attachment.contentId)
 			)
 			.run();
 	}
@@ -55,18 +62,57 @@ export async function insertAttachments(
 /**
  * Content-ID arrives wrapped in angle brackets (`<ii_123@mail>`), while the
  * body references it bare (`cid:ii_123@mail`). Store the bare, lowercased form
- * so the two can be compared directly.
+ * so the two can be compared directly. Reject line breaks so a malformed value
+ * can never become a header-injection vector downstream.
  */
 export function normalizeContentId(value: string | null | undefined): string | null {
-	const trimmed = value?.trim().replace(/^<|>$/g, '').trim().toLowerCase();
+	if (typeof value !== 'string') return null;
+	if (/[\r\n]/.test(value)) return null;
+	const trimmed = value.trim().replace(/^<|>$/g, '').trim().toLowerCase();
 	return trimmed || null;
+}
+
+export type InboundAttachmentMetadata = {
+	disposition?: AttachmentDisposition;
+	contentId?: string;
+};
+
+/**
+ * Keep the MIME metadata that is meaningful when the attachment is sent again.
+ * Unknown or absent dispositions are intentionally omitted so regular
+ * attachments continue through the existing default path unchanged.
+ */
+export function inboundAttachmentMetadata(input: {
+	disposition?: string | null;
+	contentId?: string | null;
+	related?: boolean;
+}): InboundAttachmentMetadata {
+	const contentId = input.contentId?.trim() || undefined;
+	const dispositionValue = input.disposition?.trim().toLowerCase().split(';', 1)[0];
+	const disposition =
+		dispositionValue === 'attachment' || dispositionValue === 'inline'
+			? dispositionValue
+			: input.related && contentId
+				? 'inline'
+				: undefined;
+
+	return {
+		...(disposition ? { disposition } : {}),
+		...(contentId ? { contentId } : {})
+	};
 }
 
 export async function insertAttachmentBytes(
 	db: D1Database,
 	bucket: R2Bucket,
 	emailId: string,
-	input: { filename: string; type: string; bytes: Uint8Array; contentId?: string | null }
+	input: {
+		filename: string;
+		type: string;
+		bytes: Uint8Array;
+		disposition?: AttachmentDisposition | null;
+		contentId?: string | null;
+	}
 ): Promise<void> {
 	if (input.bytes.byteLength > MAX_ATTACHMENT_BYTES) {
 		const limitMb = MAX_ATTACHMENT_BYTES / (1024 * 1024);
@@ -84,8 +130,9 @@ export async function insertAttachmentBytes(
 	await db
 		.prepare(
 			`INSERT INTO email_attachments (
-				id, email_id, filename, content_type, size_bytes, content_base64, storage_key, content_id
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+				id, email_id, filename, content_type, size_bytes, content_base64, storage_key,
+				content_disposition, content_id
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.bind(
 			id,
@@ -95,6 +142,7 @@ export async function insertAttachmentBytes(
 			input.bytes.byteLength,
 			'',
 			storageKey,
+			normalizeDisposition(input.disposition),
 			normalizeContentId(input.contentId)
 		)
 		.run();
@@ -117,6 +165,7 @@ export async function readOutboundAttachments(
 	const { results } = await db
 		.prepare(
 			`SELECT a.id, a.email_id, a.filename, a.content_type, a.size_bytes,
+			        a.content_disposition, a.content_id,
 			        a.storage_key, a.content_base64, a.created_at
 			 FROM email_attachments a
 			 JOIN emails e ON e.id = a.email_id
@@ -131,11 +180,15 @@ export async function readOutboundAttachments(
 	for (const row of results.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
 		const bytes = await readAttachmentBytes(bucket, row);
 		if (!bytes) continue;
+		const disposition = normalizeDisposition(row.content_disposition);
+		const contentId = normalizeContentId(row.content_id);
 
 		attachments.push({
 			filename: row.filename,
 			type: row.content_type,
-			content: bytesToBase64(bytes)
+			content: bytesToBase64(bytes),
+			...(disposition ? { disposition } : {}),
+			...(contentId ? { contentId } : {})
 		});
 	}
 
@@ -148,7 +201,8 @@ export async function listAttachments(
 ): Promise<EmailAttachmentMeta[]> {
 	const { results } = await db
 		.prepare(
-			`SELECT id, email_id, filename, content_type, size_bytes, created_at, content_id
+			`SELECT id, email_id, filename, content_type, size_bytes,
+			        content_disposition, content_id, created_at
 			 FROM email_attachments
 			 WHERE email_id = ?
 			 ORDER BY created_at ASC`
@@ -156,7 +210,11 @@ export async function listAttachments(
 		.bind(emailId)
 		.all<EmailAttachmentMeta>();
 
-	return results;
+	return results.map((row) => ({
+		...row,
+		content_disposition: normalizeDisposition(row.content_disposition),
+		content_id: normalizeContentId(row.content_id)
+	}));
 }
 
 export async function getAttachmentForUser(
@@ -167,7 +225,9 @@ export async function getAttachmentForUser(
 ): Promise<StoredAttachmentRow | null> {
 	const row = await db
 		.prepare(
-			`SELECT a.id, a.email_id, a.filename, a.content_type, a.size_bytes, a.storage_key, a.content_base64, a.created_at
+			`SELECT a.id, a.email_id, a.filename, a.content_type, a.size_bytes,
+			        a.content_disposition, a.content_id,
+			        a.storage_key, a.content_base64, a.created_at
 			 FROM email_attachments a
 			 JOIN emails e ON e.id = a.email_id
 			 WHERE a.id = ? AND a.email_id = ? AND e.user_id = ?`
@@ -175,7 +235,13 @@ export async function getAttachmentForUser(
 		.bind(attachmentId, emailId, userId)
 		.first<StoredAttachmentRow>();
 
-	return row ?? null;
+	return row
+		? {
+				...row,
+				content_disposition: normalizeDisposition(row.content_disposition),
+				content_id: normalizeContentId(row.content_id)
+			}
+		: null;
 }
 
 export async function readAttachmentBytes(
@@ -198,6 +264,10 @@ export async function readAttachmentBytes(
 function buildStorageKey(emailId: string, attachmentId: string, filename: string): string {
 	const safeName = filename.replace(/[^\w.\-()+ ]+/g, '_').slice(0, 120) || 'attachment';
 	return `${emailId}/${attachmentId}/${safeName}`;
+}
+
+function normalizeDisposition(value: unknown): AttachmentDisposition | null {
+	return value === 'attachment' || value === 'inline' ? value : null;
 }
 
 function base64ToBytes(base64: string): Uint8Array {
