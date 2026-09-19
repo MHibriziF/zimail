@@ -2,15 +2,24 @@
 	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
 	import { MAX_DISPLAY_NAME_LENGTH } from '$lib/meet/display-name';
+	import type { ScreenSharePolicy } from '$lib/meet/screen-share';
 
 	let {
 		roster,
+		isHost,
+		screenSharePolicy,
+		screenShareBusyIdentity,
 		onRename,
+		onSetScreenShareAllowed,
 		onClose
 	}: {
-		roster: { identity: string; name: string; isLocal: boolean }[];
+		roster: { identity: string; name: string; isLocal: boolean; canShareScreen: boolean }[];
+		isHost: boolean;
+		screenSharePolicy: ScreenSharePolicy;
+		screenShareBusyIdentity: string;
 		/** Resolves to an error message, or '' once the new name is live. */
 		onRename: (name: string) => Promise<string>;
+		onSetScreenShareAllowed: (identity: string, allowed: boolean) => void;
 		onClose: () => void;
 	} = $props();
 
@@ -104,6 +113,19 @@
 						>
 							<Icon name="pencil-line" size={16} />
 						</button>
+					{:else if isHost && screenSharePolicy === 'approval'}
+						<button
+							type="button"
+							class="call-panel-close call-rename-trigger call-share-toggle"
+							class:call-share-allowed={person.canShareScreen}
+							disabled={screenShareBusyIdentity === person.identity}
+							title={person.canShareScreen ? t('meet.screenShareRevoke') : t('meet.screenShareAllow')}
+							aria-label={person.canShareScreen ? t('meet.screenShareRevoke') : t('meet.screenShareAllow')}
+							aria-pressed={person.canShareScreen}
+							onclick={() => onSetScreenShareAllowed(person.identity, !person.canShareScreen)}
+						>
+							<Icon name="computer-line" size={16} />
+						</button>
 					{/if}
 				{/if}
 			</li>
@@ -183,6 +205,20 @@
 
 	.call-rename-trigger:hover {
 		background: rgba(255, 255, 255, 0.08);
+	}
+
+	.call-rename-trigger:disabled {
+		opacity: 0.5;
+	}
+
+	/* Muted until allowed, so it reads as an off/on toggle. */
+	.call-share-toggle {
+		opacity: 0.45;
+	}
+
+	.call-share-toggle.call-share-allowed {
+		opacity: 1;
+		color: #4ade80;
 	}
 
 	.call-rename {

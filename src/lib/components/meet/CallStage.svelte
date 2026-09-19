@@ -16,6 +16,16 @@
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { normalizeDisplayName } from '$lib/meet/display-name';
+	import {
+		DEFAULT_SCREEN_SHARE,
+		parseScreenShareMode,
+		parseScreenSharePolicy,
+		pickFeaturedShare,
+		shouldYieldScreenShare,
+		type ScreenShareMode,
+		type ScreenSharePolicy,
+		type ScreenShareSettings
+	} from '$lib/meet/screen-share';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import BackgroundPickerModal from '$lib/components/meet/BackgroundPickerModal.svelte';
@@ -36,6 +46,7 @@
 		initialDeafened = false,
 		isLoggedIn = false,
 		meetingId = '',
+		initialScreenShare = DEFAULT_SCREEN_SHARE,
 		onleave
 	}: {
 		url: string;
@@ -50,6 +61,8 @@
 		isLoggedIn?: boolean;
 		/** The meeting's internal id (LiveKit room name) — needed for the host-only settings/admissions endpoints. */
 		meetingId?: string;
+		/** As of joining — the host's attributes carry any change made after that. */
+		initialScreenShare?: ScreenShareSettings;
 		onleave: () => void;
 	} = $props();
 
@@ -75,6 +88,12 @@
 	const backgroundSupported = typeof navigator !== 'undefined' && supportsBackgroundProcessors();
 
 	const CHAT_TOPIC = 'chat';
+	const SCREEN_SHARE_REQUEST_TOPIC = 'screen-share-request';
+	const SCREEN_SHARE_DECLINED_TOPIC = 'screen-share-declined';
+	/** `TrackSource.SCREEN_SHARE` in LiveKit's protocol — livekit-client doesn't re-export the enum. */
+	const PROTO_SCREEN_SHARE_SOURCE = 3;
+	/** Stands in for your own share in `shareOrder`, where everyone else is keyed by identity. */
+	const LOCAL_SHARE_KEY = 'local';
 
 	let room: Room | null = null;
 	let localMediaEl = $state<HTMLDivElement>();
@@ -112,8 +131,22 @@
 	let admissionsPollTimer: ReturnType<typeof setInterval> | null = null;
 	const ringedAdmissionIds = new Set<string>();
 
+	let screenShareSettings = $state<ScreenShareSettings>(untrack(() => ({ ...initialScreenShare })));
+	let canShareScreen = $state(true);
+	let screenShareRequested = $state(false);
+	let screenShareRequests = $state<{ identity: string; name: string }[]>([]);
+	let screenShareBusyIdentity = $state('');
+	/** Active shares, oldest first. */
+	let shareOrder = $state<string[]>([]);
+	/** A share the viewer clicked to watch instead of the newest. */
+	let pinnedShare = $state<string | null>(null);
+	const featuredShare = $derived(pickFeaturedShare(shareOrder, pinnedShare, LOCAL_SHARE_KEY));
+	let ownShareStartedAt = 0;
+	let notice = $state('');
+	let noticeTimer: ReturnType<typeof setTimeout> | null = null;
+
 	let panel = $state<'none' | 'participants' | 'chat' | 'settings'>('none');
-	let roster = $state<{ identity: string; name: string; isLocal: boolean }[]>([]);
+	let roster = $state<{ identity: string; name: string; isLocal: boolean; canShareScreen: boolean }[]>([]);
 	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean }[]>([]);
 	let unread = $state(0);
 
@@ -307,14 +340,26 @@
 	function handleParticipantAttributesChanged(_changed: Record<string, string>, participant: Participant) {
 		const tile = remoteTiles.get(participant.identity);
 		if (tile) updateTileStatus(tile, participant);
+		if (room && participant !== room.localParticipant) readHostScreenShareSettings(participant);
 	}
 
 	function ensureScreenTile(participant: Participant): Tile {
 		let tile = screenTiles.get(participant.identity);
 		if (!tile) {
-			tile = createTile(participant.identity, t('meet.screenShareOf', { name: participant.name || t('meet.guest') }), 'call-tile-screen');
+			const identity = participant.identity;
+			tile = createTile(identity, t('meet.screenShareOf', { name: participant.name || t('meet.guest') }), 'call-tile-screen');
+			tile.el.tabIndex = 0;
+			tile.el.setAttribute('role', 'button');
+			tile.el.title = t('meet.focusScreenShare');
+			tile.el.addEventListener('click', () => focusShare(identity));
+			tile.el.addEventListener('keydown', (event) => {
+				if (event.key === 'Enter' || event.key === ' ') {
+					event.preventDefault();
+					focusShare(identity);
+				}
+			});
 			remoteContainerEl?.appendChild(tile.el);
-			screenTiles.set(participant.identity, tile);
+			screenTiles.set(identity, tile);
 		}
 		return tile;
 	}
@@ -325,7 +370,34 @@
 			tile.el.remove();
 			screenTiles.delete(identity);
 		}
+		removeShare(identity);
 	}
+
+	/** A new share always takes the big tile — newest first, per the host's "several at once" rule. */
+	function addShare(key: string) {
+		if (shareOrder.includes(key)) return;
+		shareOrder = [...shareOrder, key];
+		pinnedShare = null;
+	}
+
+	function removeShare(key: string) {
+		shareOrder = shareOrder.filter((entry) => entry !== key);
+	}
+
+	function focusShare(key: string) {
+		pinnedShare = key;
+	}
+
+	// Remote tiles are hand-built DOM, so the featured class has to be pushed onto them.
+	$effect(() => {
+		const featured = featuredShare;
+		shareOrder;
+		for (const [identity, tile] of screenTiles) {
+			const isFeatured = identity === featured;
+			tile.el.classList.toggle('call-tile-featured', isFeatured);
+			tile.el.setAttribute('aria-pressed', String(isFeatured));
+		}
+	});
 
 	/** Routes one attached remote element to the chosen output device, if a non-default one is picked. */
 	function applySinkId(el: HTMLMediaElement) {
@@ -347,6 +419,7 @@
 			applySinkId(el);
 			if (track.kind === Track.Kind.Audio && deafened) el.muted = true;
 			tile.media.appendChild(el);
+			if (track.source === Track.Source.ScreenShare) addShare(participant.identity);
 			return;
 		}
 		const tile = ensureRemoteTile(participant);
@@ -373,6 +446,7 @@
 	function handleParticipantConnected(participant: RemoteParticipant) {
 		playJoinChime();
 		ensureRemoteTile(participant);
+		readHostScreenShareSettings(participant);
 		refreshRoster();
 	}
 
@@ -385,6 +459,7 @@
 			remoteCount = remoteTiles.size;
 		}
 		removeScreenTile(participant.identity);
+		screenShareRequests = screenShareRequests.filter((request) => request.identity !== participant.identity);
 		refreshRoster();
 	}
 
@@ -393,10 +468,78 @@
 		const remote = Array.from(room.remoteParticipants.values()).map((p) => ({
 			identity: p.identity,
 			name: p.name || t('meet.guest'),
-			isLocal: false
+			isLocal: false,
+			canShareScreen: mayShareScreen(p)
 		}));
-		roster = [{ identity: room.localParticipant.identity, name: localName, isLocal: true }, ...remote];
+		roster = [
+			{ identity: room.localParticipant.identity, name: localName, isLocal: true, canShareScreen },
+			...remote
+		];
 		refreshPipVideo();
+	}
+
+	/** An empty source list is LiveKit's "no restriction". */
+	function mayShareScreen(participant: Participant): boolean {
+		const sources = participant.permissions?.canPublishSources ?? [];
+		return sources.length === 0 || sources.includes(PROTO_SCREEN_SHARE_SOURCE);
+	}
+
+	function showNotice(text: string) {
+		notice = text;
+		if (noticeTimer) clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => (notice = ''), 6000);
+	}
+
+	function handlePermissionsChanged(_previous: unknown, participant: Participant) {
+		if (room && participant === room.localParticipant) {
+			const couldShare = canShareScreen;
+			canShareScreen = mayShareScreen(participant);
+			if (canShareScreen && !couldShare && screenShareRequested) {
+				screenShareRequested = false;
+				showNotice(t('meet.screenShareGranted'));
+			}
+			if (!canShareScreen) {
+				screenShareRequested = false;
+				if (screenShareEnabled) void room.localParticipant.setScreenShareEnabled(false).catch(() => {});
+			}
+		}
+		refreshRoster();
+	}
+
+	/** "One at a time": someone else just started sharing, so ours makes way. */
+	function handleRemoteTrackPublished(publication: RemoteTrackPublication, participant: RemoteParticipant) {
+		if (publication.source !== Track.Source.ScreenShare || !room) return;
+		if (screenShareSettings.mode !== 'single' || !screenShareEnabled) return;
+		const yields = shouldYieldScreenShare({
+			ownStartedAt: ownShareStartedAt,
+			now: Date.now(),
+			ownIdentity: room.localParticipant.identity,
+			otherIdentity: participant.identity
+		});
+		if (!yields) return;
+		void room.localParticipant.setScreenShareEnabled(false).catch(() => {});
+		showNotice(t('meet.screenShareReplaced', { name: participant.name || t('meet.guest') }));
+	}
+
+	/**
+	 * The host re-broadcasts the meeting's screen-share settings as its own attributes,
+	 * so a change made mid-call reaches everyone without another server round trip.
+	 */
+	function readHostScreenShareSettings(participant: Participant) {
+		if (participant.attributes.role !== 'host') return;
+		const policy = parseScreenSharePolicy(participant.attributes.screenSharePolicy);
+		const mode = parseScreenShareMode(participant.attributes.screenShareMode);
+		if (policy || mode) applyScreenShareSettings({ policy: policy ?? screenShareSettings.policy, mode: mode ?? screenShareSettings.mode });
+	}
+
+	function applyScreenShareSettings(next: ScreenShareSettings) {
+		screenShareSettings = next;
+		if (next.policy === 'open') screenShareRequested = false;
+		// Switching to "one at a time" mid-call: everyone but the newest sharer stops.
+		const ownIndex = shareOrder.indexOf(LOCAL_SHARE_KEY);
+		if (next.mode === 'single' && room && ownIndex !== -1 && ownIndex < shareOrder.length - 1) {
+			void room.localParticipant.setScreenShareEnabled(false).catch(() => {});
+		}
 	}
 
 	/**
@@ -547,6 +690,8 @@
 		}
 		if (publication.source !== Track.Source.ScreenShare || !publication.track) return;
 		screenShareEnabled = true;
+		ownShareStartedAt = Date.now();
+		addShare(LOCAL_SHARE_KEY);
 		const el = publication.track.attach();
 		localScreenMediaEl?.appendChild(el);
 	}
@@ -557,6 +702,7 @@
 		}
 		if (publication.source !== Track.Source.ScreenShare) return;
 		screenShareEnabled = false;
+		removeShare(LOCAL_SHARE_KEY);
 		if (localScreenMediaEl) localScreenMediaEl.innerHTML = '';
 	}
 
@@ -642,10 +788,23 @@
 		instance.on(RoomEvent.TrackUnmuted, handleTrackMuteChanged);
 		instance.on(RoomEvent.ParticipantAttributesChanged, handleParticipantAttributesChanged);
 		instance.on(RoomEvent.ParticipantNameChanged, handleParticipantNameChanged);
+		instance.on(RoomEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
+		instance.on(RoomEvent.TrackPublished, handleRemoteTrackPublished);
 
 		instance.registerTextStreamHandler(CHAT_TOPIC, async (reader, participantInfo) => {
 			const text = await reader.readAll();
 			receiveChatMessage(text, participantInfo.identity);
+		});
+		instance.registerTextStreamHandler(SCREEN_SHARE_REQUEST_TOPIC, async (reader, participantInfo) => {
+			await reader.readAll();
+			receiveScreenShareRequest(participantInfo.identity);
+		});
+		instance.registerTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC, async (reader, participantInfo) => {
+			await reader.readAll();
+			// Only a host's answer counts — anyone could send on this topic.
+			if (instance.remoteParticipants.get(participantInfo.identity)?.attributes.role !== 'host') return;
+			screenShareRequested = false;
+			showNotice(t('meet.screenShareDeclined'));
 		});
 
 		(async () => {
@@ -671,7 +830,11 @@
 				}
 				// A background may have been chosen before this first publish (from the lobby's popup).
 				void reapplyBackground();
-				for (const participant of instance.remoteParticipants.values()) ensureRemoteTile(participant);
+				canShareScreen = mayShareScreen(instance.localParticipant);
+				for (const participant of instance.remoteParticipants.values()) {
+					ensureRemoteTile(participant);
+					readHostScreenShareSettings(participant);
+				}
 				refreshRoster();
 				playJoinChime();
 			} catch (error) {
@@ -693,7 +856,11 @@
 			instance.off(RoomEvent.TrackUnmuted, handleTrackMuteChanged);
 			instance.off(RoomEvent.ParticipantAttributesChanged, handleParticipantAttributesChanged);
 			instance.off(RoomEvent.ParticipantNameChanged, handleParticipantNameChanged);
+			instance.off(RoomEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
+			instance.off(RoomEvent.TrackPublished, handleRemoteTrackPublished);
 			instance.unregisterTextStreamHandler(CHAT_TOPIC);
+			instance.unregisterTextStreamHandler(SCREEN_SHARE_REQUEST_TOPIC);
+			instance.unregisterTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC);
 		};
 	});
 
@@ -701,6 +868,7 @@
 		room?.disconnect();
 		pipWindow?.close();
 		stopAdmissionsPolling();
+		if (noticeTimer) clearTimeout(noticeTimer);
 		// Give the leave chime time to finish before the context that plays it dies.
 		if (soundCtx) {
 			const ctx = soundCtx;
@@ -805,12 +973,129 @@
 
 	async function toggleScreenShare() {
 		if (!room) return;
+		if (!screenShareEnabled && !canShareScreen) {
+			await requestScreenShare();
+			return;
+		}
 		try {
 			// LiveKit shows the browser's own screen/window picker and, if the user
 			// cancels it, rejects here without ever publishing — nothing to undo.
 			await room.localParticipant.setScreenShareEnabled(!screenShareEnabled, { audio: true });
 		} catch {
 			// Picker dismissed or permission denied; state already reflects "off".
+		}
+	}
+
+	/** Under "ask the host first": the button asks instead of sharing. */
+	async function requestScreenShare() {
+		if (!room || screenShareRequested) return;
+		const hosts = Array.from(room.remoteParticipants.values())
+			.filter((participant) => participant.attributes.role === 'host')
+			.map((participant) => participant.identity);
+		if (hosts.length === 0) {
+			showNotice(t('meet.screenShareNoHost'));
+			return;
+		}
+		try {
+			await room.localParticipant.sendText(localName, { topic: SCREEN_SHARE_REQUEST_TOPIC, destinationIdentities: hosts });
+			screenShareRequested = true;
+			showNotice(t('meet.screenShareRequested'));
+		} catch {
+			showNotice(t('common.networkError'));
+		}
+	}
+
+	function receiveScreenShareRequest(identity: string) {
+		if (!isHost || !room || screenShareRequests.some((request) => request.identity === identity)) return;
+		const participant = room.remoteParticipants.get(identity);
+		if (!participant) return;
+		screenShareRequests = [...screenShareRequests, { identity, name: participant.name || t('meet.guest') }];
+		if (!deafened) playAdmissionChime();
+	}
+
+	async function setScreenShareAllowed(identity: string, allowed: boolean): Promise<boolean> {
+		if (!meetingId) return false;
+		try {
+			const response = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}/screen-share`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ identity, allowed })
+			});
+			if (!response.ok) {
+				settingsError = t('meet.screenShareUpdateFailed');
+				return false;
+			}
+			return true;
+		} catch {
+			settingsError = t('common.networkError');
+			return false;
+		}
+	}
+
+	async function respondToScreenShare(identity: string, allow: boolean) {
+		if (!room || screenShareBusyIdentity) return;
+		screenShareBusyIdentity = identity;
+		settingsError = '';
+		try {
+			const done = allow
+				? await setScreenShareAllowed(identity, true)
+				: await room.localParticipant
+						.sendText('', { topic: SCREEN_SHARE_DECLINED_TOPIC, destinationIdentities: [identity] })
+						.then(() => true)
+						.catch(() => false);
+			if (done) screenShareRequests = screenShareRequests.filter((request) => request.identity !== identity);
+		} finally {
+			screenShareBusyIdentity = '';
+		}
+	}
+
+	async function toggleParticipantScreenShare(identity: string, allowed: boolean) {
+		if (screenShareBusyIdentity) return;
+		screenShareBusyIdentity = identity;
+		try {
+			await setScreenShareAllowed(identity, allowed);
+		} finally {
+			screenShareBusyIdentity = '';
+		}
+	}
+
+	/** Lets everyone already in the call (and anyone joining later) pick up the host's current rules. */
+	function broadcastScreenShareSettings() {
+		if (!room || !isHost) return;
+		room.localParticipant
+			.setAttributes({ screenSharePolicy: screenShareSettings.policy, screenShareMode: screenShareSettings.mode })
+			.catch(() => {});
+	}
+
+	async function updateScreenShareSettings(changes: { screenSharePolicy?: ScreenSharePolicy; screenShareMode?: ScreenShareMode }) {
+		if (!meetingId || settingsBusy) return;
+		settingsBusy = true;
+		settingsError = '';
+		try {
+			const response = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(changes)
+			});
+			const body = (await response.json().catch(() => ({}))) as {
+				meeting?: { screen_share_policy: ScreenSharePolicy; screen_share_mode: ScreenShareMode };
+				error?: string;
+			};
+			if (!response.ok || !body.meeting) {
+				settingsError = body.error ?? t('meetings.couldNotSave');
+				// A 502 means the setting did save — only the live update failed — so still reflect it.
+				if (response.status !== 502) return;
+			}
+			applyScreenShareSettings({
+				policy: body.meeting?.screen_share_policy ?? changes.screenSharePolicy ?? screenShareSettings.policy,
+				mode: body.meeting?.screen_share_mode ?? changes.screenShareMode ?? screenShareSettings.mode
+			});
+			if (screenShareSettings.policy === 'open') screenShareRequests = [];
+			broadcastScreenShareSettings();
+		} catch {
+			settingsError = t('common.networkError');
+		} finally {
+			settingsBusy = false;
 		}
 	}
 
@@ -834,11 +1119,17 @@
 		try {
 			const response = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}`);
 			const body = (await response.json().catch(() => ({}))) as {
-				meeting?: { require_approval: boolean };
+				meeting?: {
+					require_approval: boolean;
+					screen_share_policy: ScreenSharePolicy;
+					screen_share_mode: ScreenShareMode;
+				};
 			};
 			if (response.ok && body.meeting) {
 				requireApproval = body.meeting.require_approval;
 				if (requireApproval) startAdmissionsPolling();
+				applyScreenShareSettings({ policy: body.meeting.screen_share_policy, mode: body.meeting.screen_share_mode });
+				broadcastScreenShareSettings();
 			}
 		} catch {
 			// The settings panel just shows the last-known (default) value — not worth surfacing an error for.
@@ -931,11 +1222,29 @@
 		{:else if connectionError}
 			<span class="call-header-status call-header-status-error">{connectionError}</span>
 		{/if}
+		{#if notice}
+			<span class="call-header-notice" role="status">{notice}</span>
+		{/if}
 	</div>
 
 	<div class="call-body">
 		<div class="call-grid">
-			<div class="call-tile call-tile-screen" hidden={!screenShareEnabled}>
+			<div
+				class="call-tile call-tile-screen"
+				class:call-tile-featured={featuredShare === LOCAL_SHARE_KEY}
+				hidden={!screenShareEnabled}
+				role="button"
+				tabindex="0"
+				title={t('meet.focusScreenShare')}
+				aria-pressed={featuredShare === LOCAL_SHARE_KEY}
+				onclick={() => focusShare(LOCAL_SHARE_KEY)}
+				onkeydown={(event) => {
+					if (event.key === 'Enter' || event.key === ' ') {
+						event.preventDefault();
+						focusShare(LOCAL_SHARE_KEY);
+					}
+				}}
+			>
 				<div class="call-tile-media" bind:this={localScreenMediaEl}></div>
 				<span class="call-tile-name">{t('meet.you')} · {t('meet.screenShare')}</span>
 			</div>
@@ -958,7 +1267,15 @@
 		</div>
 
 		{#if panel === 'participants'}
-			<CallParticipantsPanel {roster} onRename={renameSelf} onClose={() => (panel = 'none')} />
+			<CallParticipantsPanel
+				{roster}
+				{isHost}
+				screenSharePolicy={screenShareSettings.policy}
+				{screenShareBusyIdentity}
+				onRename={renameSelf}
+				onSetScreenShareAllowed={toggleParticipantScreenShare}
+				onClose={() => (panel = 'none')}
+			/>
 		{:else if panel === 'chat'}
 			<CallChatPanel {messages} onSend={sendChatMessage} onClose={() => (panel = 'none')} />
 		{:else if panel === 'settings'}
@@ -970,6 +1287,11 @@
 				{admissionsBusyId}
 				onSetAdmissionMode={setAdmissionMode}
 				onRespondToAdmission={respondToAdmission}
+				{screenShareSettings}
+				{screenShareRequests}
+				{screenShareBusyIdentity}
+				onUpdateScreenShare={updateScreenShareSettings}
+				onRespondToScreenShare={respondToScreenShare}
 				onClose={() => (panel = 'none')}
 			/>
 		{/if}
@@ -988,13 +1310,15 @@
 		{backgroundOption}
 		{screenShareSupported}
 		{screenShareEnabled}
+		{canShareScreen}
+		{screenShareRequested}
 		{pipSupported}
 		{pipActive}
 		{panel}
 		rosterCount={roster.length}
 		{unread}
 		{isHost}
-		pendingAdmissionsCount={pendingAdmissions.length}
+		pendingAdmissionsCount={pendingAdmissions.length + screenShareRequests.length}
 		onToggleDeafen={toggleDeafen}
 		onSelectMic={selectMic}
 		onToggleMic={toggleMic}
@@ -1052,6 +1376,14 @@
 
 	.call-header-status-error {
 		color: #f87171;
+	}
+
+	.call-header-notice {
+		margin-left: auto;
+		padding: 0.25rem 0.75rem;
+		border-radius: 999px;
+		font-size: 0.8125rem;
+		background: rgba(255, 255, 255, 0.1);
 	}
 
 	.call-body {
@@ -1126,10 +1458,21 @@
 	}
 
 	:global(.call-tile-screen) {
-		grid-column: 1 / -1;
-		aspect-ratio: 16 / 9;
-		max-height: 65vh;
 		background: #000;
+		cursor: pointer;
+	}
+
+	/* The share being watched: full width and first, whatever its place in the DOM. */
+	:global(.call-tile-featured) {
+		grid-column: 1 / -1;
+		order: -1;
+		max-height: 65vh;
+		cursor: default;
+	}
+
+	:global(.call-tile-screen:focus-visible) {
+		outline: 2px solid rgba(255, 255, 255, 0.6);
+		outline-offset: 2px;
 	}
 
 	:global(.call-tile-screen .call-tile-media video) {

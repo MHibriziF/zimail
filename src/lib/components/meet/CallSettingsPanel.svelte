@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
+	import type { ScreenShareMode, ScreenSharePolicy, ScreenShareSettings } from '$lib/meet/screen-share';
 
 	let {
 		requireApproval,
@@ -10,6 +11,11 @@
 		admissionsBusyId,
 		onSetAdmissionMode,
 		onRespondToAdmission,
+		screenShareSettings,
+		screenShareRequests,
+		screenShareBusyIdentity,
+		onUpdateScreenShare,
+		onRespondToScreenShare,
 		onClose
 	}: {
 		requireApproval: boolean;
@@ -19,6 +25,11 @@
 		admissionsBusyId: string;
 		onSetAdmissionMode: (next: boolean) => void;
 		onRespondToAdmission: (admissionId: string, action: 'admit' | 'deny') => void;
+		screenShareSettings: ScreenShareSettings;
+		screenShareRequests: { identity: string; name: string }[];
+		screenShareBusyIdentity: string;
+		onUpdateScreenShare: (changes: { screenSharePolicy?: ScreenSharePolicy; screenShareMode?: ScreenShareMode }) => void;
+		onRespondToScreenShare: (identity: string, allow: boolean) => void;
 		onClose: () => void;
 	} = $props();
 </script>
@@ -55,7 +66,92 @@
 			</label>
 		</fieldset>
 
+		<fieldset class="call-settings-field">
+			<legend>{t('meet.screenSharePolicyLabel')}</legend>
+			<label class="call-settings-radio">
+				<input
+					type="radio"
+					name="call-screen-share-policy"
+					checked={screenShareSettings.policy === 'open'}
+					disabled={settingsBusy}
+					onchange={() => onUpdateScreenShare({ screenSharePolicy: 'open' })}
+				/>
+				{t('meet.screenSharePolicyOpen')}
+			</label>
+			<label class="call-settings-radio">
+				<input
+					type="radio"
+					name="call-screen-share-policy"
+					checked={screenShareSettings.policy === 'approval'}
+					disabled={settingsBusy}
+					onchange={() => onUpdateScreenShare({ screenSharePolicy: 'approval' })}
+				/>
+				{t('meet.screenSharePolicyApproval')}
+			</label>
+		</fieldset>
+
+		<fieldset class="call-settings-field">
+			<legend>{t('meet.screenShareModeLabel')}</legend>
+			<label class="call-settings-radio">
+				<input
+					type="radio"
+					name="call-screen-share-mode"
+					checked={screenShareSettings.mode === 'single'}
+					disabled={settingsBusy}
+					onchange={() => onUpdateScreenShare({ screenShareMode: 'single' })}
+				/>
+				{t('meet.screenShareModeSingle')}
+			</label>
+			<label class="call-settings-radio">
+				<input
+					type="radio"
+					name="call-screen-share-mode"
+					checked={screenShareSettings.mode === 'multiple'}
+					disabled={settingsBusy}
+					onchange={() => onUpdateScreenShare({ screenShareMode: 'multiple' })}
+				/>
+				{t('meet.screenShareModeMultiple')}
+			</label>
+		</fieldset>
+
 		{#if settingsError}<p class="call-settings-error">{settingsError}</p>{/if}
+
+		{#if screenShareSettings.policy === 'approval'}
+			<div class="call-settings-field">
+				<span class="call-settings-label">{t('meet.screenShareRequestsLabel')}</span>
+				{#if screenShareRequests.length === 0}
+					<p class="call-settings-empty">{t('meet.screenShareNoRequests')}</p>
+				{:else}
+					<ul class="call-panel-list">
+						{#each screenShareRequests as request (request.identity)}
+							<li class="call-admission-row">
+								<span>{request.name}</span>
+								<div class="call-admission-actions">
+									<button
+										type="button"
+										class="call-admission-btn"
+										disabled={screenShareBusyIdentity === request.identity}
+										onclick={() => onRespondToScreenShare(request.identity, false)}
+										aria-label={t('meet.deny')}
+									>
+										<Icon name="close-line" size={16} />
+									</button>
+									<button
+										type="button"
+										class="call-admission-btn call-admission-admit"
+										disabled={screenShareBusyIdentity === request.identity}
+										onclick={() => onRespondToScreenShare(request.identity, true)}
+										aria-label={t('meet.screenShareAllow')}
+									>
+										<Icon name="check-line" size={16} />
+									</button>
+								</div>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		{/if}
 
 		{#if requireApproval}
 			<div class="call-settings-field">
