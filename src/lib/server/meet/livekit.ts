@@ -75,7 +75,8 @@ export function createLiveKitClient(
 		});
 		if (!response.ok) {
 			const error = (await response.json().catch(() => ({}))) as { code?: string; msg?: string };
-			throw new LiveKitError(`RoomService.${method} failed: ${error.code ?? response.status}${error.msg ? ` (${error.msg})` : ''}`);
+			const detail = error.msg ? ` (${error.msg})` : '';
+			throw new LiveKitError(`RoomService.${method} failed: ${error.code ?? response.status}${detail}`);
 		}
 		return (await response.json()) as T;
 	}
@@ -138,7 +139,9 @@ export function createLiveKitClient(
 
 /** The browser connects over wss://, but RoomService is plain HTTPS on the same host. */
 function httpBaseUrl(url: string): string {
-	return url.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/+$/, '');
+	let base = url.replace(/^ws(s?):\/\//, 'http$1://');
+	while (base.endsWith('/')) base = base.slice(0, -1);
+	return base;
 }
 
 async function sign(data: string, secret: string): Promise<string> {

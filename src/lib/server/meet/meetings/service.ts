@@ -128,12 +128,12 @@ export type MeetingsServiceDeps = {
 	getLiveKit: () => LiveKitClient;
 };
 
+function admitted(liveKit: LiveKitClient, token: string, meeting: Meeting): AdmittedOutcome {
+	return { type: 'admitted', url: liveKit.url, token, roomName: meeting.id, screenShare: screenShareSettingsOf(meeting) };
+}
+
 export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsService {
 	const { repo, admissionsRepo, getLiveKit } = deps;
-
-	function admitted(liveKit: LiveKitClient, token: string, meeting: Meeting): AdmittedOutcome {
-		return { type: 'admitted', url: liveKit.url, token, roomName: meeting.id, screenShare: screenShareSettingsOf(meeting) };
-	}
 
 	/**
 	 * Tokens only carry the policy that was in force when they were minted, so a
