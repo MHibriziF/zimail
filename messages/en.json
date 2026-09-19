@@ -749,10 +749,10 @@
 		"renameEmpty": "Enter a name.",
 		"renameFailed": "Couldn't change your name. Try again.",
 		"focusScreenShare": "Show this screen large",
-		"screenShareAsk": "Ask the host to share your screen",
-		"screenShareWaiting": "Waiting for the host to allow screen sharing…",
+		"screenShareAsk": "Ask to share your screen",
+		"screenShareWaiting": "Waiting for the host to let you share your screen",
 		"screenShareRequested": "Asked the host to let you share your screen",
-		"screenShareGranted": "The host let you share your screen",
+		"screenShareGranted": "The host approved — your screen is now shared",
 		"screenShareDeclined": "The host didn't allow screen sharing",
 		"screenShareNoHost": "The host isn't in the call to allow screen sharing",
 		"screenShareReplaced": "{name} started presenting, so your screen share stopped",
@@ -766,7 +766,9 @@
 		"screenShareModeSingle": "One at a time — a new share replaces the current one",
 		"screenShareModeMultiple": "Several at once — the newest is shown large",
 		"screenShareRequestsLabel": "Asking to share their screen",
-		"screenShareNoRequests": "No one is asking."
+		"screenShareNoRequests": "No one is asking.",
+		"screenShareCancelRequest": "Cancel screen share request",
+		"screenShareStartFailed": "The host approved, but your screen couldn't be shared. Try again."
 	},
 	"meetings": {
 		"title": "Meetings — {app}",

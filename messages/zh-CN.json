@@ -749,10 +749,10 @@
 		"renameEmpty": "请输入名字。",
 		"renameFailed": "无法修改你的名字，请重试。",
 		"focusScreenShare": "放大显示此屏幕",
-		"screenShareAsk": "请求主持人允许共享屏幕",
-		"screenShareWaiting": "等待主持人允许共享屏幕…",
+		"screenShareAsk": "请求共享屏幕",
+		"screenShareWaiting": "等待主持人允许你共享屏幕",
 		"screenShareRequested": "已请求主持人允许你共享屏幕",
-		"screenShareGranted": "主持人已允许你共享屏幕",
+		"screenShareGranted": "主持人已同意——你的屏幕正在共享",
 		"screenShareDeclined": "主持人未允许共享屏幕",
 		"screenShareNoHost": "主持人不在通话中，无法允许共享屏幕",
 		"screenShareReplaced": "{name} 开始演示，你的屏幕共享已停止",
@@ -766,7 +766,9 @@
 		"screenShareModeSingle": "一次一个——新的共享会替换当前共享",
 		"screenShareModeMultiple": "可同时多个——最新的放大显示",
 		"screenShareRequestsLabel": "请求共享屏幕",
-		"screenShareNoRequests": "暂无请求。"
+		"screenShareNoRequests": "暂无请求。",
+		"screenShareCancelRequest": "取消共享屏幕请求",
+		"screenShareStartFailed": "主持人已同意，但屏幕共享失败，请重试。"
 	},
 	"meetings": {
 		"title": "会议 — {app}",

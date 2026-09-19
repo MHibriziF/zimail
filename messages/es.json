@@ -749,10 +749,10 @@
 		"renameEmpty": "Escribe un nombre.",
 		"renameFailed": "No se pudo cambiar tu nombre. Inténtalo de nuevo.",
 		"focusScreenShare": "Ver esta pantalla en grande",
-		"screenShareAsk": "Pedir al anfitrión compartir tu pantalla",
-		"screenShareWaiting": "Esperando a que el anfitrión lo permita…",
+		"screenShareAsk": "Pedir permiso para compartir pantalla",
+		"screenShareWaiting": "Esperando a que el anfitrión te deje compartir pantalla",
 		"screenShareRequested": "Se pidió al anfitrión compartir tu pantalla",
-		"screenShareGranted": "El anfitrión te permitió compartir pantalla",
+		"screenShareGranted": "El anfitrión aceptó — tu pantalla se está compartiendo",
 		"screenShareDeclined": "El anfitrión no permitió compartir pantalla",
 		"screenShareNoHost": "El anfitrión no está en la llamada para permitirlo",
 		"screenShareReplaced": "{name} empezó a presentar, así que tu pantalla dejó de compartirse",
@@ -766,7 +766,9 @@
 		"screenShareModeSingle": "Una a la vez — la nueva reemplaza a la actual",
 		"screenShareModeMultiple": "Varias a la vez — la más reciente en grande",
 		"screenShareRequestsLabel": "Piden compartir pantalla",
-		"screenShareNoRequests": "Nadie lo ha pedido."
+		"screenShareNoRequests": "Nadie lo ha pedido.",
+		"screenShareCancelRequest": "Cancelar la solicitud de compartir pantalla",
+		"screenShareStartFailed": "El anfitrión aceptó, pero no se pudo compartir tu pantalla. Inténtalo de nuevo."
 	},
 	"meetings": {
 		"title": "Reuniones — {app}",

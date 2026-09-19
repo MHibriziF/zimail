@@ -749,10 +749,10 @@
 		"renameEmpty": "Masukkan nama.",
 		"renameFailed": "Tidak dapat mengubah nama Anda. Coba lagi.",
 		"focusScreenShare": "Tampilkan layar ini lebih besar",
-		"screenShareAsk": "Minta izin host untuk berbagi layar",
-		"screenShareWaiting": "Menunggu host mengizinkan berbagi layar…",
+		"screenShareAsk": "Minta izin berbagi layar",
+		"screenShareWaiting": "Menunggu host mengizinkan Anda berbagi layar",
 		"screenShareRequested": "Permintaan berbagi layar dikirim ke host",
-		"screenShareGranted": "Host mengizinkan Anda berbagi layar",
+		"screenShareGranted": "Host menyetujui — layar Anda sekarang dibagikan",
 		"screenShareDeclined": "Host tidak mengizinkan berbagi layar",
 		"screenShareNoHost": "Host tidak ada di panggilan untuk mengizinkan berbagi layar",
 		"screenShareReplaced": "{name} mulai presentasi, jadi berbagi layar Anda dihentikan",
@@ -766,7 +766,9 @@
 		"screenShareModeSingle": "Satu per satu — yang baru menggantikan yang sekarang",
 		"screenShareModeMultiple": "Beberapa sekaligus — yang terbaru ditampilkan besar",
 		"screenShareRequestsLabel": "Meminta berbagi layar",
-		"screenShareNoRequests": "Tidak ada yang meminta."
+		"screenShareNoRequests": "Tidak ada yang meminta.",
+		"screenShareCancelRequest": "Batalkan permintaan berbagi layar",
+		"screenShareStartFailed": "Host menyetujui, tetapi layar Anda gagal dibagikan. Coba lagi."
 	},
 	"meetings": {
 		"title": "Rapat — {app}",
