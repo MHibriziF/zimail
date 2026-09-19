@@ -102,6 +102,18 @@ export async function resolveFromAddress(
 }
 
 /**
+ * Catch-all replies send from an address that has no `addresses` row, so the id
+ * below is synthetic. `emails.address_id` has a foreign key onto `addresses`,
+ * so it must be stored as NULL — the address itself is still kept in `from_addr`.
+ */
+const SYNTHETIC_ADDRESS_ID_PREFIX = 'reply:';
+
+export function persistableAddressId(id: string | null | undefined): string | null {
+	if (!id || id.startsWith(SYNTHETIC_ADDRESS_ID_PREFIX)) return null;
+	return id;
+}
+
+/**
  * Replies come from the mailbox that received the original, not the default
  * sending identity. Catch-all mail uses that exact recipient if the user owns
  * the domain, even when the local-part is not a saved address.
@@ -131,7 +143,7 @@ export async function resolveReplyFromAddress(
 
 	if (domain && canSendOnDomain && mailbox.includes('@')) {
 		return {
-			id: `reply:${mailbox}`,
+			id: `${SYNTHETIC_ADDRESS_ID_PREFIX}${mailbox}`,
 			user_id: user.id,
 			domain_id: domain.id,
 			domain_name: domain.name,
@@ -219,7 +231,7 @@ export async function sendAndStore(
 		references: input.references ?? null,
 		replyToEmailId: input.replyToEmailId ?? null,
 		domainId: from.domain_id,
-		addressId: from.id,
+		addressId: persistableAddressId(from.id),
 		providerId,
 		// A waiting message has not been handed to anyone yet, so it gets its own
 		// state rather than looking like mail that is already on its way.
