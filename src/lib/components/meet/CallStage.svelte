@@ -844,7 +844,9 @@
 				};
 				if (!response.ok || !body.admissions) return;
 				pendingAdmissions = body.admissions;
-				if (takeUnseenAdmissions(ringedAdmissionIds, body.admissions).length > 0 && !deafened) {
+				// Deafened first: requests that arrive while deafened stay unrung, so they
+				// still chime once the host is listening again.
+				if (!deafened && takeUnseenAdmissions(ringedAdmissionIds, body.admissions).length > 0) {
 					playAdmissionChime();
 				}
 			} catch {
