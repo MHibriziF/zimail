@@ -827,6 +827,24 @@
 			"teal": "Sarcelle",
 			"blue": "Bleu",
 			"purple": "Violet"
-		}
+		},
+		"navTitle": "Onglets et libellés"
+	},
+	"tabs": {
+		"label": "Onglets de la boîte de réception",
+		"primary": "Principale",
+		"social": "Réseaux sociaux",
+		"promotions": "Promotions",
+		"updates": "Notifications",
+		"forums": "Forums",
+		"moveTo": "Déplacer vers l’onglet",
+		"moveHint": "Les prochains messages de cet expéditeur iront dans le même onglet.",
+		"settingsTitle": "Onglets de la boîte de réception",
+		"settingsHint": "Triez le courrier entrant en Principale, Réseaux sociaux, Promotions, Notifications et Forums. Le tri utilise des règles qui s’exécutent sur votre propre serveur — aucun message n’est envoyé ailleurs.",
+		"enable": "Répartir ma boîte de réception en onglets",
+		"sortExisting": "Trier les anciens messages",
+		"sorting": "Tri en cours… {count} traités",
+		"sortDone": "{count} conversations triées.",
+		"sortHint": "Les messages antérieurs aux onglets restent dans Principale jusqu’au tri, qui n’utilise que l’expéditeur et l’objet."
 	}
 }

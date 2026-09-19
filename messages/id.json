@@ -827,6 +827,24 @@
 			"teal": "Hijau kebiruan",
 			"blue": "Biru",
 			"purple": "Ungu"
-		}
+		},
+		"navTitle": "Tab & label"
+	},
+	"tabs": {
+		"label": "Tab kotak masuk",
+		"primary": "Utama",
+		"social": "Sosial",
+		"promotions": "Promosi",
+		"updates": "Pembaruan",
+		"forums": "Forum",
+		"moveTo": "Pindahkan ke tab",
+		"moveHint": "Email berikutnya dari pengirim ini masuk ke tab yang sama.",
+		"settingsTitle": "Tab kotak masuk",
+		"settingsHint": "Urutkan email masuk ke Utama, Sosial, Promosi, Pembaruan, dan Forum. Pengurutan memakai aturan yang berjalan di server Anda sendiri — tidak ada email yang dikirim ke mana pun.",
+		"enable": "Bagi kotak masuk saya menjadi tab",
+		"sortExisting": "Urutkan email lama",
+		"sorting": "Mengurutkan… {count} selesai",
+		"sortDone": "{count} percakapan telah diurutkan.",
+		"sortHint": "Email dari sebelum ada tab tetap di Utama sampai diurutkan. Pengurutannya hanya memakai pengirim dan subjek."
 	}
 }

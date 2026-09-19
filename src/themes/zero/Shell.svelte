@@ -106,7 +106,7 @@
 		{ href: '/settings/connections', icon: 'Users', label: t('nav.connections') },
 		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
 		{ href: '/settings/cleanup', icon: 'Bin', label: t('nav.cleanup') },
-		{ href: '/settings/labels', icon: 'Tag', label: t('labels.title') },
+		{ href: '/settings/labels', icon: 'Tag', label: t('labels.navTitle') },
 		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }] : [])
 	]);
 

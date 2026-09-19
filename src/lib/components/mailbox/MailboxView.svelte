@@ -13,6 +13,7 @@
 	import { t } from '$lib/i18n';
 	import { haptic, isPrimaryTab } from '$lib/app-chrome';
 	import type { Label } from '$lib/mail/labels';
+	import InboxTabs from './InboxTabs.svelte';
 	import type { MailAddress, MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 
 	let {
@@ -280,6 +281,10 @@
 			</div>
 		</div>
 	</header>
+
+	{#if filters.tab}
+		<InboxTabs active={filters.tab} />
+	{/if}
 
 	{#if activeFilterCount > 0}
 		<div class="filter-chips" aria-label={t('mailbox.activeFilters')}>

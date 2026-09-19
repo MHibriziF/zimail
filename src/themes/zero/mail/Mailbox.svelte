@@ -8,6 +8,7 @@
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
+	import InboxTabs from '$lib/components/mailbox/InboxTabs.svelte';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
@@ -283,6 +284,12 @@
 				{t('nav.starred')}
 			</button>
 		</div>
+
+		{#if filters.tab}
+			<div class="z-tabs">
+				<InboxTabs active={filters.tab} />
+			</div>
+		{/if}
 
 		<div class="z-rows">
 			{#if items.length === 0}

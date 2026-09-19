@@ -827,6 +827,24 @@
 			"teal": "Teal",
 			"blue": "Blue",
 			"purple": "Purple"
-		}
+		},
+		"navTitle": "Tabs & labels"
+	},
+	"tabs": {
+		"label": "Inbox tabs",
+		"primary": "Primary",
+		"social": "Social",
+		"promotions": "Promotions",
+		"updates": "Updates",
+		"forums": "Forums",
+		"moveTo": "Move to tab",
+		"moveHint": "Future mail from this sender goes to the same tab.",
+		"settingsTitle": "Inbox tabs",
+		"settingsHint": "Sort incoming mail into Primary, Social, Promotions, Updates and Forums. Sorting uses rules that run on your own server — no mail is sent anywhere to be sorted.",
+		"enable": "Split my inbox into tabs",
+		"sortExisting": "Sort earlier mail",
+		"sorting": "Sorting… {count} done",
+		"sortDone": "Sorted {count} conversations.",
+		"sortHint": "Mail from before tabs existed sits in Primary until sorted. Sorting it uses the sender and subject only."
 	}
 }
