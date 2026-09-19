@@ -1050,7 +1050,11 @@
 			for (const track of tracks) await room.localParticipant.publishTrack(track);
 			showNotice(t('meet.screenShareGranted'));
 		} catch {
-			for (const track of tracks) track.stop();
+			// Video may have published before audio failed — take back whatever got out.
+			for (const track of tracks) {
+				await room.localParticipant.unpublishTrack(track).catch(() => {});
+				track.stop();
+			}
 			showNotice(t('meet.screenShareStartFailed'));
 		}
 	}
