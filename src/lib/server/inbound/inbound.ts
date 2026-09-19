@@ -105,14 +105,19 @@ async function handleInboundEmail(
 	const route = await resolveInboundRoute(env.DB, recipients);
 
 	if (!route) {
-		await recordUnroutedEmail(env.DB, {
+		const recorded = await recordUnroutedEmail(env.DB, {
 			providerId,
 			from,
 			to: recipients.join(', ') || '(unknown)',
 			subject,
 			reason: 'No matching address and no catch-all for this domain'
 		});
-		return { handled: true, note: `Stored ${providerId} as unrouted` };
+
+		return {
+			handled: true,
+			// Resend retries on non-2xx; say plainly when a retry changed nothing.
+			note: recorded ? `Stored ${providerId} as unrouted` : `Already unrouted ${providerId}`
+		};
 	}
 
 	const emailId = await insertEmail(env.DB, {
@@ -178,7 +183,8 @@ async function storeInboundAttachments(
 			await insertAttachmentBytes(env.DB, env.ATTACHMENTS, emailId, {
 				filename: attachment.filename || 'attachment',
 				type: attachment.content_type || 'application/octet-stream',
-				bytes
+				bytes,
+				contentId: attachment.content_id ?? null
 			});
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.

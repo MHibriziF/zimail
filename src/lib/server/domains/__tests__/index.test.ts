@@ -60,7 +60,7 @@ function fakeDb(domains: DomainRow[] = [], addresses: AddressRow[] = []): D1Data
 		if (sql.includes('FROM addresses WHERE address IN')) {
 			return [];
 		}
-		if (sql.startsWith('INSERT INTO unrouted_emails')) {
+		if (sql.includes('INTO unrouted_emails')) {
 			const [id, providerId, from, to, subject, reason] = args as [
 				string,
 				string | null,

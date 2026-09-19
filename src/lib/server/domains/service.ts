@@ -52,7 +52,8 @@ export type DomainsService = {
 	deleteAddress(userId: string, addressId: string): Promise<void>;
 
 	resolveInboundRoute(recipients: string[]): Promise<InboundRoute | null>;
-	recordUnroutedEmail(input: NewUnroutedEmail): Promise<void>;
+	/** Returns whether a new row was stored — false when this is a provider retry. */
+	recordUnroutedEmail(input: NewUnroutedEmail): Promise<boolean>;
 	listUnroutedEmails(limit?: number): Promise<UnroutedEmail[]>;
 };
 

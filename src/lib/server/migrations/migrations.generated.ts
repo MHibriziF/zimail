@@ -120,5 +120,13 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0029_meeting_admission.sql",
 		sql: "-- Anyone-can-join is the existing behavior and stays the default; opting a\n-- meeting into \"host must let people in\" is a per-meeting choice, not global.\nALTER TABLE meetings ADD COLUMN require_approval INTEGER NOT NULL DEFAULT 0;\n\n-- A pending join request when a meeting requires approval. Short-lived by\n-- nature (a meeting session's lifetime) -- no cleanup job needed yet, but see\n-- the note in admissions.ts if this table ever grows unbounded.\nCREATE TABLE meeting_admissions (\n\tid TEXT PRIMARY KEY,\n\tmeeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,\n\tname TEXT NOT NULL,\n\tstatus TEXT NOT NULL DEFAULT 'pending',\n\tcreated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n);\n\nCREATE INDEX meeting_admissions_meeting_id_idx ON meeting_admissions(meeting_id);\n"
+	},
+	{
+		name: "0031_unrouted_provider_id_unique.sql",
+		sql: "-- A provider that retries delivery sends the same message again. `emails` is\n-- guarded by provider_id, but unrouted mail had no such guard, so a retry\n-- duplicated the row and announced the message a second time.\n-- Ported from upstream 0021_unrouted_provider_id_unique.sql; renumbered because\n-- this fork's migration numbers diverged from upstream's.\nDELETE FROM unrouted_emails\nWHERE provider_id IS NOT NULL\n  AND rowid NOT IN (\n    SELECT MIN(rowid) FROM unrouted_emails WHERE provider_id IS NOT NULL GROUP BY provider_id\n  );\n\nCREATE UNIQUE INDEX IF NOT EXISTS idx_unrouted_emails_provider_id\n  ON unrouted_emails (provider_id)\n  WHERE provider_id IS NOT NULL;\n"
+	},
+	{
+		name: "0032_attachment_content_id.sql",
+		sql: "-- Inline images reference a MIME part by its Content-ID (`<img src=\"cid:…\">`).\n-- Without the Content-ID stored alongside the file there is nothing to match\n-- that reference against, so every inline image rendered broken.\n-- Ported from upstream 0022_attachment_content_id.sql; renumbered for this fork.\nALTER TABLE email_attachments ADD COLUMN content_id TEXT;\n"
 	}
 ];
