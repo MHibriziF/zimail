@@ -116,7 +116,8 @@ export type DomainsRepository = {
 	setDefaultAddress(userId: string, addressId: string): Promise<void>;
 	deleteAddress(userId: string, addressId: string): Promise<void>;
 
-	recordUnroutedEmail(input: NewUnroutedEmail): Promise<void>;
+	/** Returns whether a new row was stored — false when this is a retry. */
+	recordUnroutedEmail(input: NewUnroutedEmail): Promise<boolean>;
 	listUnroutedEmails(limit: number): Promise<UnroutedEmail[]>;
 };
 
@@ -291,13 +292,17 @@ export function createD1DomainsRepository(db: D1Database): DomainsRepository {
 		},
 
 		async recordUnroutedEmail(input) {
-			await db
+			// A retried delivery must not pile up rows or announce the same message
+			// twice. `provider_id` is unique where present, so the retry is ignored and
+			// the caller learns nothing was recorded.
+			const result = await db
 				.prepare(
-					`INSERT INTO unrouted_emails (id, provider_id, from_addr, to_addr, subject, reason)
+					`INSERT OR IGNORE INTO unrouted_emails (id, provider_id, from_addr, to_addr, subject, reason)
 					 VALUES (?, ?, ?, ?, ?, ?)`
 				)
 				.bind(crypto.randomUUID(), input.providerId, input.from, input.to, input.subject, input.reason)
 				.run();
+			return (result.meta?.changes ?? 0) > 0;
 		},
 
 		async listUnroutedEmails(limit) {

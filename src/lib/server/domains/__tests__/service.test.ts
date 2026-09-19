@@ -126,7 +126,9 @@ function fakeRepo(seed: { domains?: Domain[]; addresses?: MailAddress[] } = {}):
 			const index = addresses.findIndex((a) => a.id === addressId && a.user_id === userId);
 			if (index >= 0) addresses.splice(index, 1);
 		},
-		async recordUnroutedEmail() {},
+		async recordUnroutedEmail() {
+			return true;
+		},
 		async listUnroutedEmails() {
 			return [];
 		}

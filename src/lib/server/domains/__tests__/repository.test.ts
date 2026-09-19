@@ -163,7 +163,7 @@ function setup(seed: { domains?: DomainRow[]; addresses?: AddressRow[]; unrouted
 			return [];
 		}
 
-		if (sql.startsWith('INSERT INTO unrouted_emails')) {
+		if (sql.includes('INTO unrouted_emails')) {
 			const [id, providerId, from, to, subject, reason] = args as [
 				string,
 				string | null,
@@ -172,8 +172,11 @@ function setup(seed: { domains?: DomainRow[]; addresses?: AddressRow[]; unrouted
 				string | null,
 				string
 			];
-			unrouted.push({ id, provider_id: providerId, from_addr: from, to_addr: to, subject, reason, created_at: '2026-01-01' });
-			return [];
+			// Mirrors the partial unique index on provider_id plus INSERT OR IGNORE.
+			if (providerId && unrouted.some((row) => row.provider_id === providerId)) return [];
+			const row = { id, provider_id: providerId, from_addr: from, to_addr: to, subject, reason, created_at: '2026-01-01' };
+			unrouted.push(row);
+			return [row];
 		}
 		if (sql.includes('FROM unrouted_emails')) {
 			return [...unrouted].slice(0, args[0] as number);
@@ -373,5 +376,21 @@ describe('DomainsRepository — unrouted mail', () => {
 		const results = await repo.listUnroutedEmails(1);
 		assert.equal(results.length, 1);
 		assert.equal(results[0].to_addr, 'nobody@example.com');
+	});
+
+	test('a provider retry of the same message is ignored and reported as not stored', async () => {
+		const { repo, unrouted } = setup();
+		const input = { providerId: 'p1', from: 'a@b.com', to: 'nobody@example.com', subject: 'hi', reason: 'no catch-all' };
+		assert.equal(await repo.recordUnroutedEmail(input), true);
+		assert.equal(await repo.recordUnroutedEmail(input), false);
+		assert.equal(unrouted.length, 1);
+	});
+
+	test('mail without a provider id is never treated as a duplicate', async () => {
+		const { repo, unrouted } = setup();
+		const input = { providerId: null, from: 'a@b.com', to: 'nobody@example.com', subject: 'hi', reason: 'no catch-all' };
+		assert.equal(await repo.recordUnroutedEmail(input), true);
+		assert.equal(await repo.recordUnroutedEmail(input), true);
+		assert.equal(unrouted.length, 2);
 	});
 });
