@@ -1,4 +1,5 @@
 import type { Label } from './mail/labels';
+import type { MailCategory } from './mail/categories';
 
 export type User = {
 	id: string;
@@ -127,6 +128,8 @@ export type EmailRow = {
 	archived_at: string | null;
 	/** Set when the conversation is in Spam. */
 	spam_at: string | null;
+	/** Inbox tab; null reads as Primary. */
+	category: MailCategory | null;
 	created_at: string;
 };
 
@@ -192,6 +195,8 @@ export type MailboxFilters = {
 	addressId: string;
 	/** Label to narrow the list to; empty for all. */
 	labelId: string;
+	/** The inbox tab being shown; empty when tabs are off or don't apply (search, labels). */
+	tab: MailCategory | '';
 };
 
 export type MailboxPage = {

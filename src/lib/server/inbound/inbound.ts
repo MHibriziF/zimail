@@ -14,6 +14,7 @@ import {
 } from '../telegram-notify';
 import { stripHtml } from '../util/html';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
+import { categoriesServiceForDb, pickClassifyHeaders } from '../categories';
 
 export type ResendWebhookEvent = {
 	type: string;
@@ -141,6 +142,14 @@ async function handleInboundEmail(
 		received.headers?.['arc-authentication-results']
 	]);
 
+	// Resend hands headers over as a plain object; don't rely on its key casing.
+	const headerMap = new Map(Object.entries(received.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]));
+	const category = await categoriesServiceForDb(env.DB).categorizeInbound(route.userId, {
+		from,
+		subject,
+		headers: pickClassifyHeaders((name) => headerMap.get(name))
+	});
+
 	const emailId = await insertEmail(env.DB, {
 		userId: route.userId,
 		direction: 'inbound',
@@ -160,7 +169,8 @@ async function handleInboundEmail(
 		domainId: route.domainId,
 		addressId: route.addressId,
 		providerId,
-		spam
+		spam,
+		category
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId);

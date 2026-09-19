@@ -66,6 +66,7 @@ function emailRow(overrides: Partial<EmailRow> = {}): EmailRow {
 		deleted_at: null,
 		archived_at: null,
 		spam_at: null,
+		category: null,
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -92,7 +93,9 @@ function fakeRepo(overrides: Partial<MailStoreRepository> = {}) {
 			record('insertRow', [row]);
 			insertedRows.push(row);
 		},
-		isConversationSpam: async () => false,
+		conversationState: async () => ({ spam: false, category: null }),
+		setCategory: async () => 0,
+		countInboxUnreadByCategory: async () => ({ primary: 0, social: 0, promotions: 0, updates: 0, forums: 0 }),
 		async clearArchiveForThread(userId, threadId) {
 			record('clearArchiveForThread', [userId, threadId]);
 		},
@@ -220,14 +223,14 @@ describe('insertEmail — spam stays whole per conversation', () => {
 	});
 
 	test('a spam verdict on a reply into a normal conversation is ignored', async () => {
-		const { repo, calls } = fakeRepo({ isConversationSpam: async () => false });
+		const { repo, calls } = fakeRepo({ conversationState: async () => ({ spam: false, category: null }) });
 		const service = createMailStoreService({ repo, resolveThread: async () => 'existing-thread' });
 		await service.insertEmail({ ...inbound, spam: true });
 		assert.equal(insertedSpam(calls), false);
 	});
 
 	test('any new message in a conversation already in Spam goes to Spam', async () => {
-		const { repo, calls } = fakeRepo({ isConversationSpam: async () => true });
+		const { repo, calls } = fakeRepo({ conversationState: async () => ({ spam: true, category: null }) });
 		const service = createMailStoreService({ repo, resolveThread: async () => 'existing-thread' });
 		await service.insertEmail({ ...inbound, spam: false });
 		assert.equal(insertedSpam(calls), true);
@@ -238,6 +241,26 @@ describe('insertEmail — spam stays whole per conversation', () => {
 		const service = createMailStoreService({ repo, resolveThread: async (_u, input) => input.emailId });
 		await service.insertEmail({ ...inbound, spam: true });
 		assert.equal(calls.clearArchiveForThread, undefined);
+	});
+});
+
+describe('insertEmail — a conversation stays in one inbox tab', () => {
+	const inbound = { userId: 'user-1', direction: 'inbound' as const, from: 'news@shop.test', to: 'me@example.com', subject: 'Sale' };
+	const insertedCategory = (calls: Record<string, unknown[][]>) =>
+		(calls.insertRow?.[0]?.[0] as { category: string | null }).category;
+
+	test('the rules decide the tab of a message that starts a conversation', async () => {
+		const { repo, calls } = fakeRepo();
+		const service = createMailStoreService({ repo, resolveThread: async (_u, input) => input.emailId });
+		await service.insertEmail({ ...inbound, category: 'promotions' });
+		assert.equal(insertedCategory(calls), 'promotions');
+	});
+
+	test("a reply lands in its conversation's tab, whatever the rules said", async () => {
+		const { repo, calls } = fakeRepo({ conversationState: async () => ({ spam: false, category: 'updates' }) });
+		const service = createMailStoreService({ repo, resolveThread: async () => 'existing-thread' });
+		await service.insertEmail({ ...inbound, category: 'promotions' });
+		assert.equal(insertedCategory(calls), 'updates');
 	});
 });
 

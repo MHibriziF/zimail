@@ -144,5 +144,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0035_spam.sql",
 		sql: "-- A free, local spam folder (issue #28, stage 2) — no classifier service.\n-- Spam is a conversation-level state like archiving: set on every message of\n-- the conversation, and it takes the mail out of every folder but Spam.\nALTER TABLE emails ADD COLUMN spam_at TIMESTAMP;\n\n-- Senders the user marked as spam. Their later mail is filed straight into\n-- Spam; \"Not spam\" removes them again.\nCREATE TABLE blocked_senders (\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\taddress TEXT NOT NULL COLLATE NOCASE,\n\tcreated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n\tPRIMARY KEY (user_id, address)\n);\n"
+	},
+	{
+		name: "0036_inbox_tabs.sql",
+		sql: "-- Inbox tabs sorted by local rules (issue #28, stage 3) — no classifier service.\n-- NULL means Primary, so mail that arrived before this sorts as Primary until\n-- the user backfills or moves it.\nALTER TABLE emails ADD COLUMN category TEXT;\n\n-- \"Move to tab\" remembers the sender, so their next mail lands there directly.\nCREATE TABLE sender_categories (\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\taddress TEXT NOT NULL COLLATE NOCASE,\n\tcategory TEXT NOT NULL,\n\tcreated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n\tPRIMARY KEY (user_id, address)\n);\n\n-- Tabs are on by default; switching them off shows the whole inbox in one list.\nALTER TABLE users ADD COLUMN inbox_tabs INTEGER NOT NULL DEFAULT 1;\n"
 	}
 ];

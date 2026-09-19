@@ -1,6 +1,7 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { MAILBOX_PAGE_SIZE } from '$lib/constants';
 import type { Label } from '$lib/mail/labels';
+import { MAIL_CATEGORIES, type MailCategory } from '$lib/mail/categories';
 import { createD1LabelsRepository } from '../labels/repository';
 import type {
 	DeliveryStatus,
@@ -68,6 +69,8 @@ export type MailboxQuery = {
 	attachmentsOnly?: boolean;
 	/** Only conversations carrying this label. */
 	labelId?: string | null;
+	/** Inbox tab; mail with no category counts as Primary. */
+	category?: MailCategory | null;
 	page?: number;
 	pageSize?: number;
 };
@@ -136,6 +139,10 @@ function buildScope(userId: string, query: MailboxQuery): { where: string; bindi
 	if (query.attachmentsOnly) {
 		filters.push('EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = e.id)');
 	}
+	if (query.category) {
+		filters.push("COALESCE(e.category, 'primary') = ?");
+		bindings.push(query.category);
+	}
 	if (query.labelId) {
 		filters.push(
 			`EXISTS(SELECT 1 FROM conversation_labels cl
@@ -201,6 +208,7 @@ export type NewEmailRow = {
 	isRead: boolean;
 	/** Filed straight into Spam. */
 	spam: boolean;
+	category: MailCategory | null;
 };
 
 export type MailFlagUpdate = {
@@ -256,7 +264,10 @@ export type MailStoreRepository = {
 		domainId?: string | null
 	): Promise<{ messageCount: number; latestRowid: number }>;
 	getMailboxCounts(userId: string, domainId?: string | null): Promise<MailboxCounts>;
-	isConversationSpam(userId: string, threadId: string): Promise<boolean>;
+	/** What a new message joining this conversation inherits. */
+	conversationState(userId: string, threadId: string): Promise<{ spam: boolean; category: MailCategory | null }>;
+	setCategory(userId: string, ids: string[], category: MailCategory): Promise<number>;
+	countInboxUnreadByCategory(userId: string, domainId?: string | null): Promise<Record<MailCategory, number>>;
 
 	expandToThreads(userId: string, ids: string[]): Promise<string[]>;
 	setFlags(userId: string, ids: string[], update: MailFlagUpdate): Promise<number>;
@@ -295,9 +306,9 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 						id, user_id, direction, from_addr, from_name, to_addr, cc_addr, bcc_addr, subject,
 						body_text, body_html, message_id, in_reply_to, references_header,
 						reply_to_email_id, thread_id, thread_key,
-						domain_id, address_id, provider_id, status, status_at, scheduled_at, is_read, spam_at
+						domain_id, address_id, provider_id, status, status_at, scheduled_at, is_read, spam_at, category
 					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?,
-						CASE WHEN ? THEN datetime('now') END)`
+						CASE WHEN ? THEN datetime('now') END, ?)`
 				)
 				.bind(
 					row.id,
@@ -323,20 +334,55 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 					row.status,
 					row.scheduledAt,
 					row.isRead ? 1 : 0,
-					row.spam ? 1 : 0
+					row.spam ? 1 : 0,
+					row.category
 				)
 				.run();
 		},
 
-		async isConversationSpam(userId, threadId) {
+		async conversationState(userId, threadId) {
 			const row = await db
 				.prepare(
-					`SELECT 1 AS spam FROM emails
-					 WHERE user_id = ? AND COALESCE(thread_id, id) = ? AND spam_at IS NOT NULL LIMIT 1`
+					`SELECT MAX(CASE WHEN spam_at IS NOT NULL THEN 1 ELSE 0 END) AS spam, MAX(category) AS category
+					 FROM emails WHERE user_id = ? AND COALESCE(thread_id, id) = ?`
 				)
 				.bind(userId, threadId)
-				.first<{ spam: number }>();
-			return Boolean(row);
+				.first<{ spam: number | null; category: string | null }>();
+			const category = MAIL_CATEGORIES.find((entry) => entry === row?.category) ?? null;
+			return { spam: row?.spam === 1, category };
+		},
+
+		async setCategory(userId, ids, category) {
+			if (ids.length === 0) return 0;
+			const placeholders = ids.map(() => '?').join(', ');
+			const result = await db
+				.prepare(`UPDATE emails SET category = ? WHERE user_id = ? AND id IN (${placeholders})`)
+				.bind(category, userId, ...ids)
+				.run();
+			return result.meta?.changes ?? 0;
+		},
+
+		async countInboxUnreadByCategory(userId, domainId) {
+			const bindings: unknown[] = [userId];
+			let scope = "user_id = ? AND direction = 'inbound' AND deleted_at IS NULL AND archived_at IS NULL AND spam_at IS NULL AND is_read = 0";
+			if (domainId) {
+				scope += ' AND domain_id = ?';
+				bindings.push(domainId);
+			}
+			const { results } = await db
+				.prepare(
+					`SELECT COALESCE(category, 'primary') AS category, COUNT(DISTINCT COALESCE(thread_id, id)) AS count
+					 FROM emails WHERE ${scope} GROUP BY COALESCE(category, 'primary')`
+				)
+				.bind(...bindings)
+				.all<{ category: string; count: number }>();
+
+			const counts = Object.fromEntries(MAIL_CATEGORIES.map((category) => [category, 0])) as Record<MailCategory, number>;
+			for (const row of results) {
+				const category = MAIL_CATEGORIES.find((entry) => entry === row.category);
+				if (category) counts[category] = row.count;
+			}
+			return counts;
 		},
 
 		async clearArchiveForThread(userId, threadId) {

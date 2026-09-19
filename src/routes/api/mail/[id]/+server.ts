@@ -8,6 +8,8 @@ import {
 import { getMailStoreService } from '$lib/server/mail-store';
 import { getLabelsService } from '$lib/server/labels';
 import { getSpamService } from '$lib/server/spam';
+import { getCategoriesService } from '$lib/server/categories';
+import { parseMailCategory } from '$lib/mail/categories';
 import { resolveReplyFromAddress, sendAndStore } from '$lib/server/outbound/outbox';
 import { buildReferences, displaySubject } from '$lib/server/mail-store/threads';
 import type { OutboundAttachmentInput } from '$lib/types';
@@ -38,6 +40,7 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 
 	return json({
 		threadId,
+		category: email.category ?? 'primary',
 		subject: displaySubject(messages[0]?.subject ?? email.subject),
 		labels: labels.get(threadId) ?? [],
 		messages
@@ -58,9 +61,17 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 		trashed?: boolean;
 		/** Report as spam (true) or move back out of Spam (false) — always the whole conversation. */
 		spam?: boolean;
+		/** Move the conversation to another inbox tab, remembering its sender. */
+		category?: string;
 		/** Set to limit the change to this one message instead of the thread. */
 		messageOnly?: boolean;
 	};
+
+	const category = parseMailCategory(body.category);
+	if (category) {
+		const changed = await getCategoriesService(platform).moveToCategory(locals.user.id, [params.id!], category);
+		return changed > 0 ? json({ ok: true }) : json({ error: 'Not found' }, { status: 404 });
+	}
 
 	if (typeof body.spam === 'boolean') {
 		const changed = await getSpamService(platform).setSpam(locals.user.id, [params.id!], body.spam);
