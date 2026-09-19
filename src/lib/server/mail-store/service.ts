@@ -2,6 +2,7 @@ import type { R2Bucket } from '@cloudflare/workers-types';
 import { buildThreadParticipants } from './thread-participants';
 import { MAX_BODY_BYTES } from '../constants';
 import { stripQuotedText } from '$lib/utils/quotes';
+import type { Label } from '$lib/mail/labels';
 import { displaySubject, normalizeSubject, type ThreadLookup } from './threads';
 import type {
 	DeliveryStatus,
@@ -67,7 +68,7 @@ function buildPreview(bodyHead: string | null): string {
 }
 
 /** `messages` is the whole conversation, oldest first. */
-function toThreadSummary(messages: ThreadMessageRow[]): ThreadSummary {
+function toThreadSummary(messages: ThreadMessageRow[], labels: Label[] = []): ThreadSummary {
 	const oldest = messages[0];
 	const latest = messages.at(-1) as ThreadMessageRow;
 
@@ -92,6 +93,7 @@ function toThreadSummary(messages: ThreadMessageRow[]): ThreadSummary {
 		domain_id: latest.domain_id,
 		address_id: latest.address_id,
 		status: latest.status === 'draft' ? null : latest.status,
+		labels,
 		created_at: latest.created_at
 	};
 }
@@ -268,8 +270,14 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 		getEmailForUser: (userId, emailId) => repo.getForUser(userId, emailId),
 
 		async listMailbox(userId, query) {
-			const { threads, total, page, pageCount, pageSize } = await repo.listMailboxRows(userId, query);
-			return { threads: threads.map(toThreadSummary), total, page, pageCount, pageSize };
+			const { threads, labels, total, page, pageCount, pageSize } = await repo.listMailboxRows(userId, query);
+			return {
+				threads: threads.map((messages) => toThreadSummary(messages, labels.get(messages[0].thread_id))),
+				total,
+				page,
+				pageCount,
+				pageSize
+			};
 		},
 
 		async listEmails(userId, options = {}) {

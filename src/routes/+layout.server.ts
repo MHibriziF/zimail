@@ -1,5 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { getMailStoreService } from '$lib/server/mail-store';
+import { getLabelsService } from '$lib/server/labels';
 import { runDueTrashPurge } from '$lib/server/cleanup';
 import { getEmailProvider } from '$lib/server/context';
 import { runDueScheduledSends } from '$lib/server/scheduled-send';
@@ -24,6 +25,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	// which gives SvelteKit no reason to re-run this one. Naming the dependency
 	// lets those routes refresh the badges without a full invalidateAll().
 	depends('app:counts');
+	depends('app:labels');
 
 	// Emptying old trash rides along with a page load rather than a timer. The
 	// claim inside is throttled to once a day, so this is a single cheap UPDATE
@@ -66,8 +68,12 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 					.first<{ timezone: string | null }>()
 			: null;
 
+	// Sidebar label list — changes only when labels are managed, so it has its own dependency.
+	const labels = db && locals.user ? await getLabelsService(platform).list(locals.user.id) : [];
+
 	return {
 		user: locals.user,
+		labels,
 		timeZone: timezoneRow?.timezone ?? null,
 		domains: locals.domains,
 		addresses: locals.addresses,

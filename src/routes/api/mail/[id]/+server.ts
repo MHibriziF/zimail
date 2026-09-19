@@ -6,6 +6,7 @@ import {
 	statusForProviderError
 } from '$lib/server/context';
 import { getMailStoreService } from '$lib/server/mail-store';
+import { getLabelsService } from '$lib/server/labels';
 import { resolveReplyFromAddress, sendAndStore } from '$lib/server/outbound/outbox';
 import { buildReferences, displaySubject } from '$lib/server/mail-store/threads';
 import type { OutboundAttachmentInput } from '$lib/types';
@@ -31,10 +32,13 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 
 	await mailStore.markThreadRead(locals.user.id, email);
 	const messages = await mailStore.listThreadMessages(locals.user.id, email);
+	const threadId = email.thread_id ?? email.id;
+	const labels = await getLabelsService(platform).listForConversations(locals.user.id, [threadId]);
 
 	return json({
-		threadId: email.thread_id ?? email.id,
+		threadId,
 		subject: displaySubject(messages[0]?.subject ?? email.subject),
+		labels: labels.get(threadId) ?? [],
 		messages
 	});
 };

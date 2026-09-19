@@ -1,5 +1,7 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { MAILBOX_PAGE_SIZE } from '$lib/constants';
+import type { Label } from '$lib/mail/labels';
+import { createD1LabelsRepository } from '../labels/repository';
 import type {
 	DeliveryStatus,
 	EmailAttachmentMeta,
@@ -29,6 +31,9 @@ function viewFilter(view: MailboxView): string {
 			return "e.deleted_at IS NULL AND e.is_starred = 1 AND (e.status IS NULL OR e.status <> 'draft')";
 		case 'trash':
 			return 'e.deleted_at IS NOT NULL';
+		case 'all':
+			// Every conversation that isn't trashed — what a label shows.
+			return "e.deleted_at IS NULL AND (e.status IS NULL OR e.status <> 'draft')";
 	}
 }
 
@@ -59,6 +64,8 @@ export type MailboxQuery = {
 	unreadOnly?: boolean;
 	starredOnly?: boolean;
 	attachmentsOnly?: boolean;
+	/** Only conversations carrying this label. */
+	labelId?: string | null;
 	page?: number;
 	pageSize?: number;
 };
@@ -85,6 +92,8 @@ export type ThreadMessageRow = {
 export type MailboxRowsPage = {
 	/** Each entry is one conversation's messages, oldest first. */
 	threads: ThreadMessageRow[][];
+	/** Labels per conversation id, for the conversations on this page. */
+	labels: Map<string, Label[]>;
 	total: number;
 	page: number;
 	pageCount: number;
@@ -124,6 +133,13 @@ function buildScope(userId: string, query: MailboxQuery): { where: string; bindi
 	if (query.starredOnly) filters.push('e.is_starred = 1');
 	if (query.attachmentsOnly) {
 		filters.push('EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = e.id)');
+	}
+	if (query.labelId) {
+		filters.push(
+			`EXISTS(SELECT 1 FROM conversation_labels cl
+			  WHERE cl.user_id = e.user_id AND cl.label_id = ? AND cl.conversation_id = COALESCE(e.thread_id, e.id))`
+		);
+		bindings.push(query.labelId);
 	}
 
 	return { where: filters.join(' AND '), bindings };
@@ -345,7 +361,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 			const page = Math.min(Math.max(1, query.page ?? 1), pageCount);
 
 			if (total === 0) {
-				return { threads: [], total, page, pageCount, pageSize };
+				return { threads: [], labels: new Map(), total, page, pageCount, pageSize };
 			}
 
 			const { results: rows } = await db
@@ -365,7 +381,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 
 			const threadIds = rows.map((row) => row.thread_id);
 			if (threadIds.length === 0) {
-				return { threads: [], total, page, pageCount, pageSize };
+				return { threads: [], labels: new Map(), total, page, pageCount, pageSize };
 			}
 
 			const placeholders = threadIds.map(() => '?').join(', ');
@@ -393,7 +409,8 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 				.map((threadId) => byThread.get(threadId))
 				.filter((group): group is ThreadMessageRow[] => Boolean(group?.length));
 
-			return { threads, total, page, pageCount, pageSize };
+			const labels = await createD1LabelsRepository(db).listForConversations(userId, threadIds);
+			return { threads, labels, total, page, pageCount, pageSize };
 		},
 
 		async listFlatRows(userId, options) {

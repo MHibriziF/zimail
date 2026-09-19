@@ -136,5 +136,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0033_attachment_content_disposition.sql",
 		sql: "-- Forwarding needs the original MIME disposition so inline parts stay inline\n-- and ordinary files stay attachments. content_id already exists from 0032.\n-- Ported from upstream 0023_attachment_content_disposition.sql; renumbered for this fork.\nALTER TABLE email_attachments ADD COLUMN content_disposition TEXT;\n"
+	},
+	{
+		name: "0034_labels.sql",
+		sql: "-- User-defined labels, applied to whole conversations (like Gmail), not single\n-- messages: a reply that arrives later is labelled because its conversation is.\n-- `conversation_id` is COALESCE(emails.thread_id, emails.id) — the id of the\n-- conversation's oldest message, which never changes once assigned.\n-- Replaces upstream's 0024_labels.sql (tabs/spam/TypeSafe), which this fork\n-- deliberately doesn't port; see issue #28.\nCREATE TABLE labels (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\tname TEXT NOT NULL,\n\tcolor TEXT NOT NULL,\n\tcreated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n);\n\nCREATE UNIQUE INDEX labels_user_name_idx ON labels(user_id, name COLLATE NOCASE);\n\nCREATE TABLE conversation_labels (\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\tconversation_id TEXT NOT NULL,\n\tlabel_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,\n\tcreated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n\tPRIMARY KEY (user_id, conversation_id, label_id)\n);\n\nCREATE INDEX conversation_labels_label_idx ON conversation_labels(label_id);\n"
 	}
 ];
