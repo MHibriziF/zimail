@@ -38,8 +38,10 @@
 		})
 	);
 
+	/** Intl throws on an invalid date, so one bad row must not take the page down. */
 	function formatDate(iso: string): string {
-		return dateFormat.format(new Date(iso));
+		const date = new Date(iso);
+		return Number.isNaN(date.getTime()) ? '' : dateFormat.format(date);
 	}
 
 	function joinUrlFor(code: string): string {
