@@ -88,18 +88,25 @@ export function inboundAttachmentMetadata(input: {
 	related?: boolean;
 }): InboundAttachmentMetadata {
 	const contentId = input.contentId?.trim() || undefined;
-	const dispositionValue = input.disposition?.trim().toLowerCase().split(';', 1)[0];
-	const disposition =
-		dispositionValue === 'attachment' || dispositionValue === 'inline'
-			? dispositionValue
-			: input.related && contentId
-				? 'inline'
-				: undefined;
+	const disposition = inboundDisposition(input.disposition, input.related === true && Boolean(contentId));
 
 	return {
 		...(disposition ? { disposition } : {}),
 		...(contentId ? { contentId } : {})
 	};
+}
+
+/**
+ * An explicit disposition wins; without one, a part referenced from a
+ * multipart/related body by Content-ID is shown inline by the sender's client.
+ */
+function inboundDisposition(
+	raw: string | null | undefined,
+	relatedWithContentId: boolean
+): AttachmentDisposition | undefined {
+	const value = raw?.trim().toLowerCase().split(';', 1)[0];
+	if (value === 'attachment' || value === 'inline') return value;
+	return relatedWithContentId ? 'inline' : undefined;
 }
 
 export async function insertAttachmentBytes(
