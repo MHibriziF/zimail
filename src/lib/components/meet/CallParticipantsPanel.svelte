@@ -29,9 +29,12 @@
 		event.preventDefault();
 		if (renameBusy) return;
 		renameBusy = true;
-		renameError = await onRename(draftName);
-		renameBusy = false;
-		if (!renameError) renaming = false;
+		try {
+			renameError = await onRename(draftName);
+			if (!renameError) renaming = false;
+		} finally {
+			renameBusy = false;
+		}
 	}
 
 	function focusOnMount(el: HTMLInputElement) {
