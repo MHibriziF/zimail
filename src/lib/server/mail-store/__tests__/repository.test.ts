@@ -100,6 +100,7 @@ function newRow(overrides: Partial<NewEmailRow> = {}): NewEmailRow {
 		status: null,
 		scheduledAt: null,
 		isRead: false,
+		spam: false,
 		...overrides
 	};
 }

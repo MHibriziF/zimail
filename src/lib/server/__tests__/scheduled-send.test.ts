@@ -40,6 +40,7 @@ function scheduledRow(overrides: Partial<EmailRow> = {}): EmailRow {
 		is_starred: 0,
 		deleted_at: null,
 		archived_at: null,
+		spam_at: null,
 		created_at: PAST,
 		...overrides
 	};

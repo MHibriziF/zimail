@@ -77,7 +77,7 @@ export type MailAddress = {
 };
 
 /** The mailboxes the sidebar can show. Drafts/Trash are flags, not folders. */
-export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'all';
+export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'all' | 'spam';
 
 export type MailboxCounts = {
 	inbox: number;
@@ -87,6 +87,7 @@ export type MailboxCounts = {
 	drafts: number;
 	sent: number;
 	trash: number;
+	spam: number;
 };
 
 export type EmailRow = {
@@ -124,6 +125,8 @@ export type EmailRow = {
 	is_starred: number;
 	deleted_at: string | null;
 	archived_at: string | null;
+	/** Set when the conversation is in Spam. */
+	spam_at: string | null;
 	created_at: string;
 };
 

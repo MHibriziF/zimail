@@ -65,6 +65,7 @@ function emailRow(overrides: Partial<EmailRow> = {}): EmailRow {
 		is_starred: 0,
 		deleted_at: null,
 		archived_at: null,
+		spam_at: null,
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -91,6 +92,7 @@ function fakeRepo(overrides: Partial<MailStoreRepository> = {}) {
 			record('insertRow', [row]);
 			insertedRows.push(row);
 		},
+		isConversationSpam: async () => false,
 		async clearArchiveForThread(userId, threadId) {
 			record('clearArchiveForThread', [userId, threadId]);
 		},
@@ -108,7 +110,7 @@ function fakeRepo(overrides: Partial<MailStoreRepository> = {}) {
 			return [];
 		},
 		getCursorCounts: async () => ({ messageCount: 0, latestRowid: 0 }),
-		getMailboxCounts: async () => ({ inbox: 0, inbox_unread: 0, archive: 0, starred: 0, drafts: 0, sent: 0, trash: 0 }),
+		getMailboxCounts: async () => ({ inbox: 0, inbox_unread: 0, archive: 0, starred: 0, drafts: 0, sent: 0, trash: 0, spam: 0 }),
 		expandToThreads: async (userId, ids) => ids,
 		setFlags: async () => 0,
 		async findOwnedIds(userId, ids) {
@@ -203,6 +205,39 @@ describe('thin pass-throughs', () => {
 		await service.deleteDraft('user-1', 'draft-1');
 		assert.deepEqual(calls.deleteDraftRow?.[0], ['user-1', 'draft-1']);
 		assert.deepEqual((await service.listForwardThreadMessages('user-1', 'thread-1')).map((m) => m.id), ['fwd-1']);
+	});
+});
+
+describe('insertEmail — spam stays whole per conversation', () => {
+	const inbound = { userId: 'user-1', direction: 'inbound' as const, from: 'x@spam.test', to: 'me@example.com', subject: 'Hi' };
+	const insertedSpam = (calls: Record<string, unknown[][]>) => (calls.insertRow?.[0]?.[0] as { spam: boolean }).spam;
+
+	test('a spam verdict on a message that starts a conversation files it in Spam', async () => {
+		const { repo, calls } = fakeRepo();
+		const service = createMailStoreService({ repo, resolveThread: async (_u, input) => input.emailId });
+		await service.insertEmail({ ...inbound, spam: true });
+		assert.equal(insertedSpam(calls), true);
+	});
+
+	test('a spam verdict on a reply into a normal conversation is ignored', async () => {
+		const { repo, calls } = fakeRepo({ isConversationSpam: async () => false });
+		const service = createMailStoreService({ repo, resolveThread: async () => 'existing-thread' });
+		await service.insertEmail({ ...inbound, spam: true });
+		assert.equal(insertedSpam(calls), false);
+	});
+
+	test('any new message in a conversation already in Spam goes to Spam', async () => {
+		const { repo, calls } = fakeRepo({ isConversationSpam: async () => true });
+		const service = createMailStoreService({ repo, resolveThread: async () => 'existing-thread' });
+		await service.insertEmail({ ...inbound, spam: false });
+		assert.equal(insertedSpam(calls), true);
+	});
+
+	test('spam mail does not pull an archived conversation back into the inbox', async () => {
+		const { repo, calls } = fakeRepo();
+		const service = createMailStoreService({ repo, resolveThread: async (_u, input) => input.emailId });
+		await service.insertEmail({ ...inbound, spam: true });
+		assert.equal(calls.clearArchiveForThread, undefined);
 	});
 });
 
@@ -352,7 +387,7 @@ describe('getMailboxCursor / countUnread', () => {
 
 	test('countUnread reads inbox_unread off the mailbox counts', async () => {
 		const { repo } = fakeRepo({
-			getMailboxCounts: async () => ({ inbox: 5, inbox_unread: 3, archive: 0, starred: 0, drafts: 0, sent: 0, trash: 0 })
+			getMailboxCounts: async () => ({ inbox: 5, inbox_unread: 3, archive: 0, starred: 0, drafts: 0, sent: 0, trash: 0, spam: 0 })
 		});
 		const service = createMailStoreService({ repo, resolveThread: async (_u, input) => input.emailId });
 		assert.equal(await service.countUnread('user-1'), 3);

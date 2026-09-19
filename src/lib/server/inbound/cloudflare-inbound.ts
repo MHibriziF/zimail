@@ -13,6 +13,7 @@ import {
 	type TelegramNotificationEnv
 } from '../telegram-notify';
 import { stripHtml } from '../util/html';
+import { isFiledAsSpam, spamServiceForDb } from '../spam';
 
 export type CloudflareInboundMessage = {
 	readonly from: string;
@@ -87,6 +88,11 @@ export async function handleCloudflareInbound(
 		return;
 	}
 
+	const spam = await spamServiceForDb(env.DB).isSpamInbound(route.userId, from, [
+		message.headers.get('authentication-results'),
+		message.headers.get('arc-authentication-results')
+	]);
+
 	const emailId = await insertEmail(env.DB, {
 		userId: route.userId,
 		direction: 'inbound',
@@ -102,10 +108,13 @@ export async function handleCloudflareInbound(
 		references,
 		domainId: route.domainId,
 		addressId: route.addressId,
-		providerId
+		providerId,
+		spam
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, emailId, parsed.attachments);
+	// Mail filed in Spam is kept but never announced.
+	if (await isFiledAsSpam(env.DB, route.userId, emailId)) return;
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,

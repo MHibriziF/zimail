@@ -16,7 +16,8 @@ export { createD1MailStoreRepository } from './repository';
 
 type PlatformLike = App.Platform | undefined | null;
 
-function serviceForDb(db: D1Database): MailStoreService {
+/** For peer server modules that are handed a `db` rather than `platform` (inbound, spam). */
+export function mailStoreServiceForDb(db: D1Database): MailStoreService {
 	return createMailStoreService({
 		repo: createD1MailStoreRepository(db),
 		resolveThread: (userId, input) => resolveThreadId(db, userId, input)
@@ -27,7 +28,7 @@ function serviceForDb(db: D1Database): MailStoreService {
 export function getMailStoreService(platform: PlatformLike): MailStoreService {
 	const db = platform?.env.DB;
 	if (!db) throw new Error('Database unavailable');
-	return serviceForDb(db);
+	return mailStoreServiceForDb(db);
 }
 
 /*
@@ -40,11 +41,11 @@ export function getMailStoreService(platform: PlatformLike): MailStoreService {
  */
 
 export function insertEmail(db: D1Database, input: InsertEmailInput) {
-	return serviceForDb(db).insertEmail(input);
+	return mailStoreServiceForDb(db).insertEmail(input);
 }
 
 export function emailExistsByProviderId(db: D1Database, providerId: string) {
-	return serviceForDb(db).emailExistsByProviderId(providerId);
+	return mailStoreServiceForDb(db).emailExistsByProviderId(providerId);
 }
 
 export function updateEmailStatusByProviderId(
@@ -53,7 +54,7 @@ export function updateEmailStatusByProviderId(
 	status: DeliveryStatus,
 	detail?: string | null
 ) {
-	return serviceForDb(db).updateEmailStatusByProviderId(providerId, status, detail);
+	return mailStoreServiceForDb(db).updateEmailStatusByProviderId(providerId, status, detail);
 }
 
 export function deleteEmailsPermanently(
@@ -62,9 +63,9 @@ export function deleteEmailsPermanently(
 	userId: string,
 	ids: string[]
 ) {
-	return serviceForDb(db).deleteEmailsPermanently(userId, bucket, ids);
+	return mailStoreServiceForDb(db).deleteEmailsPermanently(userId, bucket, ids);
 }
 
 export function listMailbox(db: D1Database, userId: string, query: Parameters<MailStoreService['listMailbox']>[1]) {
-	return serviceForDb(db).listMailbox(userId, query);
+	return mailStoreServiceForDb(db).listMailbox(userId, query);
 }
