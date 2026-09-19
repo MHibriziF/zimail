@@ -8,7 +8,8 @@ export function readFilters(url: URL): MailboxFilters {
 		unreadOnly: url.searchParams.get('unread') === '1',
 		starredOnly: url.searchParams.get('starred') === '1',
 		attachmentsOnly: url.searchParams.get('attachments') === '1',
-		addressId: url.searchParams.get('address')?.trim() ?? ''
+		addressId: url.searchParams.get('address')?.trim() ?? '',
+		labelId: url.searchParams.get('label')?.trim() ?? ''
 	};
 }
 
@@ -36,6 +37,7 @@ export async function loadMailbox(
 		unreadOnly: filters.unreadOnly,
 		starredOnly: filters.starredOnly,
 		attachmentsOnly: filters.attachmentsOnly,
+		labelId: filters.labelId || null,
 		page: Number(url.searchParams.get('page')) || 1
 	});
 

@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { disablePushForCurrentAccount } from '$lib/push-client';
 	import { t } from '$lib/i18n';
+	import { LABEL_SWATCH } from '$lib/mail/labels';
 	import type { ThemeShellProps } from '$lib/ui-theme/types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import AccountHeader from './AccountHeader.svelte';
@@ -104,6 +105,7 @@
 		{ href: '/settings/connections', icon: 'Users', label: t('nav.connections') },
 		{ href: '/settings/notifications', icon: 'Bell', label: t('nav.notifications') },
 		{ href: '/settings/cleanup', icon: 'Bin', label: t('nav.cleanup') },
+		{ href: '/settings/labels', icon: 'Tag', label: t('labels.title') },
 		...(data.user.is_admin ? [{ href: '/admin', icon: 'SettingsGear', label: t('nav.admin') }] : [])
 	]);
 
@@ -305,6 +307,24 @@
 						{/each}
 					</div>
 				{/each}
+				{#if data.labels.length > 0}
+					<div class="z-nav-section">
+						{#if !collapsed || mobileOpen}<div class="z-nav-title">{t('labels.title')}</div>{/if}
+						{#each data.labels as label (label.id)}
+							<Tooltip text={label.name} side="right" enabled={collapsed && !mobileOpen} stretch>
+								<a
+									href="/all?label={label.id}"
+									class="z-nav-link"
+									class:active={pathname === '/all' && $page.url.searchParams.get('label') === label.id}
+									aria-label={collapsed && !mobileOpen ? label.name : undefined}
+								>
+									<span class="z-label-dot" style="background: {LABEL_SWATCH[label.color]}"></span>
+									{#if !collapsed || mobileOpen}<span>{label.name}</span>{/if}
+								</a>
+							</Tooltip>
+						{/each}
+					</div>
+				{/if}
 			{/if}
 		</nav>
 

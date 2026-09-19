@@ -8,7 +8,8 @@ export const FOLDER_PATH: Record<MailboxView, string> = {
 	starred: '/starred',
 	drafts: '/drafts',
 	sent: '/sent',
-	trash: '/trash'
+	trash: '/trash',
+	all: '/all'
 };
 
 export function folderTitle(view: MailboxView, locale: string = DEFAULT_LOCALE): string {
@@ -25,6 +26,8 @@ export function folderTitle(view: MailboxView, locale: string = DEFAULT_LOCALE):
 			return translate(locale, 'nav.sent');
 		case 'trash':
 			return translate(locale, 'nav.bin');
+		case 'all':
+			return translate(locale, 'nav.allMail');
 		default: {
 			const _never: never = view;
 			return _never;
@@ -38,7 +41,8 @@ export const FOLDER_TITLE: Record<MailboxView, string> = {
 	starred: 'Starred',
 	drafts: 'Drafts',
 	sent: 'Sent',
-	trash: 'Bin'
+	trash: 'Bin',
+	all: 'All mail'
 };
 
 export function viewFromLocation(pathname: string, search: URLSearchParams): MailboxView {
@@ -49,6 +53,7 @@ export function viewFromLocation(pathname: string, search: URLSearchParams): Mai
 	if (pathname === '/sent') return 'sent';
 	if (pathname === '/starred') return 'starred';
 	if (pathname === '/trash') return 'trash';
+	if (pathname === '/all') return 'all';
 	return 'inbox';
 }
 

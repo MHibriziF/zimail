@@ -67,7 +67,8 @@
 		"openSidebar": "Open sidebar",
 		"closeSidebar": "Close sidebar",
 		"security": "Security",
-		"cleanup": "Cleanup"
+		"cleanup": "Cleanup",
+		"allMail": "All mail"
 	},
 	"account": {
 		"menu": "Account menu",
@@ -205,7 +206,8 @@
 			"zero": "It's empty here",
 			"zeroHint": "Search for another email or",
 			"clearFiltersLink": "clear filters",
-			"search": "No messages match that search"
+			"search": "No messages match that search",
+			"all": "Nothing here yet."
 		},
 		"noSubject": "(no subject)",
 		"noRecipient": "No recipient",
@@ -796,5 +798,31 @@
 		"emptyHint": "Meetings you create show up here, ready to reuse — the code stays the same until you get a new one.",
 		"open": "Open",
 		"or": "or"
+	},
+	"labels": {
+		"title": "Labels",
+		"apply": "Labels",
+		"searchOrCreate": "Find or create a label",
+		"create": "Create \"{name}\"",
+		"none": "No labels yet.",
+		"manage": "Manage labels",
+		"settingsHint": "Tag conversations to find them later. A label stays on the whole conversation, including replies that arrive afterwards.",
+		"newName": "New label name",
+		"color": "Color",
+		"add": "Add label",
+		"emptySettings": "You haven't made any labels yet.",
+		"rename": "Rename label",
+		"delete": "Delete",
+		"deleteConfirm": "Remove this label from every conversation?",
+		"colors": {
+			"gray": "Gray",
+			"red": "Red",
+			"orange": "Orange",
+			"yellow": "Yellow",
+			"green": "Green",
+			"teal": "Teal",
+			"blue": "Blue",
+			"purple": "Purple"
+		}
 	}
 }

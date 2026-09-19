@@ -38,6 +38,7 @@
 			addresses: data.addresses,
 			activeDomainId: data.activeDomainId,
 			counts: data.counts,
+			labels: data.labels,
 			uiTheme: data.uiTheme
 		};
 	});

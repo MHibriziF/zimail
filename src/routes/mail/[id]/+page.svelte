@@ -6,6 +6,9 @@
 	import AttachmentPicker from '$lib/components/mailbox/AttachmentPicker.svelte';
 	import ThreadMessage from '$lib/components/mailbox/ThreadMessage.svelte';
 	import SendButton from '$lib/components/mailbox/SendButton.svelte';
+	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
+	import LabelPicker from '$lib/components/mailbox/LabelPicker.svelte';
+	import type { Label } from '$lib/mail/labels';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import {
 		cancelScheduledSend,
@@ -21,6 +24,13 @@
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	/** Updated in place by the picker; reset whenever a different conversation loads. */
+	let appliedLabels = $state<Label[]>([]);
+	$effect(() => {
+		appliedLabels = data.conversationLabels;
+	});
+	const allLabels = $derived((data.labels ?? []) as Label[]);
 
 	// Opening a thread marks it read server-side, but the sidebar's unread badge
 	// comes from the root layout load, which SvelteKit has no reason to re-run on
@@ -284,6 +294,15 @@
 				</button>
 			{/if}
 
+			{#if latest}
+				<LabelPicker
+					emailId={latest.id}
+					labels={allLabels}
+					applied={appliedLabels}
+					onchange={(next) => (appliedLabels = next)}
+				/>
+			{/if}
+
 			<button
 				type="button"
 				class="icon-btn"
@@ -330,6 +349,14 @@
 				<span class="thread-count">{messages.length} messages</span>
 			{/if}
 		</div>
+
+		{#if appliedLabels.length > 0}
+			<div class="thread-labels">
+				{#each appliedLabels as label (label.id)}
+					<LabelChip {label} href="/all?label={label.id}" />
+				{/each}
+			</div>
+		{/if}
 
 		{#if collapsedCount > 0}
 			<button type="button" class="expand-all" onclick={expandAll}>
@@ -503,6 +530,13 @@
 		font-weight: 600;
 		letter-spacing: -0.02em;
 		line-height: 1.35;
+	}
+
+	.thread-labels {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+		margin-top: 0.75rem;
 	}
 
 	.subject-row {

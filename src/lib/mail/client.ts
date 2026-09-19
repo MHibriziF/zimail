@@ -1,4 +1,5 @@
 import type { OutboundAttachmentInput } from '$lib/types';
+import type { Label, LabelColor } from '$lib/mail/labels';
 
 /**
  * Every write a shell makes to the mailbox, in one place.
@@ -188,4 +189,41 @@ export async function cancelScheduledSend(messageId: string): Promise<string | u
 		'Could not recall that message'
 	);
 	return body.draftId;
+}
+
+/** Replaces the labels on the conversation `emailId` belongs to; resolves to what's applied now. */
+export async function setConversationLabels(emailId: string, labelIds: string[]): Promise<Label[]> {
+	const response = await fetch(`/api/mail/${encodeURIComponent(emailId)}/labels`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ labelIds })
+	});
+	const body = (await response.json().catch(() => ({}))) as { labels?: Label[]; error?: string };
+	if (!response.ok || !body.labels) {
+		throw new MailRequestError(response.status, body.error ?? 'Could not update the labels');
+	}
+	return body.labels;
+}
+
+async function labelRequest(url: string, method: string, payload?: unknown): Promise<Label | null> {
+	const response = await fetch(url, {
+		method,
+		headers: payload ? { 'Content-Type': 'application/json' } : undefined,
+		body: payload ? JSON.stringify(payload) : undefined
+	});
+	const body = (await response.json().catch(() => ({}))) as { label?: Label; error?: string };
+	if (!response.ok) throw new MailRequestError(response.status, body.error ?? 'Could not save the label');
+	return body.label ?? null;
+}
+
+export async function createLabel(input: { name: string; color: LabelColor }): Promise<Label> {
+	return (await labelRequest('/api/labels', 'POST', input)) as Label;
+}
+
+export async function updateLabel(id: string, changes: { name?: string; color?: LabelColor }): Promise<Label> {
+	return (await labelRequest(`/api/labels/${encodeURIComponent(id)}`, 'PATCH', changes)) as Label;
+}
+
+export async function deleteLabel(id: string): Promise<void> {
+	await labelRequest(`/api/labels/${encodeURIComponent(id)}`, 'DELETE');
 }

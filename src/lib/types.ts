@@ -1,3 +1,5 @@
+import type { Label } from './mail/labels';
+
 export type User = {
 	id: string;
 	email: string;
@@ -75,7 +77,7 @@ export type MailAddress = {
 };
 
 /** The mailboxes the sidebar can show. Drafts/Trash are flags, not folders. */
-export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash';
+export type MailboxView = 'inbox' | 'archive' | 'starred' | 'drafts' | 'sent' | 'trash' | 'all';
 
 export type MailboxCounts = {
 	inbox: number;
@@ -173,6 +175,8 @@ export type ThreadSummary = {
 	address_id: string | null;
 	/** Delivery state of the newest message, when we sent it. */
 	status: MailStatus | null;
+	/** User labels on the conversation. */
+	labels: Label[];
 	created_at: string;
 };
 
@@ -183,6 +187,8 @@ export type MailboxFilters = {
 	attachmentsOnly: boolean;
 	/** Registered address to narrow the list to; empty for all addresses. */
 	addressId: string;
+	/** Label to narrow the list to; empty for all. */
+	labelId: string;
 };
 
 export type MailboxPage = {

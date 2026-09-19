@@ -6,15 +6,18 @@
 	import DomainSwitcher from './DomainSwitcher.svelte';
 	import { APP_NAME } from '$lib/constants';
 	import type { Domain, MailboxCounts } from '$lib/types';
+	import { LABEL_SWATCH, type Label } from '$lib/mail/labels';
 
 	let {
 		counts,
+		labels = [],
 		domains,
 		activeDomainId,
 		isAdmin,
 		collapsed = $bindable(false)
 	}: {
 		counts: MailboxCounts;
+		labels?: Label[];
 		domains: Domain[];
 		activeDomainId: string | null;
 		isAdmin: boolean;
@@ -44,6 +47,10 @@
 		{ href: '/settings', icon: 'user-settings-line', label: t('nav.settings') },
 		...(isAdmin ? [{ href: '/admin', icon: 'settings-3-line', label: t('nav.admin') }] : [])
 	]);
+
+	function isLabelActive(id: string): boolean {
+		return $page.url.pathname === '/all' && $page.url.searchParams.get('label') === id;
+	}
 
 	function isActive(href: string): boolean {
 		return $page.url.pathname === href || $page.url.pathname.startsWith(`${href}/`);
@@ -85,6 +92,25 @@
 			</a>
 		{/each}
 	</nav>
+
+	{#if labels.length > 0}
+		<div class="section">
+			{#if !collapsed}<p class="section-title">{t('labels.title')}</p>{/if}
+			<nav class="nav" aria-label={t('labels.title')}>
+				{#each labels as label (label.id)}
+					<a
+						href="/all?label={label.id}"
+						class="nav-link"
+						class:active={isLabelActive(label.id)}
+						title={collapsed ? label.name : undefined}
+					>
+						<span class="label-dot" style="background: {LABEL_SWATCH[label.color]}"></span>
+						{#if !collapsed}<span class="nav-label">{label.name}</span>{/if}
+					</a>
+				{/each}
+			</nav>
+		</div>
+	{/if}
 
 	{#if !collapsed && domains.length > 0}
 		<div class="section">
@@ -256,6 +282,14 @@
 
 	.section {
 		margin-top: 1.125rem;
+	}
+
+	.label-dot {
+		flex-shrink: 0;
+		width: 0.625rem;
+		height: 0.625rem;
+		margin: 0 0.1875rem;
+		border-radius: 999px;
 	}
 
 	.section-title {

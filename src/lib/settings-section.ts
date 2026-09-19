@@ -13,7 +13,8 @@ export const SETTINGS_SECTIONS = [
 	'security',
 	'connections',
 	'notifications',
-	'cleanup'
+	'cleanup',
+	'labels'
 ] as const;
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number] | 'all';

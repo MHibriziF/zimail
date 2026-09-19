@@ -102,7 +102,7 @@ function fakeRepo(overrides: Partial<MailStoreRepository> = {}) {
 		getForUser: async () => null,
 		async listMailboxRows(userId: string, query: MailboxQuery): Promise<MailboxRowsPage> {
 			record('listMailboxRows', [userId, query]);
-			return { threads: [], total: 0, page: 1, pageCount: 1, pageSize: 25 };
+			return { threads: [], labels: new Map(), total: 0, page: 1, pageCount: 1, pageSize: 25 };
 		},
 		async listFlatRows() {
 			return [];
@@ -315,7 +315,7 @@ describe('listMailbox / listEmails — row to view-model mapping', () => {
 		];
 		const { repo } = fakeRepo({
 			async listMailboxRows() {
-				return { threads: [messages], total: 1, page: 1, pageCount: 1, pageSize: 25 };
+				return { threads: [messages], labels: new Map(), total: 1, page: 1, pageCount: 1, pageSize: 25 };
 			}
 		});
 		const service = createMailStoreService({ repo, resolveThread: async (_u, input) => input.emailId });

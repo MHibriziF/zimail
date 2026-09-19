@@ -12,6 +12,7 @@
 	import { patchThread, runMailAction } from '$lib/mail/client';
 	import { t } from '$lib/i18n';
 	import { haptic, isPrimaryTab } from '$lib/app-chrome';
+	import type { Label } from '$lib/mail/labels';
 	import type { MailAddress, MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 
 	let {
@@ -31,11 +32,16 @@
 			starred: { title: t('nav.starred'), icon: 'star-line', empty: t('mailbox.empty.starred') },
 			drafts: { title: t('nav.drafts'), icon: 'draft-line', empty: t('mailbox.empty.drafts') },
 			sent: { title: t('nav.sent'), icon: 'send-plane-line', empty: t('mailbox.empty.sent') },
-			trash: { title: t('nav.trash'), icon: 'delete-bin-line', empty: t('mailbox.empty.trash') }
+			trash: { title: t('nav.trash'), icon: 'delete-bin-line', empty: t('mailbox.empty.trash') },
+			all: { title: t('nav.allMail'), icon: 'mail-line', empty: t('mailbox.empty.all') }
 		}) satisfies Record<MailboxView, { title: string; icon: string; empty: string }>
 	);
 
 	const meta = $derived(META[view]);
+	// A label view is titled by the label, not by the folder it happens to be filtering.
+	const activeLabel = $derived(
+		(($currentPage.data.labels ?? []) as Label[]).find((label) => label.id === filters.labelId)
+	);
 	const addresses = $derived(($currentPage.data.addresses ?? []) as MailAddress[]);
 
 	// Local copy so stars and reads can flip before the server round trip lands.
@@ -206,7 +212,7 @@
 					{/if}
 				</div>
 			{:else}
-				<h1 class="title">{meta.title}</h1>
+				<h1 class="title">{activeLabel?.name ?? meta.title}</h1>
 				{#if mailbox.total > 0}
 					<span class="total">{mailbox.total}</span>
 				{/if}

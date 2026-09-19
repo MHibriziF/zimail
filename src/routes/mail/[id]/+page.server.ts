@@ -4,6 +4,7 @@ import { getMailStoreService } from '$lib/server/mail-store';
 import { resolveReplyFromAddress } from '$lib/server/outbound/outbox';
 import { displaySubject } from '$lib/server/mail-store/threads';
 import { getDomainsService } from '$lib/server/domains';
+import { getLabelsService } from '$lib/server/labels';
 
 export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	if (!locals.user || !platform?.env.DB) {
@@ -24,11 +25,15 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 	]);
 	const identities = new Map(addresses.map((address) => [address.address.toLowerCase(), address]));
 
+	const threadId = email.thread_id ?? email.id;
+	const labels = await getLabelsService(platform).listForConversations(locals.user.id, [threadId]);
+
 	const latest = messages[messages.length - 1] ?? email;
 	const replyIdentity = await resolveReplyFromAddress(platform.env.DB, locals.user, latest);
 
 	return {
-		threadId: email.thread_id ?? email.id,
+		threadId,
+		conversationLabels: labels.get(threadId) ?? [],
 		/** The message that was linked to — expanded first when the page opens. */
 		focusId: email.id,
 		trashed: Boolean(email.deleted_at),

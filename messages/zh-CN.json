@@ -67,7 +67,8 @@
 		"openSidebar": "打开侧边栏",
 		"closeSidebar": "关闭侧边栏",
 		"security": "安全",
-		"cleanup": "清理"
+		"cleanup": "清理",
+		"allMail": "所有邮件"
 	},
 	"account": {
 		"menu": "账户菜单",
@@ -205,7 +206,8 @@
 			"zero": "这里是空的",
 			"zeroHint": "搜索其他邮件，或",
 			"clearFiltersLink": "清除筛选",
-			"search": "没有符合该搜索的邮件"
+			"search": "没有符合该搜索的邮件",
+			"all": "这里还没有内容。"
 		},
 		"noSubject": "（无主题）",
 		"noRecipient": "无收件人",
@@ -796,5 +798,31 @@
 		"emptyHint": "你创建的会议会显示在这里，可重复使用——除非你获取新代码，否则代码保持不变。",
 		"open": "打开",
 		"or": "或"
+	},
+	"labels": {
+		"title": "标签",
+		"apply": "标签",
+		"searchOrCreate": "查找或新建标签",
+		"create": "新建“{name}”",
+		"none": "还没有标签。",
+		"manage": "管理标签",
+		"settingsHint": "给会话打标签，方便以后查找。标签作用于整个会话，包括之后收到的回复。",
+		"newName": "新标签名称",
+		"color": "颜色",
+		"add": "添加标签",
+		"emptySettings": "你还没有创建任何标签。",
+		"rename": "重命名标签",
+		"delete": "删除",
+		"deleteConfirm": "从所有会话中移除此标签？",
+		"colors": {
+			"gray": "灰色",
+			"red": "红色",
+			"orange": "橙色",
+			"yellow": "黄色",
+			"green": "绿色",
+			"teal": "青色",
+			"blue": "蓝色",
+			"purple": "紫色"
+		}
 	}
 }

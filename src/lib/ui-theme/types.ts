@@ -1,5 +1,6 @@
 import type { Component, Snippet } from 'svelte';
 import type { Domain, MailAddress, MailboxCounts, MailboxView, User } from '$lib/types';
+import type { Label } from '$lib/mail/labels';
 
 /** What a theme's shell can do, so a route can ask before assuming. */
 export type ThemeCapabilities = {
@@ -16,6 +17,8 @@ export type ThemeShellData = {
 	addresses: MailAddress[];
 	activeDomainId: string | null;
 	counts: MailboxCounts;
+	/** User labels, for the sidebar. */
+	labels: Label[];
 	uiTheme: string;
 };
 

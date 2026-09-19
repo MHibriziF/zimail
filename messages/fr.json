@@ -67,7 +67,8 @@
 		"openSidebar": "Ouvrir la barre latérale",
 		"closeSidebar": "Fermer la barre latérale",
 		"security": "Sécurité",
-		"cleanup": "Nettoyage"
+		"cleanup": "Nettoyage",
+		"allMail": "Tous les messages"
 	},
 	"account": {
 		"menu": "Menu du compte",
@@ -205,7 +206,8 @@
 			"zero": "C’est vide ici",
 			"zeroHint": "Recherchez un autre e-mail ou",
 			"clearFiltersLink": "effacez les filtres",
-			"search": "Aucun message ne correspond à cette recherche"
+			"search": "Aucun message ne correspond à cette recherche",
+			"all": "Rien ici pour l’instant."
 		},
 		"noSubject": "(sans objet)",
 		"noRecipient": "Aucun destinataire",
@@ -796,5 +798,31 @@
 		"emptyHint": "Les réunions que vous créez apparaissent ici, prêtes à être réutilisées — le code reste le même jusqu’à ce que vous en demandiez un nouveau.",
 		"open": "Ouvrir",
 		"or": "ou"
+	},
+	"labels": {
+		"title": "Libellés",
+		"apply": "Libellés",
+		"searchOrCreate": "Chercher ou créer un libellé",
+		"create": "Créer « {name} »",
+		"none": "Aucun libellé pour l’instant.",
+		"manage": "Gérer les libellés",
+		"settingsHint": "Étiquetez les conversations pour les retrouver. Un libellé s’applique à toute la conversation, y compris aux réponses suivantes.",
+		"newName": "Nom du nouveau libellé",
+		"color": "Couleur",
+		"add": "Ajouter",
+		"emptySettings": "Vous n’avez encore créé aucun libellé.",
+		"rename": "Renommer le libellé",
+		"delete": "Supprimer",
+		"deleteConfirm": "Retirer ce libellé de toutes les conversations ?",
+		"colors": {
+			"gray": "Gris",
+			"red": "Rouge",
+			"orange": "Orange",
+			"yellow": "Jaune",
+			"green": "Vert",
+			"teal": "Sarcelle",
+			"blue": "Bleu",
+			"purple": "Violet"
+		}
 	}
 }
