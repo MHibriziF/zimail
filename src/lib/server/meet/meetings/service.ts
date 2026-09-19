@@ -1,4 +1,5 @@
 import type { AdmissionsRepository, AdmissionStatus, PendingAdmission } from '../admissions/repository';
+import { createHostIdentity, isHostIdentity } from '../../../meet/host-identity';
 import {
 	DEFAULT_SCREEN_SHARE,
 	type ScreenShareMode,
@@ -145,7 +146,7 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 		const participants = await liveKit.listParticipants(meeting.id);
 		await Promise.all(
 			participants
-				.filter((participant) => participant.attributes.role !== 'host')
+				.filter((participant) => !isHostIdentity(participant.identity))
 				.map((participant) => liveKit.setPublishSources(meeting.id, participant.identity, sources))
 		);
 	}
@@ -271,10 +272,9 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 
 			const liveKit = getLiveKit();
 			const token = await liveKit.createAccessToken({
-				identity: crypto.randomUUID(),
+				identity: isOwner ? createHostIdentity() : crypto.randomUUID(),
 				name,
 				room: meeting.id,
-				attributes: isOwner ? { role: 'host' } : undefined,
 				canPublishSources: publishSourcesFor(meeting, isOwner)
 			});
 

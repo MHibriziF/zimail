@@ -31,7 +31,7 @@ type AccessTokenOptions = {
 	room: string;
 	/** How long the token is valid to establish the *initial* connection. */
 	ttlSeconds?: number;
-	/** Initial participant attributes (e.g. `{ role: 'host' }`) — a top-level JWT claim, not part of the `video` grant. */
+	/** Initial participant attributes — a top-level JWT claim, not part of the `video` grant. Self-editable, so never trust them for authority. */
 	attributes?: Record<string, string>;
 	/** Omitted means every source is allowed. */
 	canPublishSources?: TrackSourceName[];

@@ -16,6 +16,7 @@
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { normalizeDisplayName } from '$lib/meet/display-name';
+	import { isHostIdentity } from '$lib/meet/host-identity';
 	import {
 		DEFAULT_SCREEN_SHARE,
 		parseScreenShareMode,
@@ -526,7 +527,7 @@
 	 * so a change made mid-call reaches everyone without another server round trip.
 	 */
 	function readHostScreenShareSettings(participant: Participant) {
-		if (participant.attributes.role !== 'host') return;
+		if (!isHostIdentity(participant.identity)) return;
 		const policy = parseScreenSharePolicy(participant.attributes.screenSharePolicy);
 		const mode = parseScreenShareMode(participant.attributes.screenShareMode);
 		if (policy || mode) applyScreenShareSettings({ policy: policy ?? screenShareSettings.policy, mode: mode ?? screenShareSettings.mode });
@@ -802,7 +803,7 @@
 		instance.registerTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC, async (reader, participantInfo) => {
 			await reader.readAll();
 			// Only a host's answer counts — anyone could send on this topic.
-			if (instance.remoteParticipants.get(participantInfo.identity)?.attributes.role !== 'host') return;
+			if (!isHostIdentity(participantInfo.identity)) return;
 			screenShareRequested = false;
 			showNotice(t('meet.screenShareDeclined'));
 		});
@@ -810,7 +811,7 @@
 		(async () => {
 			try {
 				await instance.connect(url, token);
-				isHost = instance.localParticipant.attributes.role === 'host';
+				isHost = isHostIdentity(instance.localParticipant.identity);
 				if (isHost) void loadMeetingSettings();
 				if (deafened) syncDeafenedAttribute('1');
 				await instance.localParticipant.setMicrophoneEnabled(
@@ -990,7 +991,7 @@
 	async function requestScreenShare() {
 		if (!room || screenShareRequested) return;
 		const hosts = Array.from(room.remoteParticipants.values())
-			.filter((participant) => participant.attributes.role === 'host')
+			.filter((participant) => isHostIdentity(participant.identity))
 			.map((participant) => participant.identity);
 		if (hosts.length === 0) {
 			showNotice(t('meet.screenShareNoHost'));

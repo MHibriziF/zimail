@@ -374,7 +374,7 @@ describe('screen-share policy', () => {
 	test('changing the policy mid-call re-applies it to everyone in the room except the host', async () => {
 		const { repo } = fakeMeetingsRepo([meeting()]);
 		const liveKit = recordingLiveKit([
-			{ identity: 'host', attributes: { role: 'host' } },
+			{ identity: 'host-1', attributes: {} },
 			{ identity: 'guest', attributes: {} }
 		]);
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
@@ -386,6 +386,29 @@ describe('screen-share policy', () => {
 
 		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'open' });
 		assert.deepEqual(liveKit.permissionChanges[1].sources, ['camera', 'microphone', 'screen_share', 'screen_share_audio']);
+	});
+
+	test('a guest claiming the host role in its attributes is not exempt from a policy change', async () => {
+		// Participants can set their own attributes, so `role: host` proves nothing.
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([{ identity: 'guest', attributes: { role: 'host' } }]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'approval' });
+		assert.deepEqual(liveKit.permissionChanges.map((change) => change.identity), ['guest']);
+	});
+
+	test('only the owner is minted a host identity', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		await service.requestJoin('aaa-aaaa-aaa', { name: 'Host', requesterId: 'user-1' });
+		await service.requestJoin('aaa-aaaa-aaa', { name: 'Guest', requesterId: 'someone-else' });
+		assert.deepEqual(
+			liveKit.tokens.map((token) => token.identity.startsWith('host-')),
+			[true, false]
+		);
 	});
 
 	test('changing only the mode, or re-saving the same policy, touches no one in the room', async () => {
