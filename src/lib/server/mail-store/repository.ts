@@ -691,7 +691,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 			const placeholders = results.map(() => '?').join(', ');
 			const { results: files } = await db
 				.prepare(
-					`SELECT id, email_id, filename, content_type, size_bytes, created_at
+					`SELECT id, email_id, filename, content_type, size_bytes, created_at, content_id
 					 FROM email_attachments
 					 WHERE email_id IN (${placeholders})
 					 ORDER BY created_at ASC`

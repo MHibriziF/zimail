@@ -4,6 +4,7 @@
 	import AttachmentList from './AttachmentList.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import EmailBody from './EmailBody.svelte';
+	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import { formatFullDate, formatRelativeDate } from '$lib/utils/date';
 	import { splitQuotedText } from '$lib/utils/quotes';
 	import type { ThreadMessage } from '$lib/types';
@@ -128,7 +129,7 @@
 
 		<div class="body mail-body">
 			{#if message.body_html}
-				<EmailBody html={message.body_html} />
+				<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
 			{:else if text.body}
 				<p class="whitespace-pre-wrap">{text.body}</p>
 				{#if text.quoted}
@@ -150,7 +151,11 @@
 			{/if}
 		</div>
 
-		<AttachmentList emailId={message.id} attachments={message.attachments} compact />
+		<AttachmentList
+			emailId={message.id}
+			attachments={visibleAttachments(message.body_html, message.attachments)}
+			compact
+		/>
 
 		{#if message.status === 'bounced' || message.status === 'failed'}
 			<p class="failure">
@@ -163,7 +168,7 @@
 			<span class="avatar small" class:self={outbound}>{outbound ? 'me' : initial}</span>
 			<span class="name">{sender}</span>
 			<span class="snippet">{snippet}</span>
-			{#if message.attachments.length > 0}
+			{#if visibleAttachments(message.body_html, message.attachments).length > 0}
 				<Icon name="attachment-2" size={13} />
 			{/if}
 			<span class="when">{formatRelativeDate(message.created_at)}</span>
