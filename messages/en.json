@@ -766,6 +766,11 @@
 		"admissionOpen": "Anyone with the code or link",
 		"admissionApproval": "I need to let people in",
 		"admissionBadge": "Admission required",
-		"couldNotSave": "Could not save changes"
+		"couldNotSave": "Could not save changes",
+		"startHeading": "Start or join a call",
+		"listHeading": "Your meetings",
+		"emptyHint": "Meetings you create show up here, ready to reuse — the code stays the same until you get a new one.",
+		"open": "Open",
+		"or": "or"
 	}
 }

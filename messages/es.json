@@ -766,6 +766,11 @@
 		"admissionOpen": "Cualquiera con el código o enlace",
 		"admissionApproval": "Necesito dejar entrar a la gente",
 		"admissionBadge": "Requiere admisión",
-		"couldNotSave": "No se pudieron guardar los cambios"
+		"couldNotSave": "No se pudieron guardar los cambios",
+		"startHeading": "Inicia o únete a una llamada",
+		"listHeading": "Tus reuniones",
+		"emptyHint": "Las reuniones que crees aparecen aquí, listas para reutilizarse — el código no cambia hasta que pidas uno nuevo.",
+		"open": "Abrir",
+		"or": "o"
 	}
 }

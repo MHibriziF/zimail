@@ -766,6 +766,11 @@
 		"admissionOpen": "Siapa saja dengan kode atau tautan",
 		"admissionApproval": "Saya perlu mengizinkan orang masuk",
 		"admissionBadge": "Perlu persetujuan",
-		"couldNotSave": "Tidak dapat menyimpan perubahan"
+		"couldNotSave": "Tidak dapat menyimpan perubahan",
+		"startHeading": "Mulai atau gabung panggilan",
+		"listHeading": "Rapat Anda",
+		"emptyHint": "Rapat yang Anda buat muncul di sini dan bisa dipakai lagi — kodenya tetap sama sampai Anda membuat kode baru.",
+		"open": "Buka",
+		"or": "atau"
 	}
 }
