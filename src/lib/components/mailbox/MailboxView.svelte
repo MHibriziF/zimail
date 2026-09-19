@@ -33,7 +33,8 @@
 			drafts: { title: t('nav.drafts'), icon: 'draft-line', empty: t('mailbox.empty.drafts') },
 			sent: { title: t('nav.sent'), icon: 'send-plane-line', empty: t('mailbox.empty.sent') },
 			trash: { title: t('nav.trash'), icon: 'delete-bin-line', empty: t('mailbox.empty.trash') },
-			all: { title: t('nav.allMail'), icon: 'mail-line', empty: t('mailbox.empty.all') }
+			all: { title: t('nav.allMail'), icon: 'mail-line', empty: t('mailbox.empty.all') },
+			spam: { title: t('nav.spam'), icon: 'spam-2-line', empty: t('mailbox.empty.spam') }
 		}) satisfies Record<MailboxView, { title: string; icon: string; empty: string }>
 	);
 
@@ -192,9 +193,19 @@
 						<button type="button" class="tool-btn" title={t('mailbox.moveToInbox')} disabled={busy} onclick={() => run('unarchive')}>
 							<Icon name="inbox-line" size={16} />
 						</button>
-					{:else if view !== 'drafts' && view !== 'trash'}
+					{:else if view !== 'drafts' && view !== 'trash' && view !== 'spam'}
 						<button type="button" class="tool-btn" title={t('nav.archive')} disabled={busy} onclick={() => run('archive')}>
 							<Icon name="archive-line" size={16} />
+						</button>
+					{/if}
+
+					{#if view === 'spam'}
+						<button type="button" class="tool-btn" title={t('thread.notSpam')} disabled={busy} onclick={() => run('notspam')}>
+							<Icon name="inbox-unarchive-line" size={16} />
+						</button>
+					{:else if view !== 'drafts' && view !== 'trash' && view !== 'sent'}
+						<button type="button" class="tool-btn" title={t('thread.reportSpam')} disabled={busy} onclick={() => run('spam')}>
+							<Icon name="spam-2-line" size={16} />
 						</button>
 					{/if}
 

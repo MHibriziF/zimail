@@ -80,7 +80,9 @@
 	const backHref = $derived(
 		data.trashed
 			? '/trash'
-			: data.archived
+			: data.spam
+				? '/spam'
+				: data.archived
 				? '/archive'
 				: latest?.direction === 'outbound'
 					? '/sent'
@@ -133,6 +135,12 @@
 	async function toggleArchive() {
 		await patch({ archived: !data.archived });
 		goto(data.archived ? '/archive' : '/inbox');
+	}
+
+	/** Reporting also blocks the sender; either way the conversation leaves this folder. */
+	async function toggleSpam() {
+		await patch({ spam: !data.spam });
+		goto(data.spam ? '/inbox' : backHref);
 	}
 
 	async function trash() {
@@ -301,6 +309,18 @@
 					applied={appliedLabels}
 					onchange={(next) => (appliedLabels = next)}
 				/>
+			{/if}
+
+			{#if !data.trashed && latest?.direction === 'inbound'}
+				<button
+					type="button"
+					class="icon-btn"
+					aria-label={data.spam ? t('thread.notSpam') : t('thread.reportSpam')}
+					title={data.spam ? t('thread.notSpam') : t('thread.reportSpam')}
+					onclick={toggleSpam}
+				>
+					<Icon name={data.spam ? 'inbox-unarchive-line' : 'spam-2-line'} size={16} />
+				</button>
 			{/if}
 
 			<button

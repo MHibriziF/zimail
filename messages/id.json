@@ -68,7 +68,8 @@
 		"closeSidebar": "Tutup bilah sisi",
 		"security": "Keamanan",
 		"cleanup": "Pembersihan",
-		"allMail": "Semua email"
+		"allMail": "Semua email",
+		"spam": "Spam"
 	},
 	"account": {
 		"menu": "Menu akun",
@@ -207,7 +208,8 @@
 			"zeroHint": "Cari surel lain atau",
 			"clearFiltersLink": "bersihkan filter",
 			"search": "Tidak ada pesan yang cocok dengan pencarian itu",
-			"all": "Belum ada apa pun di sini."
+			"all": "Belum ada apa pun di sini.",
+			"spam": "Tidak ada spam. Email yang Anda laporkan, dari pengirim yang pernah Anda laporkan, atau yang gagal autentikasi pengirim akan masuk ke sini."
 		},
 		"noSubject": "(tanpa subjek)",
 		"noRecipient": "Tanpa penerima",
@@ -345,7 +347,9 @@
 		"scheduledFor": "Dijadwalkan terkirim {when}",
 		"scheduled": "Dijadwalkan terkirim",
 		"recall": "Tarik kembali",
-		"couldNotRecall": "Tidak bisa menarik kembali pesan itu"
+		"couldNotRecall": "Tidak bisa menarik kembali pesan itu",
+		"reportSpam": "Laporkan spam",
+		"notSpam": "Bukan spam"
 	},
 	"search": {
 		"title": "Cari",

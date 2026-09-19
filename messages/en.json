@@ -68,7 +68,8 @@
 		"closeSidebar": "Close sidebar",
 		"security": "Security",
 		"cleanup": "Cleanup",
-		"allMail": "All mail"
+		"allMail": "All mail",
+		"spam": "Spam"
 	},
 	"account": {
 		"menu": "Account menu",
@@ -207,7 +208,8 @@
 			"zeroHint": "Search for another email or",
 			"clearFiltersLink": "clear filters",
 			"search": "No messages match that search",
-			"all": "Nothing here yet."
+			"all": "Nothing here yet.",
+			"spam": "No spam. Mail you report, from senders you've reported, or that fails sender authentication lands here."
 		},
 		"noSubject": "(no subject)",
 		"noRecipient": "No recipient",
@@ -345,7 +347,9 @@
 		"scheduledFor": "Scheduled to send {when}",
 		"scheduled": "Scheduled to send",
 		"recall": "Recall",
-		"couldNotRecall": "Could not recall that message"
+		"couldNotRecall": "Could not recall that message",
+		"reportSpam": "Report spam",
+		"notSpam": "Not spam"
 	},
 	"search": {
 		"title": "Search",
