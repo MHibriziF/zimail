@@ -153,17 +153,22 @@
 			class:call-btn-active={screenShareEnabled}
 			class:call-btn-pending={screenShareRequested}
 			onclick={onToggleScreenShare}
-			disabled={screenShareRequested}
 			aria-label={screenShareEnabled
 				? t('meet.screenShareOff')
-				: canShareScreen
-					? t('meet.screenShareOn')
-					: screenShareRequested
-						? t('meet.screenShareWaiting')
+				: screenShareRequested
+					? t('meet.screenShareCancelRequest')
+					: canShareScreen
+						? t('meet.screenShareOn')
 						: t('meet.screenShareAsk')}
-			title={canShareScreen || screenShareEnabled ? undefined : screenShareRequested ? t('meet.screenShareWaiting') : t('meet.screenShareAsk')}
+			title={screenShareEnabled
+				? t('meet.screenShareOff')
+				: screenShareRequested
+					? t('meet.screenShareCancelRequest')
+					: canShareScreen
+						? t('meet.screenShareOn')
+						: t('meet.screenShareAsk')}
 		>
-			<Icon name={canShareScreen || screenShareEnabled ? 'computer-line' : 'hand'} size={20} />
+			<Icon name="computer-line" size={20} />
 		</button>
 	{/if}
 	{#if pipSupported}
@@ -287,9 +292,22 @@
 		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
 	}
 
+	/* Waiting on the host: a pulsing ring, and pressing again withdraws the request. */
 	.call-btn-pending {
-		opacity: 0.55;
-		cursor: default;
+		box-shadow: 0 0 0 2px #facc15;
+		animation: call-btn-pulse 1.6s ease-in-out infinite;
+	}
+
+	@keyframes call-btn-pulse {
+		50% {
+			box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.35);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.call-btn-pending {
+			animation: none;
+		}
 	}
 
 	/* Same warning color as a muted mic/camera — deafened means you can't speak or hear either. */

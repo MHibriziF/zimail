@@ -4,6 +4,8 @@
 		Room,
 		RoomEvent,
 		Track,
+		createLocalScreenTracks,
+		type LocalTrack,
 		type LocalTrackPublication,
 		type LocalVideoTrack,
 		type Participant,
@@ -91,6 +93,7 @@
 	const CHAT_TOPIC = 'chat';
 	const SCREEN_SHARE_REQUEST_TOPIC = 'screen-share-request';
 	const SCREEN_SHARE_DECLINED_TOPIC = 'screen-share-declined';
+	const SCREEN_SHARE_CANCELLED_TOPIC = 'screen-share-cancelled';
 	/** `TrackSource.SCREEN_SHARE` in LiveKit's protocol — livekit-client doesn't re-export the enum. */
 	const PROTO_SCREEN_SHARE_SOURCE = 3;
 	/** Stands in for your own share in `shareOrder`, where everyone else is keyed by identity. */
@@ -135,6 +138,12 @@
 	let screenShareSettings = $state<ScreenShareSettings>(untrack(() => ({ ...initialScreenShare })));
 	let canShareScreen = $state(true);
 	let screenShareRequested = $state(false);
+	/**
+	 * Under "only people I allow", the screen is picked *before* asking, so
+	 * approval can start sharing straight away — no second press, and the
+	 * browser's picker (which needs a click) never has to open later.
+	 */
+	let pendingScreenTracks: LocalTrack[] = [];
 	let screenShareRequests = $state<{ identity: string; name: string }[]>([]);
 	let screenShareBusyIdentity = $state('');
 	/** Active shares, oldest first. */
@@ -495,13 +504,9 @@
 		if (room && participant === room.localParticipant) {
 			const couldShare = canShareScreen;
 			canShareScreen = mayShareScreen(participant);
-			if (canShareScreen && !couldShare && screenShareRequested) {
-				screenShareRequested = false;
-				showNotice(t('meet.screenShareGranted'));
-			}
-			if (!canShareScreen) {
-				screenShareRequested = false;
-				if (screenShareEnabled) void room.localParticipant.setScreenShareEnabled(false).catch(() => {});
+			if (canShareScreen && !couldShare && screenShareRequested) void publishPendingScreenShare();
+			if (!canShareScreen && screenShareEnabled) {
+				void room.localParticipant.setScreenShareEnabled(false).catch(() => {});
 			}
 		}
 		refreshRoster();
@@ -535,7 +540,6 @@
 
 	function applyScreenShareSettings(next: ScreenShareSettings) {
 		screenShareSettings = next;
-		if (next.policy === 'open') screenShareRequested = false;
 		// Switching to "one at a time" mid-call: everyone but the newest sharer stops.
 		const ownIndex = shareOrder.indexOf(LOCAL_SHARE_KEY);
 		if (next.mode === 'single' && room && ownIndex !== -1 && ownIndex < shareOrder.length - 1) {
@@ -803,9 +807,13 @@
 		instance.registerTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC, async (reader, participantInfo) => {
 			await reader.readAll();
 			// Only a host's answer counts — anyone could send on this topic.
-			if (!isHostIdentity(participantInfo.identity)) return;
-			screenShareRequested = false;
+			if (!isHostIdentity(participantInfo.identity) || !screenShareRequested) return;
+			releasePendingScreenShare();
 			showNotice(t('meet.screenShareDeclined'));
+		});
+		instance.registerTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC, async (reader, participantInfo) => {
+			await reader.readAll();
+			screenShareRequests = screenShareRequests.filter((request) => request.identity !== participantInfo.identity);
 		});
 
 		(async () => {
@@ -862,6 +870,7 @@
 			instance.unregisterTextStreamHandler(CHAT_TOPIC);
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_REQUEST_TOPIC);
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC);
+			instance.unregisterTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC);
 		};
 	});
 
@@ -869,6 +878,7 @@
 		room?.disconnect();
 		pipWindow?.close();
 		stopAdmissionsPolling();
+		releasePendingScreenShare();
 		if (noticeTimer) clearTimeout(noticeTimer);
 		// Give the leave chime time to finish before the context that plays it dies.
 		if (soundCtx) {
@@ -974,6 +984,10 @@
 
 	async function toggleScreenShare() {
 		if (!room) return;
+		if (screenShareRequested) {
+			void cancelScreenShareRequest();
+			return;
+		}
 		if (!screenShareEnabled && !canShareScreen) {
 			await requestScreenShare();
 			return;
@@ -987,23 +1001,74 @@
 		}
 	}
 
-	/** Under "ask the host first": the button asks instead of sharing. */
-	async function requestScreenShare() {
-		if (!room || screenShareRequested) return;
-		const hosts = Array.from(room.remoteParticipants.values())
+	function hostIdentities(): string[] {
+		if (!room) return [];
+		return Array.from(room.remoteParticipants.values())
 			.filter((participant) => isHostIdentity(participant.identity))
 			.map((participant) => participant.identity);
+	}
+
+	/** Under "only people I allow": pick the screen now, then ask; approval publishes it. */
+	async function requestScreenShare() {
+		if (!room || screenShareRequested) return;
+		const hosts = hostIdentities();
 		if (hosts.length === 0) {
 			showNotice(t('meet.screenShareNoHost'));
 			return;
 		}
+
+		let tracks: LocalTrack[];
+		try {
+			tracks = await createLocalScreenTracks({ audio: true });
+		} catch {
+			return; // Picker dismissed — nothing was captured, nothing to ask for.
+		}
+
+		pendingScreenTracks = tracks;
+		screenShareRequested = true;
+		// Stopping from the browser's own "stop sharing" bar withdraws the request too.
+		for (const track of tracks) {
+			if (track.source === Track.Source.ScreenShare) {
+				track.mediaStreamTrack.addEventListener('ended', () => void cancelScreenShareRequest(), { once: true });
+			}
+		}
+
 		try {
 			await room.localParticipant.sendText(localName, { topic: SCREEN_SHARE_REQUEST_TOPIC, destinationIdentities: hosts });
-			screenShareRequested = true;
-			showNotice(t('meet.screenShareRequested'));
 		} catch {
+			releasePendingScreenShare();
 			showNotice(t('common.networkError'));
 		}
+	}
+
+	async function publishPendingScreenShare() {
+		const tracks = pendingScreenTracks;
+		pendingScreenTracks = [];
+		screenShareRequested = false;
+		if (!room || tracks.length === 0) return;
+		try {
+			for (const track of tracks) await room.localParticipant.publishTrack(track);
+			showNotice(t('meet.screenShareGranted'));
+		} catch {
+			for (const track of tracks) track.stop();
+			showNotice(t('meet.screenShareStartFailed'));
+		}
+	}
+
+	function releasePendingScreenShare() {
+		for (const track of pendingScreenTracks) track.stop();
+		pendingScreenTracks = [];
+		screenShareRequested = false;
+	}
+
+	async function cancelScreenShareRequest() {
+		if (!screenShareRequested) return;
+		releasePendingScreenShare();
+		const hosts = hostIdentities();
+		if (!room || hosts.length === 0) return;
+		await room.localParticipant
+			.sendText('', { topic: SCREEN_SHARE_CANCELLED_TOPIC, destinationIdentities: hosts })
+			.catch(() => {});
 	}
 
 	function receiveScreenShareRequest(identity: string) {
@@ -1223,7 +1288,15 @@
 		{:else if connectionError}
 			<span class="call-header-status call-header-status-error">{connectionError}</span>
 		{/if}
-		{#if notice}
+		{#if screenShareRequested}
+			<span class="call-header-notice call-header-waiting" role="status">
+				<Icon name="computer-line" size={14} />
+				{t('meet.screenShareWaiting')}
+				<button type="button" class="call-header-notice-action" onclick={() => void cancelScreenShareRequest()}>
+					{t('common.cancel')}
+				</button>
+			</span>
+		{:else if notice}
 			<span class="call-header-notice" role="status">{notice}</span>
 		{/if}
 	</div>
@@ -1385,6 +1458,24 @@
 		border-radius: 999px;
 		font-size: 0.8125rem;
 		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.call-header-waiting {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		color: #fde68a;
+		background: rgba(250, 204, 21, 0.18);
+	}
+
+	.call-header-notice-action {
+		padding: 0.125rem 0.5rem;
+		border: none;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		color: #fff;
+		background: rgba(255, 255, 255, 0.15);
+		cursor: pointer;
 	}
 
 	.call-body {
