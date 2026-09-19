@@ -744,7 +744,10 @@
 		"chatPlaceholder": "Mensaje",
 		"send": "Enviar",
 		"noMessages": "Aún no hay mensajes.",
-		"close": "Cerrar"
+		"close": "Cerrar",
+		"rename": "Cambiar tu nombre",
+		"renameEmpty": "Escribe un nombre.",
+		"renameFailed": "No se pudo cambiar tu nombre. Inténtalo de nuevo."
 	},
 	"meetings": {
 		"title": "Reuniones — {app}",

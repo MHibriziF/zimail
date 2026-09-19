@@ -744,7 +744,10 @@
 		"chatPlaceholder": "发送消息",
 		"send": "发送",
 		"noMessages": "还没有消息。",
-		"close": "关闭"
+		"close": "关闭",
+		"rename": "修改你的名字",
+		"renameEmpty": "请输入名字。",
+		"renameFailed": "无法修改你的名字，请重试。"
 	},
 	"meetings": {
 		"title": "会议 — {app}",
