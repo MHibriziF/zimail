@@ -14,6 +14,7 @@
 	} from 'livekit-client';
 	import { BackgroundProcessor, supportsBackgroundProcessors } from '@livekit/track-processors';
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
+	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import BackgroundPickerModal from '$lib/components/meet/BackgroundPickerModal.svelte';
@@ -108,6 +109,7 @@
 	let pendingAdmissions = $state<{ id: string; name: string }[]>([]);
 	let admissionsBusyId = $state('');
 	let admissionsPollTimer: ReturnType<typeof setInterval> | null = null;
+	const ringedAdmissionIds = new Set<string>();
 
 	let panel = $state<'none' | 'participants' | 'chat' | 'settings'>('none');
 	let roster = $state<{ identity: string; name: string; isLocal: boolean }[]>([]);
@@ -173,6 +175,13 @@
 
 	function playToggleTone(on: boolean) {
 		playTone(on ? 880 : 440, 0, 0.08);
+	}
+
+	/** Three rising notes — distinct from the two-note join chime, since it asks the host to act. */
+	function playAdmissionChime() {
+		playTone(783.99, 0, 0.12);
+		playTone(987.77, 0.13, 0.12);
+		playTone(1174.66, 0.26, 0.18);
 	}
 
 	type Tile = {
@@ -833,7 +842,13 @@
 				const body = (await response.json().catch(() => ({}))) as {
 					admissions?: { id: string; name: string }[];
 				};
-				if (response.ok && body.admissions) pendingAdmissions = body.admissions;
+				if (!response.ok || !body.admissions) return;
+				pendingAdmissions = body.admissions;
+				// Deafened first: requests that arrive while deafened stay unrung, so they
+				// still chime once the host is listening again.
+				if (!deafened && takeUnseenAdmissions(ringedAdmissionIds, body.admissions).length > 0) {
+					playAdmissionChime();
+				}
 			} catch {
 				// A dropped poll just retries on the next tick.
 			}
