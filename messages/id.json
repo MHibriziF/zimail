@@ -744,7 +744,10 @@
 		"chatPlaceholder": "Pesan",
 		"send": "Kirim",
 		"noMessages": "Belum ada pesan.",
-		"close": "Tutup"
+		"close": "Tutup",
+		"rename": "Ubah nama Anda",
+		"renameEmpty": "Masukkan nama.",
+		"renameFailed": "Tidak dapat mengubah nama Anda. Coba lagi."
 	},
 	"meetings": {
 		"title": "Rapat — {app}",

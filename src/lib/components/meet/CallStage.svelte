@@ -15,6 +15,7 @@
 	import { BackgroundProcessor, supportsBackgroundProcessors } from '@livekit/track-processors';
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
+	import { normalizeDisplayName } from '$lib/meet/display-name';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import BackgroundPickerModal from '$lib/components/meet/BackgroundPickerModal.svelte';
@@ -135,8 +136,10 @@
 		return `hsl(${Math.abs(hash) % 360}, 45%, 38%)`;
 	}
 
-	const localInitials = $derived(initialsFor(displayName));
-	const localColor = $derived(colorFor(displayName || 'me'));
+	let localName = $state(untrack(() => displayName));
+	const localInitials = $derived(initialsFor(localName));
+	// Seeded from the join-time name, not localName, so renaming doesn't also repaint your avatar.
+	const localColor = colorFor(untrack(() => displayName) || 'me');
 
 	// A short beep synthesized on the fly — no audio asset to ship, and it works
 	// the instant a call starts instead of waiting on a file to load.
@@ -186,6 +189,8 @@
 
 	type Tile = {
 		el: HTMLDivElement;
+		avatar: HTMLDivElement;
+		nameEl: HTMLSpanElement;
 		media: HTMLDivElement;
 		micIcon: HTMLElement;
 		cameraIcon: HTMLElement;
@@ -225,7 +230,35 @@
 		name.textContent = label;
 
 		el.append(avatar, media, status, name);
-		return { el, media, micIcon, cameraIcon, deafenedIcon };
+		return { el, avatar, nameEl: name, media, micIcon, cameraIcon, deafenedIcon };
+	}
+
+	function handleParticipantNameChanged(_name: string, participant: Participant) {
+		if (room && participant === room.localParticipant) return;
+		const label = participant.name || t('meet.guest');
+		const tile = remoteTiles.get(participant.identity);
+		if (tile) {
+			tile.nameEl.textContent = label;
+			tile.avatar.textContent = initialsFor(label);
+		}
+		const screenTile = screenTiles.get(participant.identity);
+		if (screenTile) screenTile.nameEl.textContent = t('meet.screenShareOf', { name: label });
+		refreshRoster();
+	}
+
+	/** Returns an error message for the rename form, or '' on success. */
+	async function renameSelf(input: string): Promise<string> {
+		const name = normalizeDisplayName(input);
+		if (!name) return t('meet.renameEmpty');
+		if (!room) return t('meet.connectionError');
+		try {
+			await room.localParticipant.setName(name);
+		} catch {
+			return t('meet.renameFailed');
+		}
+		localName = name;
+		refreshRoster();
+		return '';
 	}
 
 	/** Reflects a participant's current mute state — and, via the `deafened` attribute, whether they've left audio — on their tile's status badges. */
@@ -362,7 +395,7 @@
 			name: p.name || t('meet.guest'),
 			isLocal: false
 		}));
-		roster = [{ identity: room.localParticipant.identity, name: displayName, isLocal: true }, ...remote];
+		roster = [{ identity: room.localParticipant.identity, name: localName, isLocal: true }, ...remote];
 		refreshPipVideo();
 	}
 
@@ -410,7 +443,7 @@
 				return;
 			}
 		}
-		showAvatar(displayName);
+		showAvatar(localName);
 	}
 
 	function updatePipButtons() {
@@ -608,6 +641,7 @@
 		instance.on(RoomEvent.TrackMuted, handleTrackMuteChanged);
 		instance.on(RoomEvent.TrackUnmuted, handleTrackMuteChanged);
 		instance.on(RoomEvent.ParticipantAttributesChanged, handleParticipantAttributesChanged);
+		instance.on(RoomEvent.ParticipantNameChanged, handleParticipantNameChanged);
 
 		instance.registerTextStreamHandler(CHAT_TOPIC, async (reader, participantInfo) => {
 			const text = await reader.readAll();
@@ -658,6 +692,7 @@
 			instance.off(RoomEvent.TrackMuted, handleTrackMuteChanged);
 			instance.off(RoomEvent.TrackUnmuted, handleTrackMuteChanged);
 			instance.off(RoomEvent.ParticipantAttributesChanged, handleParticipantAttributesChanged);
+			instance.off(RoomEvent.ParticipantNameChanged, handleParticipantNameChanged);
 			instance.unregisterTextStreamHandler(CHAT_TOPIC);
 		};
 	});
@@ -786,7 +821,7 @@
 
 	async function sendChatMessage(text: string) {
 		if (!room) return;
-		messages = [...messages, { id: crypto.randomUUID(), from: displayName, text, isLocal: true }];
+		messages = [...messages, { id: crypto.randomUUID(), from: localName, text, isLocal: true }];
 		try {
 			await room.localParticipant.sendText(text, { topic: CHAT_TOPIC });
 		} catch {
@@ -890,7 +925,7 @@
 
 <div class="call-stage">
 	<div class="call-header">
-		<span class="call-header-name">{displayName}</span>
+		<span class="call-header-name">{localName}</span>
 		{#if connecting}
 			<span class="call-header-status">{t('meet.connecting')}</span>
 		{:else if connectionError}
@@ -912,7 +947,7 @@
 					{#if !cameraEnabled}<Icon name="camera-off-line" size={14} class="call-tile-status-icon" />{/if}
 					{#if deafened}<Icon name="volume-mute-line" size={14} class="call-tile-status-icon" />{/if}
 				</div>
-				<span class="call-tile-name">{displayName} · {t('meet.you')}</span>
+				<span class="call-tile-name">{localName} · {t('meet.you')}</span>
 			</div>
 			<div class="call-tile-group" bind:this={remoteContainerEl}></div>
 			{#if !connecting && !connectionError && remoteCount === 0}
@@ -923,7 +958,7 @@
 		</div>
 
 		{#if panel === 'participants'}
-			<CallParticipantsPanel {roster} onClose={() => (panel = 'none')} />
+			<CallParticipantsPanel {roster} onRename={renameSelf} onClose={() => (panel = 'none')} />
 		{:else if panel === 'chat'}
 			<CallChatPanel {messages} onSend={sendChatMessage} onClose={() => (panel = 'none')} />
 		{:else if panel === 'settings'}
