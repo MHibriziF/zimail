@@ -15,10 +15,10 @@ export function authenticationFailed(...headers: (string | null | undefined)[]):
 	if (!results) return false;
 
 	const failed = (method: string): boolean => {
-		const verdicts = [...results.matchAll(new RegExp(String.raw`(?:^|[\s;])${method}=([a-z]+)`, 'g'))].map(
-			(match) => match[1]
+		const verdicts = new Set(
+			[...results.matchAll(new RegExp(String.raw`(?:^|[\s;])${method}=([a-z]+)`, 'g'))].map((match) => match[1])
 		);
-		return verdicts.includes('fail') && !verdicts.includes('pass');
+		return verdicts.has('fail') && !verdicts.has('pass');
 	};
 
 	return failed('dmarc') || (failed('spf') && failed('dkim'));
