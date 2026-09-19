@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { loadMailbox } from '$lib/server/mail-store/mailbox';
+import { getCategoriesService } from '$lib/server/categories';
 
 export const load: PageServerLoad = async ({ locals, platform, url }) => {
 	// Zero's sidebar reaches Archive through `?view=archive` on the inbox route;
@@ -14,5 +15,9 @@ export const load: PageServerLoad = async ({ locals, platform, url }) => {
 	}
 
 	const view = url.searchParams.get('view') === 'archive' ? 'archive' : 'inbox';
-	return loadMailbox(platform?.env.DB, locals.user?.id, view, url, locals.activeDomainId);
+	const tabs =
+		view === 'inbox' && platform?.env.DB && locals.user
+			? await getCategoriesService(platform).tabsEnabled(locals.user.id)
+			: false;
+	return loadMailbox(platform?.env.DB, locals.user?.id, view, url, locals.activeDomainId, { tabs });
 };

@@ -827,6 +827,24 @@
 			"teal": "Verde azulado",
 			"blue": "Azul",
 			"purple": "Morado"
-		}
+		},
+		"navTitle": "Pestañas y etiquetas"
+	},
+	"tabs": {
+		"label": "Pestañas de la bandeja",
+		"primary": "Principal",
+		"social": "Social",
+		"promotions": "Promociones",
+		"updates": "Notificaciones",
+		"forums": "Foros",
+		"moveTo": "Mover a pestaña",
+		"moveHint": "El correo futuro de este remitente irá a la misma pestaña.",
+		"settingsTitle": "Pestañas de la bandeja",
+		"settingsHint": "Ordena el correo entrante en Principal, Social, Promociones, Notificaciones y Foros. Se usan reglas que se ejecutan en tu propio servidor: ningún correo se envía a otro sitio.",
+		"enable": "Dividir mi bandeja en pestañas",
+		"sortExisting": "Ordenar correo anterior",
+		"sorting": "Ordenando… {count} listos",
+		"sortDone": "{count} conversaciones ordenadas.",
+		"sortHint": "El correo anterior a las pestañas queda en Principal hasta ordenarlo; solo se usan el remitente y el asunto."
 	}
 }

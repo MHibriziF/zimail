@@ -8,6 +8,8 @@
 	import SendButton from '$lib/components/mailbox/SendButton.svelte';
 	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
 	import LabelPicker from '$lib/components/mailbox/LabelPicker.svelte';
+	import CategoryMenu from '$lib/components/mailbox/CategoryMenu.svelte';
+	import type { MailCategory } from '$lib/mail/categories';
 	import type { Label } from '$lib/mail/labels';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import {
@@ -31,6 +33,11 @@
 		appliedLabels = data.conversationLabels;
 	});
 	const allLabels = $derived((data.labels ?? []) as Label[]);
+
+	let category = $state<MailCategory>('primary');
+	$effect(() => {
+		category = data.category;
+	});
 
 	// Opening a thread marks it read server-side, but the sidebar's unread badge
 	// comes from the root layout load, which SvelteKit has no reason to re-run on
@@ -308,6 +315,17 @@
 					labels={allLabels}
 					applied={appliedLabels}
 					onchange={(next) => (appliedLabels = next)}
+				/>
+			{/if}
+
+			{#if !data.trashed && !data.spam && latest?.direction === 'inbound'}
+				<CategoryMenu
+					emailId={latest.id}
+					current={category}
+					onchange={(next) => {
+						category = next;
+						void invalidate('app:counts');
+					}}
 				/>
 			{/if}
 

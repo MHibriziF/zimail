@@ -3,6 +3,7 @@ import { buildThreadParticipants } from './thread-participants';
 import { MAX_BODY_BYTES } from '../constants';
 import { stripQuotedText } from '$lib/utils/quotes';
 import type { Label } from '$lib/mail/labels';
+import type { MailCategory } from '$lib/mail/categories';
 import { displaySubject, normalizeSubject, type ThreadLookup } from './threads';
 import type {
 	DeliveryStatus,
@@ -43,6 +44,8 @@ export type InsertEmailInput = {
 	 * honoured for a message that starts a conversation — see insertEmail.
 	 */
 	spam?: boolean;
+	/** Inbox tab from the inbound rules. Like spam, only honoured when it starts a conversation. */
+	category?: MailCategory | null;
 	/** Disable fallback grouping when this message must start a conversation. */
 	subjectMatch?: boolean;
 };
@@ -156,6 +159,8 @@ export type MailStoreService = {
 	/** Widens a set of message ids to every message in the same conversations. */
 	expandToThreads(userId: string, ids: string[]): Promise<string[]>;
 	setEmailFlags(userId: string, ids: string[], update: MailFlagUpdate): Promise<number>;
+	setCategory(userId: string, ids: string[], category: MailCategory): Promise<number>;
+	countInboxUnreadByCategory(userId: string, domainId?: string | null): Promise<Record<MailCategory, number>>;
 	/** Irreversible: drops the rows and the R2 objects their attachments point at. */
 	deleteEmailsPermanently(userId: string, bucket: R2Bucket | undefined, ids: string[]): Promise<number>;
 	markAllRead(userId: string, domainId?: string | null): Promise<number>;
@@ -210,10 +215,11 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 		// in both the inbox and Spam. A new message follows its conversation; a
 		// spam verdict only applies to a message that starts one, so a flagged
 		// reply can never pull a legitimate conversation out of the inbox.
+		// The same rule keeps a conversation in one inbox tab.
 		const startsConversation = threadId === id;
-		const spam =
-			(startsConversation && input.spam === true) ||
-			(!startsConversation && (await repo.isConversationSpam(input.userId, threadId)));
+		const inherited = startsConversation ? null : await repo.conversationState(input.userId, threadId);
+		const spam = inherited ? inherited.spam : input.spam === true;
+		const category = inherited ? inherited.category : (input.category ?? null);
 
 		await repo.insertRow({
 			id,
@@ -239,7 +245,8 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 			status: input.status ?? null,
 			scheduledAt: input.scheduledAt ?? null,
 			isRead: input.isRead ?? false,
-			spam
+			spam,
+			category
 		});
 
 		// A new inbound reply brings an archived conversation back to the inbox —
@@ -314,6 +321,8 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 
 		expandToThreads: (userId, ids) => repo.expandToThreads(userId, ids),
 		setEmailFlags: (userId, ids, update) => repo.setFlags(userId, ids, update),
+		setCategory: (userId, ids, category) => repo.setCategory(userId, ids, category),
+		countInboxUnreadByCategory: (userId, domainId) => repo.countInboxUnreadByCategory(userId, domainId),
 		deleteEmailsPermanently,
 		markAllRead: (userId, domainId) => repo.markAllRead(userId, domainId),
 		async emptyTrash(userId, bucket) {

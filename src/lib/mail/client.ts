@@ -58,7 +58,8 @@ export async function runMailAction(
 	return { ok: true, affected: body.affected };
 }
 
-export async function patchThread(id: string, flags: Record<string, boolean>): Promise<void> {
+/** Flags are booleans; `category` moves the conversation to another inbox tab. */
+export async function patchThread(id: string, flags: Record<string, boolean | string>): Promise<void> {
 	const response = await fetch(`/api/mail/${id}`, {
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },

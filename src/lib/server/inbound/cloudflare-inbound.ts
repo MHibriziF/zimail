@@ -14,6 +14,7 @@ import {
 } from '../telegram-notify';
 import { stripHtml } from '../util/html';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
+import { categoriesServiceForDb, pickClassifyHeaders } from '../categories';
 
 export type CloudflareInboundMessage = {
 	readonly from: string;
@@ -93,6 +94,12 @@ export async function handleCloudflareInbound(
 		message.headers.get('arc-authentication-results')
 	]);
 
+	const category = await categoriesServiceForDb(env.DB).categorizeInbound(route.userId, {
+		from,
+		subject,
+		headers: pickClassifyHeaders((name) => message.headers.get(name))
+	});
+
 	const emailId = await insertEmail(env.DB, {
 		userId: route.userId,
 		direction: 'inbound',
@@ -109,7 +116,8 @@ export async function handleCloudflareInbound(
 		domainId: route.domainId,
 		addressId: route.addressId,
 		providerId,
-		spam
+		spam,
+		category
 	});
 
 	const storedAttachments = await storeInboundAttachments(env, emailId, parsed.attachments);

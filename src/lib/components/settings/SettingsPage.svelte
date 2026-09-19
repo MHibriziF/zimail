@@ -13,6 +13,7 @@
 	import RecoveryEmailPanel from './RecoveryEmailPanel.svelte';
 	import CleanupPanel from './CleanupPanel.svelte';
 	import LabelsPanel from './LabelsPanel.svelte';
+	import InboxTabsPanel from './InboxTabsPanel.svelte';
 	import TimeZonePanel from './TimeZonePanel.svelte';
 	import InstallApp from './InstallApp.svelte';
 	import LocalePicker from './LocalePicker.svelte';
@@ -57,6 +58,7 @@
 	{/if}
 
 	{#if show('labels')}
+		<InboxTabsPanel />
 		<LabelsPanel />
 	{/if}
 

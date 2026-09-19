@@ -2013,3 +2013,8 @@
 	flex: 1;
 	min-width: 0;
 }
+
+[data-ui-theme='zero'] .z-tabs {
+	flex-shrink: 0;
+	padding: 0 0.5rem;
+}

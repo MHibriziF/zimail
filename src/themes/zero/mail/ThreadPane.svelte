@@ -5,6 +5,8 @@
 	import EmailBody from '$lib/components/mailbox/EmailBody.svelte';
 	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
 	import LabelPicker from '$lib/components/mailbox/LabelPicker.svelte';
+	import CategoryMenu from '$lib/components/mailbox/CategoryMenu.svelte';
+	import type { MailCategory } from '$lib/mail/categories';
 	import type { Label } from '$lib/mail/labels';
 	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
@@ -45,6 +47,7 @@
 		threadId: string;
 		subject: string;
 		labels: Label[];
+		category: MailCategory;
 		messages: ThreadMessage[];
 	};
 
@@ -501,6 +504,18 @@
 							<Icon name="Trash" size={16} />
 						</button>
 					</Tooltip>
+				{/if}
+				{#if view === 'inbox' && thread.messages.length > 0}
+					<CategoryMenu
+						emailId={thread.messages[thread.messages.length - 1].id}
+						current={thread.category}
+						buttonClass="z-thread-icon"
+						onchange={(next) => {
+							if (thread) thread = { ...thread, category: next };
+							// It leaves the tab the list is showing.
+							void invalidateAll();
+						}}
+					/>
 				{/if}
 				{#if thread.messages.length > 0}
 					<LabelPicker

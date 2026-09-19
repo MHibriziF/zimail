@@ -39,6 +39,7 @@ export const load: PageServerLoad = async ({ params, locals, platform }) => {
 		trashed: Boolean(email.deleted_at),
 		archived: Boolean(email.archived_at),
 		spam: Boolean(email.spam_at),
+		category: email.category ?? 'primary',
 		/** Opening this thread cleared unread messages, so the badges are stale. */
 		markedRead: newlyRead > 0,
 		subject: displaySubject(messages[0]?.subject ?? email.subject),

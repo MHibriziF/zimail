@@ -827,6 +827,24 @@
 			"teal": "青色",
 			"blue": "蓝色",
 			"purple": "紫色"
-		}
+		},
+		"navTitle": "标签页与标签"
+	},
+	"tabs": {
+		"label": "收件箱标签页",
+		"primary": "主要",
+		"social": "社交",
+		"promotions": "推广",
+		"updates": "动态",
+		"forums": "论坛",
+		"moveTo": "移至标签页",
+		"moveHint": "此发件人之后的邮件会进入同一标签页。",
+		"settingsTitle": "收件箱标签页",
+		"settingsHint": "将收到的邮件分到主要、社交、推广、动态和论坛。分类规则在你自己的服务器上运行——不会把邮件发送到任何地方。",
+		"enable": "将收件箱分为标签页",
+		"sortExisting": "整理较早的邮件",
+		"sorting": "正在整理…已完成 {count} 个",
+		"sortDone": "已整理 {count} 个会话。",
+		"sortHint": "启用标签页之前的邮件会留在“主要”，直到整理；整理只依据发件人和主题。"
 	}
 }
