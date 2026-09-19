@@ -59,7 +59,7 @@ export async function insertAttachments(
  */
 export function normalizeContentId(value: string | null | undefined): string | null {
 	const trimmed = value?.trim().replace(/^<|>$/g, '').trim().toLowerCase();
-	return trimmed ? trimmed : null;
+	return trimmed || null;
 }
 
 export async function insertAttachmentBytes(

@@ -64,7 +64,7 @@ export function inlineAttachmentIds(
 	attachments: EmailAttachmentMeta[]
 ): Set<string> {
 	const ids = new Set<string>();
-	if (!html || !html.toLowerCase().includes('cid:')) return ids;
+	if (!html?.toLowerCase().includes('cid:')) return ids;
 
 	const byContentId = new Map<string, EmailAttachmentMeta>();
 	for (const attachment of attachments) {

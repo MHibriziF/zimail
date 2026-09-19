@@ -176,10 +176,9 @@ async function readError(response: Response): Promise<string> {
 function base64UrlEncode(buffer: ArrayBuffer): string {
 	const bytes = new Uint8Array(buffer);
 	let binary = '';
-	for (let index = 0; index < bytes.length; index += 1) {
-		binary += String.fromCharCode(bytes[index]);
-	}
-	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
+	for (const byte of bytes) binary += String.fromCodePoint(byte);
+	// Base64 only ever uses '=' as trailing padding, so dropping every one is exact.
+	return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
 /** Accept strings, ArrayBuffers, and Uint8Arrays so Safari's plain
@@ -206,7 +205,11 @@ export function pushSubscriptionPayload(subscription: PushSubscription): string 
 	const endpoint = subscription.endpoint;
 	const expirationTime = subscription.expirationTime ?? null;
 
-	if (typeof subscription.toJSON === 'function') return JSON.stringify(subscription.toJSON());
+	// Some webviews return a toJSON() without the keys; only trust it when complete.
+	if (typeof subscription.toJSON === 'function') {
+		const json = subscription.toJSON();
+		if (json?.keys?.p256dh && json.keys.auth) return JSON.stringify(json);
+	}
 
 	let p256dh: string | null = null;
 	let auth: string | null = null;

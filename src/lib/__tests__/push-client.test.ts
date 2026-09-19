@@ -95,3 +95,19 @@ test('rejects subscriptions without readable keys', () => {
 	const subscription = { endpoint: 'https://web.push.apple.com/device' } as PushSubscription;
 	assert.throws(() => pushSubscriptionPayload(subscription), /unreadable push subscription/);
 });
+
+test('falls back to getKey() when toJSON() omits the keys', () => {
+	const subscription = {
+		endpoint: 'https://push.example/device',
+		toJSON: () => ({ endpoint: 'https://push.example/device' }),
+		getKey: (name: string) => new Uint8Array(name === 'p256dh' ? [1, 2, 3] : [9]).buffer
+	} as unknown as PushSubscription;
+	const parsed = JSON.parse(pushSubscriptionPayload(subscription)) as { keys: Record<string, string> };
+	assert.deepEqual(parsed.keys, { p256dh: 'AQID', auth: 'CQ' });
+});
+
+test('uses toJSON() as-is when it carries both keys', () => {
+	const json = { endpoint: 'https://push.example/device', keys: { p256dh: 'key', auth: 'secret' } };
+	const subscription = { endpoint: json.endpoint, toJSON: () => json } as unknown as PushSubscription;
+	assert.deepEqual(JSON.parse(pushSubscriptionPayload(subscription)), json);
+});
