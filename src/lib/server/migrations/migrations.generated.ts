@@ -128,5 +128,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0032_attachment_content_id.sql",
 		sql: "-- Inline images reference a MIME part by its Content-ID (`<img src=\"cid:…\">`).\n-- Without the Content-ID stored alongside the file there is nothing to match\n-- that reference against, so every inline image rendered broken.\n-- Ported from upstream 0022_attachment_content_id.sql; renumbered for this fork.\nALTER TABLE email_attachments ADD COLUMN content_id TEXT;\n"
+	},
+	{
+		name: "0033_attachment_content_disposition.sql",
+		sql: "-- Forwarding needs the original MIME disposition so inline parts stay inline\n-- and ordinary files stay attachments. content_id already exists from 0032.\n-- Ported from upstream 0023_attachment_content_disposition.sql; renumbered for this fork.\nALTER TABLE email_attachments ADD COLUMN content_disposition TEXT;\n"
 	}
 ];

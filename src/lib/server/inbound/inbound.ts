@@ -1,6 +1,6 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { DeliveryStatus } from '$lib/types';
-import { insertAttachmentBytes } from '../attachments';
+import { inboundAttachmentMetadata, insertAttachmentBytes } from '../attachments';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL, MAX_BODY_BYTES } from '../constants';
 import { collectInboundRecipients, parseEmailIdentity } from '../util/email-address';
 import { recordUnroutedEmail, resolveInboundRoute } from '../domains';
@@ -184,7 +184,10 @@ async function storeInboundAttachments(
 				filename: attachment.filename || 'attachment',
 				type: attachment.content_type || 'application/octet-stream',
 				bytes,
-				contentId: attachment.content_id ?? null
+				...inboundAttachmentMetadata({
+					disposition: attachment.content_disposition,
+					contentId: attachment.content_id
+				})
 			});
 		} catch (error) {
 			// One bad attachment shouldn't cost us the message.

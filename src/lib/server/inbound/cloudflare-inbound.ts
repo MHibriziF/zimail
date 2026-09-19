@@ -1,6 +1,6 @@
 import type { R2Bucket } from '@cloudflare/workers-types';
 import PostalMime, { type Address, type Attachment } from 'postal-mime';
-import { insertAttachmentBytes } from '../attachments';
+import { inboundAttachmentMetadata, insertAttachmentBytes } from '../attachments';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from '../constants';
 import { recordUnroutedEmail, resolveInboundRoute } from '../domains';
 import { collectInboundRecipients, parseEmailAddress } from '../util/email-address';
@@ -114,7 +114,11 @@ async function storeInboundAttachments(
 				filename: attachment.filename || 'attachment',
 				type: attachment.mimeType || 'application/octet-stream',
 				bytes,
-				contentId: attachment.contentId ?? null
+				...inboundAttachmentMetadata({
+					disposition: attachment.disposition,
+					contentId: attachment.contentId,
+					related: attachment.related
+				})
 			});
 		} catch (error) {
 			console.error('Failed to store inbound Cloudflare attachment', attachment.filename, error);

@@ -344,7 +344,7 @@ function setup(seedRows: Partial<Row>[] = [], seedAttachments: Attachment[] = []
 				.filter((r) => r.user_id === userId && threadIdOf(r) === threadId && r.status !== 'draft' && (includeDeleted || !r.deleted_at))
 				.sort((a, b) => a.created_at.localeCompare(b.created_at));
 		}
-		if (sql.startsWith('SELECT id, email_id, filename, content_type, size_bytes, created_at')) {
+		if (sql.startsWith('SELECT id, email_id, filename, content_type, size_bytes,')) {
 			const ids = args as string[];
 			return attachments.filter((a) => ids.includes(a.email_id));
 		}

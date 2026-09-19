@@ -62,6 +62,16 @@ const BEARER_ROUTES: RouteRule[] = [
 		scopes: ['mail:send']
 	},
 	{
+		method: 'POST',
+		match: (pathname) => /^\/api\/mail\/[^/]+\/forward$/.test(pathname),
+		scopes: ['mail:send']
+	},
+	{
+		method: 'POST',
+		match: (pathname) => /^\/api\/mail\/thread\/[^/]+\/forward$/.test(pathname),
+		scopes: ['mail:send']
+	},
+	{
 		method: 'PATCH',
 		match: (pathname) => /^\/api\/mail\/[^/]+$/.test(pathname),
 		scopes: ['mail:send']
