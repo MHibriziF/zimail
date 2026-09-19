@@ -9,6 +9,7 @@
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
 	import { APP_NAME } from '$lib/constants';
 	import { initials } from '$lib/mail/folders';
+	import { DEFAULT_SCREEN_SHARE, type ScreenShareSettings } from '$lib/meet/screen-share';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -16,7 +17,13 @@
 	let name = $state(data.userName ?? '');
 	let joining = $state(false);
 	let error = $state('');
-	let session = $state<{ url: string; token: string; displayName: string; meetingId: string } | null>(null);
+	let session = $state<{
+		url: string;
+		token: string;
+		displayName: string;
+		meetingId: string;
+		screenShare: ScreenShareSettings;
+	} | null>(null);
 	let left = $state(false);
 	let waitingAdmissionId = $state('');
 	let waitingDenied = $state(false);
@@ -175,6 +182,7 @@
 				url?: string;
 				token?: string;
 				roomName?: string;
+				screenShare?: ScreenShareSettings;
 				pending?: boolean;
 				admissionId?: string;
 				error?: string;
@@ -190,7 +198,13 @@
 			}
 			// Hand the devices off to LiveKit's own capture rather than holding two readers open.
 			stopPreview();
-			session = { url: body.url, token: body.token, displayName, meetingId: body.roomName };
+			session = {
+				url: body.url,
+				token: body.token,
+				displayName,
+				meetingId: body.roomName,
+				screenShare: body.screenShare ?? DEFAULT_SCREEN_SHARE
+			};
 		} catch {
 			error = t('common.networkError');
 		} finally {
@@ -210,11 +224,18 @@
 					url?: string;
 					token?: string;
 					roomName?: string;
+					screenShare?: ScreenShareSettings;
 				};
 				if (body.status === 'admitted' && body.url && body.token && body.roomName) {
 					stopWaiting();
 					stopPreview();
-					session = { url: body.url, token: body.token, displayName, meetingId: body.roomName };
+					session = {
+						url: body.url,
+						token: body.token,
+						displayName,
+						meetingId: body.roomName,
+						screenShare: body.screenShare ?? DEFAULT_SCREEN_SHARE
+					};
 				} else if (body.status === 'denied') {
 					stopWaiting();
 					waitingDenied = true;
@@ -260,6 +281,7 @@
 		initialDeafened={deafened}
 		isLoggedIn={data.isLoggedIn}
 		meetingId={session.meetingId}
+		initialScreenShare={session.screenShare}
 		{onleave}
 	/>
 {:else}

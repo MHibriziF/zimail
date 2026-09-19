@@ -91,3 +91,83 @@ describe('minting a LiveKit access token', () => {
 		assert.throws(() => createLiveKitClient('key', 'secret', ''));
 	});
 });
+
+describe('screen-share permissions', () => {
+	type Call = { url: string; auth: string; body: Record<string, unknown> };
+
+	function recordingFetch(respond: (call: Call) => Response) {
+		const calls: Call[] = [];
+		const fetchImpl = (async (input: string, init: RequestInit) => {
+			const call = {
+				url: input,
+				auth: (init.headers as Record<string, string>).Authorization,
+				body: JSON.parse(init.body as string)
+			};
+			calls.push(call);
+			return respond(call);
+		}) as unknown as typeof fetch;
+		return { calls, fetchImpl };
+	}
+
+	test('a token can be limited to camera and microphone', async () => {
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud');
+		const jwt = await client.createAccessToken({
+			identity: 'u',
+			room: 'r',
+			canPublishSources: ['camera', 'microphone']
+		});
+		const video = decodeJson(jwt.split('.')[1]).video as Record<string, unknown>;
+		assert.deepEqual(video.canPublishSources, ['camera', 'microphone']);
+	});
+
+	test('setPublishSources calls UpdateParticipant over https, restating every grant', async () => {
+		const { calls, fetchImpl } = recordingFetch(() => Response.json({}));
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud/', fetchImpl);
+		await client.setPublishSources('room-1', 'guest-1', ['camera', 'microphone', 'screen_share']);
+
+		assert.equal(calls[0].url, 'https://example.livekit.cloud/twirp/livekit.RoomService/UpdateParticipant');
+		assert.deepEqual(calls[0].body, {
+			room: 'room-1',
+			identity: 'guest-1',
+			permission: {
+				can_subscribe: true,
+				can_publish: true,
+				can_publish_data: true,
+				can_update_metadata: true,
+				can_publish_sources: ['CAMERA', 'MICROPHONE', 'SCREEN_SHARE']
+			}
+		});
+	});
+
+	test('the admin token is scoped to the one room', async () => {
+		const { calls, fetchImpl } = recordingFetch(() => Response.json({}));
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
+		await client.setPublishSources('room-1', 'guest-1', []);
+
+		const token = calls[0].auth.replace(/^Bearer /, '');
+		assert.deepEqual(decodeJson(token.split('.')[1]).video, { roomAdmin: true, room: 'room-1' });
+	});
+
+	test('listParticipants returns identities and attributes', async () => {
+		const { fetchImpl } = recordingFetch(() =>
+			Response.json({ participants: [{ identity: 'a', attributes: { role: 'host' } }, { identity: 'b' }] })
+		);
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
+		assert.deepEqual(await client.listParticipants('room-1'), [
+			{ identity: 'a', attributes: { role: 'host' } },
+			{ identity: 'b', attributes: {} }
+		]);
+	});
+
+	test('listParticipants treats a missing room as empty', async () => {
+		const { fetchImpl } = recordingFetch(() => Response.json({ code: 'not_found', msg: 'room not found' }, { status: 404 }));
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
+		assert.deepEqual(await client.listParticipants('room-1'), []);
+	});
+
+	test('other RoomService failures surface as errors', async () => {
+		const { fetchImpl } = recordingFetch(() => Response.json({ code: 'unauthenticated' }, { status: 401 }));
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
+		await assert.rejects(client.setPublishSources('room-1', 'g', []), /unauthenticated/);
+	});
+});

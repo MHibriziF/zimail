@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { AdmissionsRepository, AdmissionStatus, PendingAdmission } from '../../admissions/repository';
-import type { LiveKitClient } from '../../livekit';
+import type { LiveKitClient, RoomParticipant, TrackSourceName } from '../../livekit';
 import type { Meeting, MeetingFieldPatch, MeetingsRepository, NewMeeting } from '../repository';
 import { createMeetingsService } from '../service';
 
@@ -12,6 +12,8 @@ function meeting(overrides: Partial<Meeting> = {}): Meeting {
 		code: 'aaa-aaaa-aaa',
 		title: 'Standup',
 		require_approval: false,
+		screen_share_policy: 'open',
+		screen_share_mode: 'multiple',
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -40,6 +42,8 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 				code: input.code,
 				title: input.title,
 				require_approval: input.requireApproval,
+				screen_share_policy: 'open',
+				screen_share_mode: 'multiple',
 				created_at: input.createdAt
 			});
 		},
@@ -57,6 +61,8 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 			if (!row) return false;
 			if (patch.title !== undefined) row.title = patch.title;
 			if (patch.requireApproval !== undefined) row.require_approval = patch.requireApproval;
+			if (patch.screenSharePolicy !== undefined) row.screen_share_policy = patch.screenSharePolicy;
+			if (patch.screenShareMode !== undefined) row.screen_share_mode = patch.screenShareMode;
 			return true;
 		},
 		async updateCode(userId, id, code) {
@@ -114,8 +120,32 @@ function fakeLiveKit(): LiveKitClient {
 		url: 'wss://livekit.test',
 		async createAccessToken({ identity }) {
 			return `token-for-${identity}`;
+		},
+		async listParticipants() {
+			return [];
+		},
+		async setPublishSources() {}
+	};
+}
+
+/** Records every token and permission change, with a fixed set of people already in the room. */
+function recordingLiveKit(inRoom: RoomParticipant[] = []) {
+	const tokens: Parameters<LiveKitClient['createAccessToken']>[0][] = [];
+	const permissionChanges: { room: string; identity: string; sources: TrackSourceName[] }[] = [];
+	const client: LiveKitClient = {
+		url: 'wss://livekit.test',
+		async createAccessToken(options) {
+			tokens.push(options);
+			return 'token';
+		},
+		async listParticipants() {
+			return inRoom;
+		},
+		async setPublishSources(room, identity, sources) {
+			permissionChanges.push({ room, identity, sources });
 		}
 	};
+	return { client, tokens, permissionChanges };
 }
 
 describe('create', () => {
@@ -297,5 +327,131 @@ describe('decideAdmission', () => {
 		assert.equal(await service.decideAdmission('user-1', 'meeting-1', 'no-such-admission', 'denied'), 'admission_not_found');
 		assert.equal(await service.decideAdmission('user-1', 'meeting-1', id, 'admitted'), 'ok');
 		assert.equal((await admissionsRepo.get('meeting-1', id))?.status, 'admitted');
+	});
+});
+
+describe('screen-share policy', () => {
+	test('under "approval", a guest token cannot publish a screen share but the host token can', async () => {
+		const { repo } = fakeMeetingsRepo([meeting({ screen_share_policy: 'approval' })]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		await service.requestJoin('aaa-aaaa-aaa', { name: 'Guest' });
+		await service.requestJoin('aaa-aaaa-aaa', { name: 'Host', requesterId: 'user-1' });
+
+		assert.deepEqual(liveKit.tokens[0].canPublishSources, ['camera', 'microphone']);
+		assert.equal(liveKit.tokens[1].canPublishSources, undefined);
+	});
+
+	test('under "open", guest tokens are unrestricted', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+		await service.requestJoin('aaa-aaaa-aaa', { name: 'Guest' });
+		assert.equal(liveKit.tokens[0].canPublishSources, undefined);
+	});
+
+	test('an admitted guest waiting-room token follows the policy too', async () => {
+		const { repo } = fakeMeetingsRepo([meeting({ require_approval: true, screen_share_policy: 'approval' })]);
+		const admissions = fakeAdmissionsRepo();
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: admissions, getLiveKit: () => liveKit.client });
+
+		admissions.seedStatus('adm-1', 'admitted');
+		const outcome = await service.checkAdmission('aaa-aaaa-aaa', 'adm-1', 'Guest');
+		assert.equal(outcome.type, 'admitted');
+		assert.deepEqual(liveKit.tokens[0].canPublishSources, ['camera', 'microphone']);
+	});
+
+	test('joining reports the meeting\'s screen-share settings', async () => {
+		const { repo } = fakeMeetingsRepo([meeting({ screen_share_mode: 'single' })]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		const outcome = await service.requestJoin('aaa-aaaa-aaa', { name: 'Guest' });
+		assert.equal(outcome.type, 'admitted');
+		if (outcome.type === 'admitted') assert.deepEqual(outcome.screenShare, { policy: 'open', mode: 'single' });
+	});
+
+	test('changing the policy mid-call re-applies it to everyone in the room except the host', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([
+			{ identity: 'host-1', attributes: {} },
+			{ identity: 'guest', attributes: {} }
+		]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'approval' });
+		assert.deepEqual(liveKit.permissionChanges, [
+			{ room: 'meeting-1', identity: 'guest', sources: ['camera', 'microphone'] }
+		]);
+
+		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'open' });
+		assert.deepEqual(liveKit.permissionChanges[1].sources, ['camera', 'microphone', 'screen_share', 'screen_share_audio']);
+	});
+
+	test('a guest claiming the host role in its attributes is not exempt from a policy change', async () => {
+		// Participants can set their own attributes, so `role: host` proves nothing.
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([{ identity: 'guest', attributes: { role: 'host' } }]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'approval' });
+		assert.deepEqual(liveKit.permissionChanges.map((change) => change.identity), ['guest']);
+	});
+
+	test('only the owner is minted a host identity', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		await service.requestJoin('aaa-aaaa-aaa', { name: 'Host', requesterId: 'user-1' });
+		await service.requestJoin('aaa-aaaa-aaa', { name: 'Guest', requesterId: 'someone-else' });
+		assert.deepEqual(
+			liveKit.tokens.map((token) => token.identity.startsWith('host-')),
+			[true, false]
+		);
+	});
+
+	test('changing only the mode, or re-saving the same policy, touches no one in the room', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([{ identity: 'guest', attributes: {} }]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		await service.update('user-1', 'meeting-1', { screenShareMode: 'single' });
+		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'open' });
+		assert.deepEqual(liveKit.permissionChanges, []);
+	});
+
+	test('someone else cannot change the policy of a meeting they do not own', async () => {
+		const { repo, rows } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([{ identity: 'guest', attributes: {} }]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.update('someone-else', 'meeting-1', { screenSharePolicy: 'approval' }), null);
+		assert.equal(rows[0].screen_share_policy, 'open');
+		assert.deepEqual(liveKit.permissionChanges, []);
+	});
+});
+
+describe('setScreenShareAllowed', () => {
+	test('the owner can allow and then revoke one participant', async () => {
+		const { repo } = fakeMeetingsRepo([meeting({ screen_share_policy: 'approval' })]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.setScreenShareAllowed('user-1', 'meeting-1', 'guest', true), 'ok');
+		assert.equal(await service.setScreenShareAllowed('user-1', 'meeting-1', 'guest', false), 'ok');
+		assert.deepEqual(
+			liveKit.permissionChanges.map((change) => change.sources.includes('screen_share')),
+			[true, false]
+		);
+	});
+
+	test('nobody but the owner can grant it', async () => {
+		const { repo } = fakeMeetingsRepo([meeting({ screen_share_policy: 'approval' })]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.setScreenShareAllowed('someone-else', 'meeting-1', 'guest', true), 'meeting_not_found');
+		assert.deepEqual(liveKit.permissionChanges, []);
 	});
 });

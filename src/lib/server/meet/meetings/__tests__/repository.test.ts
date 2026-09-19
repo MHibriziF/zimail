@@ -10,6 +10,8 @@ type Row = {
 	title: string | null;
 	code: string | null;
 	require_approval: number;
+	screen_share_policy: string;
+	screen_share_mode: string;
 	created_at: string;
 };
 
@@ -21,6 +23,8 @@ function row(overrides: Partial<Row> = {}): Row {
 		title: 'Standup',
 		code: 'aaa-aaaa-aaa',
 		require_approval: 0,
+		screen_share_policy: 'open',
+		screen_share_mode: 'multiple',
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -52,7 +56,7 @@ function setup(seed: Row[] = []) {
 				string
 			];
 			assertCodeFree(code);
-			rows.push({ id, user_id: userId, domain_id: domainId, title, code, require_approval: requireApproval, created_at: createdAt });
+			rows.push({ id, user_id: userId, domain_id: domainId, title, code, require_approval: requireApproval, screen_share_policy: 'open', screen_share_mode: 'multiple', created_at: createdAt });
 			return [];
 		}
 		if (sql.includes('WHERE code = ?')) {
@@ -83,6 +87,8 @@ function setup(seed: Row[] = []) {
 			let cursor = 0;
 			if (sql.includes('title = ?')) entry.title = args[cursor++] as string | null;
 			if (sql.includes('require_approval = ?')) entry.require_approval = args[cursor++] as number;
+			if (sql.includes('screen_share_policy = ?')) entry.screen_share_policy = args[cursor++] as string;
+			if (sql.includes('screen_share_mode = ?')) entry.screen_share_mode = args[cursor++] as string;
 			return [entry];
 		}
 		throw new Error(`Unhandled query in fake D1: ${sql}`);
@@ -133,6 +139,23 @@ describe('MeetingsRepository', () => {
 
 		assert.equal(await repo.updateFields('someone-else', 'meeting-1', { title: 'Hijacked' }), false);
 		assert.equal(rows[0].title, 'Standup');
+	});
+
+	test('screen-share settings round-trip, and an unknown stored value reads as the default', async () => {
+		const { repo, rows } = setup([row()]);
+		assert.equal(
+			await repo.updateFields('user-1', 'meeting-1', { screenSharePolicy: 'approval', screenShareMode: 'single' }),
+			true
+		);
+		assert.equal(rows[0].screen_share_policy, 'approval');
+		assert.equal(rows[0].screen_share_mode, 'single');
+
+		const meeting = await repo.getForUser('user-1', 'meeting-1');
+		assert.equal(meeting?.screen_share_policy, 'approval');
+		assert.equal(meeting?.screen_share_mode, 'single');
+
+		rows[0].screen_share_policy = 'something-else';
+		assert.equal((await repo.getForUser('user-1', 'meeting-1'))?.screen_share_policy, 'open');
 	});
 
 	test('updateCode replaces the code, ownership-checked, and rejects a collision', async () => {

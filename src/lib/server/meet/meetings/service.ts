@@ -1,6 +1,13 @@
 import type { AdmissionsRepository, AdmissionStatus, PendingAdmission } from '../admissions/repository';
-import type { LiveKitClient } from '../livekit';
-import type { Meeting, MeetingsRepository } from './repository';
+import { createHostIdentity, isHostIdentity } from '../../../meet/host-identity';
+import {
+	DEFAULT_SCREEN_SHARE,
+	type ScreenShareMode,
+	type ScreenSharePolicy,
+	type ScreenShareSettings
+} from '../../../meet/screen-share';
+import { ALL_TRACK_SOURCES, NON_SCREEN_TRACK_SOURCES, type LiveKitClient, type TrackSourceName } from '../livekit';
+import type { Meeting, MeetingFieldPatch, MeetingsRepository } from './repository';
 
 /** A freshly created meeting: the join code plus its summary. */
 export type CreatedMeeting = {
@@ -11,15 +18,39 @@ export type CreatedMeeting = {
 export type JoinOutcome =
 	| { type: 'not_found' }
 	| { type: 'pending'; admissionId: string }
-	| { type: 'admitted'; url: string; token: string; roomName: string };
+	| AdmittedOutcome;
+
+type AdmittedOutcome = {
+	type: 'admitted';
+	url: string;
+	token: string;
+	roomName: string;
+	screenShare: ScreenShareSettings;
+};
 
 export type AdmissionCheckOutcome =
 	| { type: 'meeting_not_found' }
 	| { type: 'admission_not_found' }
 	| { type: 'waiting'; status: Exclude<AdmissionStatus, 'admitted'> }
-	| { type: 'admitted'; url: string; token: string; roomName: string };
+	| AdmittedOutcome;
 
 export type DecideAdmissionOutcome = 'meeting_not_found' | 'admission_not_found' | 'ok';
+
+export type MeetingChanges = {
+	title?: string;
+	requireApproval?: boolean;
+	screenSharePolicy?: ScreenSharePolicy;
+	screenShareMode?: ScreenShareMode;
+};
+
+/** What a participant may publish under the meeting's policy — the host is never restricted. */
+function publishSourcesFor(meeting: Meeting, isOwner: boolean): TrackSourceName[] | undefined {
+	return meeting.screen_share_policy === 'approval' && !isOwner ? NON_SCREEN_TRACK_SOURCES : undefined;
+}
+
+function screenShareSettingsOf(meeting: Meeting): ScreenShareSettings {
+	return { policy: meeting.screen_share_policy, mode: meeting.screen_share_mode };
+}
 
 const CODE_GROUP_LENGTHS = [3, 4, 3];
 const CODE_ALPHABET = 'abcdefghijklmnopqrstuvwxyz';
@@ -61,11 +92,17 @@ export type MeetingsService = {
 	list(userId: string): Promise<Meeting[]>;
 	findByCode(code: string): Promise<Meeting | null>;
 	getForUser(userId: string, id: string): Promise<Meeting | null>;
-	update(
+	update(userId: string, id: string, changes: MeetingChanges): Promise<Meeting | null>;
+	/**
+	 * Owner-only: let one participant share their screen (or take it back) in the
+	 * live call. `meeting_not_found` when it doesn't exist or isn't the caller's.
+	 */
+	setScreenShareAllowed(
 		userId: string,
-		id: string,
-		changes: { title?: string; requireApproval?: boolean }
-	): Promise<Meeting | null>;
+		meetingId: string,
+		identity: string,
+		allowed: boolean
+	): Promise<'meeting_not_found' | 'ok'>;
 	rotateCode(userId: string, id: string): Promise<string | null>;
 	/** Owner-only — `null` when the meeting doesn't exist or isn't the caller's. */
 	listPendingAdmissions(userId: string, meetingId: string): Promise<PendingAdmission[] | null>;
@@ -91,8 +128,28 @@ export type MeetingsServiceDeps = {
 	getLiveKit: () => LiveKitClient;
 };
 
+function admitted(liveKit: LiveKitClient, token: string, meeting: Meeting): AdmittedOutcome {
+	return { type: 'admitted', url: liveKit.url, token, roomName: meeting.id, screenShare: screenShareSettingsOf(meeting) };
+}
+
 export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsService {
 	const { repo, admissionsRepo, getLiveKit } = deps;
+
+	/**
+	 * Tokens only carry the policy that was in force when they were minted, so a
+	 * change mid-call has to be pushed to everyone already in the room. Switching
+	 * to `approval` takes back any permission the host granted under the old one.
+	 */
+	async function applyScreenSharePolicyToRoom(meeting: Meeting) {
+		const liveKit = getLiveKit();
+		const sources = meeting.screen_share_policy === 'approval' ? NON_SCREEN_TRACK_SOURCES : ALL_TRACK_SOURCES;
+		const participants = await liveKit.listParticipants(meeting.id);
+		await Promise.all(
+			participants
+				.filter((participant) => !isHostIdentity(participant.identity))
+				.map((participant) => liveKit.setPublishSources(meeting.id, participant.identity, sources))
+		);
+	}
 
 	/** `Meeting #N` for the caller's Nth meeting, used whenever no title is given at creation. */
 	async function defaultTitle(userId: string): Promise<string> {
@@ -127,6 +184,8 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 							code,
 							title,
 							require_approval: requireApproval,
+							screen_share_policy: DEFAULT_SCREEN_SHARE.policy,
+							screen_share_mode: DEFAULT_SCREEN_SHARE.mode,
 							created_at: createdAt
 						}
 					};
@@ -143,15 +202,31 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 		getForUser: (userId, id) => repo.getForUser(userId, id),
 
 		async update(userId, id, changes) {
-			const patch: { title?: string | null; requireApproval?: boolean } = {};
+			const patch: MeetingFieldPatch = {};
 			if (changes.title !== undefined) patch.title = changes.title.trim().slice(0, 200) || null;
 			if (changes.requireApproval !== undefined) patch.requireApproval = changes.requireApproval;
+			if (changes.screenSharePolicy !== undefined) patch.screenSharePolicy = changes.screenSharePolicy;
+			if (changes.screenShareMode !== undefined) patch.screenShareMode = changes.screenShareMode;
 
 			if (Object.keys(patch).length === 0) return repo.getForUser(userId, id);
 
+			const previousPolicy = (await repo.getForUser(userId, id))?.screen_share_policy;
+			if (!previousPolicy) return null;
 			const changed = await repo.updateFields(userId, id, patch);
 			if (!changed) return null;
-			return repo.getForUser(userId, id);
+			const after = await repo.getForUser(userId, id);
+
+			if (after && after.screen_share_policy !== previousPolicy) {
+				await applyScreenSharePolicyToRoom(after);
+			}
+			return after;
+		},
+
+		async setScreenShareAllowed(userId, meetingId, identity, allowed) {
+			const meeting = await repo.getForUser(userId, meetingId);
+			if (!meeting) return 'meeting_not_found';
+			await getLiveKit().setPublishSources(meeting.id, identity, allowed ? ALL_TRACK_SOURCES : NON_SCREEN_TRACK_SOURCES);
+			return 'ok';
 		},
 
 		/**
@@ -197,13 +272,13 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 
 			const liveKit = getLiveKit();
 			const token = await liveKit.createAccessToken({
-				identity: crypto.randomUUID(),
+				identity: isOwner ? createHostIdentity() : crypto.randomUUID(),
 				name,
 				room: meeting.id,
-				attributes: isOwner ? { role: 'host' } : undefined
+				canPublishSources: publishSourcesFor(meeting, isOwner)
 			});
 
-			return { type: 'admitted', url: liveKit.url, token, roomName: meeting.id };
+			return admitted(liveKit, token, meeting);
 		},
 
 		/** Polled by a guest waiting to be let in — the second half of `requestJoin`. */
@@ -222,10 +297,11 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			const token = await liveKit.createAccessToken({
 				identity: crypto.randomUUID(),
 				name,
-				room: meeting.id
+				room: meeting.id,
+				canPublishSources: publishSourcesFor(meeting, false)
 			});
 
-			return { type: 'admitted', url: liveKit.url, token, roomName: meeting.id };
+			return admitted(liveKit, token, meeting);
 		},
 
 		/** Admit or deny one pending join request — owner-only. */

@@ -16,6 +16,8 @@
 		backgroundOption,
 		screenShareSupported,
 		screenShareEnabled,
+		canShareScreen,
+		screenShareRequested,
 		pipSupported,
 		pipActive,
 		panel,
@@ -47,6 +49,9 @@
 		backgroundOption: string;
 		screenShareSupported: boolean;
 		screenShareEnabled: boolean;
+		/** False under "ask the host first" until the host allows it — the button then asks instead. */
+		canShareScreen: boolean;
+		screenShareRequested: boolean;
 		pipSupported: boolean;
 		pipActive: boolean;
 		panel: 'none' | 'participants' | 'chat' | 'settings';
@@ -146,10 +151,19 @@
 			type="button"
 			class="call-btn"
 			class:call-btn-active={screenShareEnabled}
+			class:call-btn-pending={screenShareRequested}
 			onclick={onToggleScreenShare}
-			aria-label={screenShareEnabled ? t('meet.screenShareOff') : t('meet.screenShareOn')}
+			disabled={screenShareRequested}
+			aria-label={screenShareEnabled
+				? t('meet.screenShareOff')
+				: canShareScreen
+					? t('meet.screenShareOn')
+					: screenShareRequested
+						? t('meet.screenShareWaiting')
+						: t('meet.screenShareAsk')}
+			title={canShareScreen || screenShareEnabled ? undefined : screenShareRequested ? t('meet.screenShareWaiting') : t('meet.screenShareAsk')}
 		>
-			<Icon name="computer-line" size={20} />
+			<Icon name={canShareScreen || screenShareEnabled ? 'computer-line' : 'hand'} size={20} />
 		</button>
 	{/if}
 	{#if pipSupported}
@@ -271,6 +285,11 @@
 	.call-btn-active {
 		background: #3f3f46;
 		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+	}
+
+	.call-btn-pending {
+		opacity: 0.55;
+		cursor: default;
 	}
 
 	/* Same warning color as a muted mic/camera — deafened means you can't speak or hear either. */
