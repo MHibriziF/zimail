@@ -2,8 +2,11 @@
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
 		"rewriteRelativeImportExtensions": true,
-		"allowJs": true,
-		"checkJs": true,
+		// The repo has no .js sources, so allowJs only ever let the checker follow
+		// src/worker.ts's import into .svelte-kit/output and report thousands of
+		// errors from the bundle once a build existed. See issue #39.
+		"allowJs": false,
+		"checkJs": false,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
 		"resolveJsonModule": true,
