@@ -8,7 +8,9 @@ import { getEmailProvider } from './lib/server/context';
 import { ensureSchema } from './lib/server/migrations/migrate';
 import { runDueScheduledSends } from './lib/server/scheduled-send';
 // Renamed from `_worker.js` by `scripts/wrap-cloudflare-worker.mjs` after `vite build`.
-// @ts-expect-error file is created at build time
+// Whether this resolves depends on whether a build exists, so the suppression has
+// to be @ts-ignore: @ts-expect-error itself becomes an error once one does.
+// @ts-ignore file is created at build time
 import sveltekit from '../.svelte-kit/cloudflare/_sveltekit.js';
 
 type SvelteKitWorker = {
