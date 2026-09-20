@@ -540,10 +540,29 @@
 		refreshRoster();
 	}
 
+	/**
+	 * Host-side backstop for "one at a time". The previous sharer's own client
+	 * steps aside below, but that is cooperative — only the host can ask the
+	 * server to mute a client that doesn't.
+	 */
+	async function enforceSingleShare(newIdentity: string) {
+		if (!isHost || !meetingId) return;
+		const stale = shareOrder.filter((key) => key !== newIdentity && key !== LOCAL_SHARE_KEY);
+		for (const identity of stale) {
+			await fetch(`/api/meetings/${encodeURIComponent(meetingId)}/screen-share/stop`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ identity })
+			}).catch(() => {});
+		}
+	}
+
 	/** "One at a time": someone else just started sharing, so ours makes way. */
 	function handleRemoteTrackPublished(publication: RemoteTrackPublication, participant: RemoteParticipant) {
 		if (publication.source !== Track.Source.ScreenShare || !room) return;
-		if (screenShareSettings.mode !== 'single' || !screenShareEnabled) return;
+		if (screenShareSettings.mode !== 'single') return;
+		void enforceSingleShare(participant.identity);
+		if (!screenShareEnabled) return;
 		const yields = shouldYieldScreenShare({
 			ownStartedAt: ownShareStartedAt,
 			now: Date.now(),

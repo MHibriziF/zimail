@@ -6,7 +6,13 @@ import {
 	type ScreenSharePolicy,
 	type ScreenShareSettings
 } from '../../../meet/screen-share';
-import { ALL_TRACK_SOURCES, NON_SCREEN_TRACK_SOURCES, type LiveKitClient, type TrackSourceName } from '../livekit';
+import {
+	ALL_TRACK_SOURCES,
+	NON_SCREEN_TRACK_SOURCES,
+	isScreenShareTrack,
+	type LiveKitClient,
+	type TrackSourceName
+} from '../livekit';
 import type { Meeting, MeetingFieldPatch, MeetingsRepository } from './repository';
 
 /** A freshly created meeting: the join code plus its summary. */
@@ -105,6 +111,12 @@ export type MeetingsService = {
 		identity: string,
 		allowed: boolean
 	): Promise<'meeting_not_found' | 'ok'>;
+	/**
+	 * Owner-only: stop one participant's screen share at the server, for the
+	 * "one at a time" rule. Muting is done by the SFU, so a client that ignores
+	 * the rule stops being seen regardless.
+	 */
+	stopScreenShare(userId: string, meetingId: string, identity: string): Promise<'meeting_not_found' | 'ok'>;
 	rotateCode(userId: string, id: string): Promise<string | null>;
 	/** Owner-only — `null` when the meeting doesn't exist or isn't the caller's. */
 	listPendingAdmissions(userId: string, meetingId: string): Promise<PendingAdmission[] | null>;
@@ -230,6 +242,20 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			const meeting = await repo.getForUser(userId, meetingId);
 			if (!meeting) return 'meeting_not_found';
 			await getLiveKit().setPublishSources(meeting.id, identity, allowed ? ALL_TRACK_SOURCES : NON_SCREEN_TRACK_SOURCES);
+			return 'ok';
+		},
+
+		async stopScreenShare(userId, meetingId, identity) {
+			const meeting = await repo.getForUser(userId, meetingId);
+			if (!meeting) return 'meeting_not_found';
+
+			const liveKit = getLiveKit();
+			const participants = await liveKit.listParticipants(meeting.id);
+			const target = participants.find((participant) => participant.identity === identity);
+			// Gone already, or never sharing: nothing to stop, and not an error.
+			for (const track of target?.tracks.filter(isScreenShareTrack) ?? []) {
+				await liveKit.muteTrack(meeting.id, identity, track.sid);
+			}
 			return 'ok';
 		},
 

@@ -148,15 +148,38 @@ describe('screen-share permissions', () => {
 		assert.deepEqual(decodeJson(token.split('.')[1]).video, { roomAdmin: true, room: 'room-1' });
 	});
 
-	test('listParticipants returns identities and attributes', async () => {
+	test('listParticipants returns identities, attributes and published tracks', async () => {
 		const { fetchImpl } = recordingFetch(() =>
-			Response.json({ participants: [{ identity: 'a', attributes: { role: 'host' } }, { identity: 'b' }] })
+			Response.json({
+				participants: [
+					{ identity: 'a', attributes: { role: 'host' }, tracks: [{ sid: 'TR_1', source: 'SCREEN_SHARE' }] },
+					{ identity: 'b' }
+				]
+			})
 		);
 		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
 		assert.deepEqual(await client.listParticipants('room-1'), [
-			{ identity: 'a', attributes: { role: 'host' } },
-			{ identity: 'b', attributes: {} }
+			{ identity: 'a', attributes: { role: 'host' }, tracks: [{ sid: 'TR_1', source: 'SCREEN_SHARE' }] },
+			{ identity: 'b', attributes: {}, tracks: [] }
 		]);
+	});
+
+	test('a track without a sid is dropped rather than muted by accident later', async () => {
+		const { fetchImpl } = recordingFetch(() =>
+			Response.json({ participants: [{ identity: 'a', tracks: [{ source: 'SCREEN_SHARE' }, { sid: 'TR_2' }] }] })
+		);
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
+		const [first] = await client.listParticipants('room-1');
+		assert.deepEqual(first.tracks, [{ sid: 'TR_2', source: '' }]);
+	});
+
+	test('muteTrack asks RoomService to mute that one track', async () => {
+		const { calls, fetchImpl } = recordingFetch(() => Response.json({}));
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
+		await client.muteTrack('room-1', 'guest-1', 'TR_9');
+
+		assert.match(calls[0].url, /MutePublishedTrack$/);
+		assert.deepEqual(calls[0].body, { room: 'room-1', identity: 'guest-1', track_sid: 'TR_9', muted: true });
 	});
 
 	test('listParticipants treats a missing room as empty', async () => {

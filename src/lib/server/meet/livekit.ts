@@ -23,7 +23,17 @@ export type TrackSourceName = 'camera' | 'microphone' | 'screen_share' | 'screen
 export const ALL_TRACK_SOURCES: TrackSourceName[] = ['camera', 'microphone', 'screen_share', 'screen_share_audio'];
 export const NON_SCREEN_TRACK_SOURCES: TrackSourceName[] = ['camera', 'microphone'];
 
-export type RoomParticipant = { identity: string; attributes: Record<string, string> };
+/** `source` is LiveKit's TrackSource enum name, e.g. `SCREEN_SHARE`. */
+export type RoomTrack = { sid: string; source: string };
+
+export type RoomParticipant = { identity: string; attributes: Record<string, string>; tracks: RoomTrack[] };
+
+/** The enum names RoomService reports for a shared screen, picture and sound. */
+const SCREEN_SHARE_SOURCE_NAMES = new Set(['SCREEN_SHARE', 'SCREEN_SHARE_AUDIO']);
+
+export function isScreenShareTrack(track: RoomTrack): boolean {
+	return SCREEN_SHARE_SOURCE_NAMES.has(track.source.toUpperCase());
+}
 
 type AccessTokenOptions = {
 	identity: string;
@@ -45,6 +55,8 @@ export type LiveKitClient = {
 	listParticipants(room: string): Promise<RoomParticipant[]>;
 	/** Replaces what one participant may publish, taking effect immediately in the live call. */
 	setPublishSources(room: string, identity: string, sources: TrackSourceName[]): Promise<void>;
+	/** Mutes one published track at the server, whatever the publisher's client does. */
+	muteTrack(room: string, identity: string, trackSid: string): Promise<void>;
 };
 
 export function createLiveKitClient(
@@ -107,12 +119,20 @@ export function createLiveKitClient(
 
 		async listParticipants(room) {
 			try {
-				const body = await roomService<{ participants?: { identity: string; attributes?: Record<string, string> }[] }>(
-					'ListParticipants',
-					room,
-					{}
-				);
-				return (body.participants ?? []).map((p) => ({ identity: p.identity, attributes: p.attributes ?? {} }));
+				const body = await roomService<{
+					participants?: {
+						identity: string;
+						attributes?: Record<string, string>;
+						tracks?: { sid?: string; source?: string }[];
+					}[];
+				}>('ListParticipants', room, {});
+				return (body.participants ?? []).map((p) => ({
+					identity: p.identity,
+					attributes: p.attributes ?? {},
+					tracks: (p.tracks ?? [])
+						.filter((track): track is { sid: string; source?: string } => typeof track.sid === 'string')
+						.map((track) => ({ sid: track.sid, source: track.source ?? '' }))
+				}));
 			} catch (error) {
 				// A room only exists while someone is in it — no room just means no one to update.
 				if (error instanceof LiveKitError && /not_found/.test(error.message)) return [];
@@ -133,6 +153,10 @@ export function createLiveKitClient(
 					can_publish_sources: sources.map((source) => source.toUpperCase())
 				}
 			});
+		},
+
+		async muteTrack(room, identity, trackSid) {
+			await roomService('MutePublishedTrack', room, { identity, track_sid: trackSid, muted: true });
 		}
 	};
 }
