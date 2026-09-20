@@ -81,6 +81,13 @@ squash-merge once everything is green.
 Run `bun test && bun run check` before pushing; it is cheaper than learning
 these from a red check.
 
+**A conflicting PR gets no CI at all.** If checks never appear after a push,
+check `gh pr view N --json mergeable` first. When a PR conflicts with `main`,
+GitHub can't build `refs/pull/N/merge`, so every `pull_request` workflow
+silently never runs — no queued run, no failure, nothing to re-run. It looks
+identical to Actions dropping the event. Rebase on `main`; closing and
+reopening the PR or pushing a new SHA won't help.
+
 ## Scope
 
 Keep it free. Prefer a local implementation over a paid service — labels, spam
