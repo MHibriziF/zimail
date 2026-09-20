@@ -47,8 +47,16 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 				created_at: input.createdAt
 			});
 		},
-		async listForUser(userId) {
-			return rows.filter((m) => m.user_id === userId);
+		async listForUser(userId, limit) {
+			const mine = rows.filter((m) => m.user_id === userId);
+			// Mirrors SQLite: a negative LIMIT means no limit.
+			return limit === undefined || limit < 0 ? mine : mine.slice(0, limit);
+		},
+		async deleteForUser(userId, id) {
+			const index = rows.findIndex((m) => m.id === id && m.user_id === userId);
+			if (index === -1) return false;
+			rows.splice(index, 1);
+			return true;
 		},
 		async findByCode(code) {
 			return rows.find((m) => m.code === code) ?? null;
@@ -189,6 +197,42 @@ describe('getForUser', () => {
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
 		assert.equal((await service.getForUser('user-1', 'meeting-1'))?.title, 'Standup');
 		assert.equal(await service.getForUser('someone-else', 'meeting-1'), null);
+	});
+});
+
+describe('list', () => {
+	test('without a limit returns everything the user owns', async () => {
+		const { repo } = fakeMeetingsRepo([meeting(), meeting({ id: 'meeting-2', code: 'bbb-bbbb-bbb' })]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		assert.equal((await service.list('user-1')).length, 2);
+	});
+
+	test('passes the limit through, so a long history loads a page at a time', async () => {
+		const { repo } = fakeMeetingsRepo([meeting(), meeting({ id: 'meeting-2', code: 'bbb-bbbb-bbb' })]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		assert.equal((await service.list('user-1', 1)).length, 1);
+	});
+});
+
+describe('remove', () => {
+	test('deletes the meeting, so its code stops resolving', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		assert.equal(await service.remove('user-1', 'meeting-1'), true);
+		assert.equal(await service.findByCode('aaa-aaaa-aaa'), null);
+	});
+
+	test('is ownership-scoped — someone else cannot delete it', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		assert.equal(await service.remove('someone-else', 'meeting-1'), false);
+		assert.equal((await service.getForUser('user-1', 'meeting-1'))?.title, 'Standup');
+	});
+
+	test('a meeting that is not there reports false rather than throwing', async () => {
+		const { repo } = fakeMeetingsRepo([]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		assert.equal(await service.remove('user-1', 'missing'), false);
 	});
 });
 

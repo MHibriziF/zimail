@@ -803,7 +803,13 @@
 		"listHeading": "Tus reuniones",
 		"emptyHint": "Las reuniones que crees aparecen aquí, listas para reutilizarse — el código no cambia hasta que pidas uno nuevo.",
 		"open": "Abrir",
-		"or": "o"
+		"or": "o",
+		"delete": "Eliminar reunión",
+		"deleteConfirm": "¿Eliminar esta reunión? Su enlace de acceso dejará de funcionar.",
+		"deleteAction": "Eliminar",
+		"deleting": "Eliminando…",
+		"couldNotDelete": "No se pudo eliminar esa reunión.",
+		"showMore": "Mostrar más"
 	},
 	"labels": {
 		"title": "Etiquetas",

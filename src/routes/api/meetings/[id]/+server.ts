@@ -21,6 +21,17 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 	return json({ meeting });
 };
 
+/** Owner-only. Cascades to `meeting_admissions`, so the join code stops working. */
+export const DELETE: RequestHandler = async ({ params, locals, platform }) => {
+	if (!platform?.env.DB || !locals.user) {
+		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	const removed = await getMeetingsService(platform).remove(locals.user.id, params.id);
+	if (!removed) return json({ error: 'Meeting not found' }, { status: 404 });
+	return json({ ok: true });
+};
+
 /** Backs both the /meetings list's edit option and the in-call host settings panel — same check, same effect. */
 export const PATCH: RequestHandler = async ({ params, request, locals, platform }) => {
 	if (!platform?.env.DB || !locals.user) {

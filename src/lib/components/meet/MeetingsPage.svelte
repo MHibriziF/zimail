@@ -9,11 +9,18 @@
 	import { describeMailError } from '$lib/mail/client';
 	import type { Meeting } from '$lib/server/meet/meetings';
 	import { DEFAULT_SCREEN_SHARE, type ScreenShareMode, type ScreenSharePolicy } from '$lib/meet/screen-share';
+	import { MEETINGS_PAGE_SIZE, nextShowCount } from '$lib/meet/meetings-list';
 
-	let { meetings }: { meetings: Meeting[] } = $props();
+	let {
+		meetings,
+		shown = MEETINGS_PAGE_SIZE,
+		hasMore = false
+	}: { meetings: Meeting[]; shown?: number; hasMore?: boolean } = $props();
 
 	/** Meetings started from this page this session — prepended ahead of `meetings`. */
 	let created = $state<Meeting[]>([]);
+	/** Deleted this session — filtered out rather than refetching the page. */
+	let removed = $state<string[]>([]);
 	/** Edits applied this session, keyed by meeting id — kept separate rather than mutating `meetings` (a plain prop, not reactive state). */
 	let overrides = $state<
 		Record<
@@ -21,7 +28,11 @@
 			Partial<Pick<Meeting, 'code' | 'title' | 'require_approval' | 'screen_share_policy' | 'screen_share_mode'>>
 		>
 	>({});
-	const rows = $derived([...created, ...meetings].map((meeting) => ({ ...meeting, ...overrides[meeting.id] })));
+	const rows = $derived(
+		[...created, ...meetings]
+			.filter((meeting) => !removed.includes(meeting.id))
+			.map((meeting) => ({ ...meeting, ...overrides[meeting.id] }))
+	);
 
 	let starting = $state(false);
 	let busyId = $state('');
@@ -30,6 +41,8 @@
 	let joinCode = $state('');
 
 	let editingId = $state('');
+	/** The row showing its "delete this meeting?" confirmation, if any. */
+	let deletingId = $state('');
 	let editTitle = $state('');
 	let editRequireApproval = $state(false);
 	let editScreenSharePolicy = $state<ScreenSharePolicy>(DEFAULT_SCREEN_SHARE.policy);
@@ -132,6 +145,30 @@
 
 	function cancelEdit() {
 		editingId = '';
+	}
+
+	/** Deleting is irreversible and invalidates the join code, so the row asks first. */
+	async function confirmDelete(id: string) {
+		if (busyId) return;
+		busyId = id;
+		error = '';
+
+		try {
+			const response = await fetch(`/api/meetings/${encodeURIComponent(id)}`, { method: 'DELETE' });
+			if (!response.ok) {
+				const body = (await response.json().catch(() => ({}))) as { error?: string };
+				error = body.error ?? t('meetings.couldNotDelete');
+				return;
+			}
+			removed = [...removed, id];
+			created = created.filter((meeting) => meeting.id !== id);
+			if (editingId === id) editingId = '';
+			deletingId = '';
+		} catch {
+			error = t('common.networkError');
+		} finally {
+			busyId = '';
+		}
 	}
 
 	async function saveEdit(id: string) {
@@ -271,8 +308,36 @@
 								>
 									<Icon name="refresh-line" size={16} />
 								</button>
+								<button
+									type="button"
+									class="icon-btn meetings-delete-trigger"
+									title={t('meetings.delete')}
+									aria-label={t('meetings.delete')}
+									aria-expanded={deletingId === meeting.id}
+									disabled={busyId === meeting.id}
+									onclick={() => (deletingId = deletingId === meeting.id ? '' : meeting.id)}
+								>
+									<Icon name="delete-bin-line" size={16} />
+								</button>
 							</div>
 						</div>
+
+						{#if deletingId === meeting.id}
+							<div class="meetings-confirm" role="alert">
+								<span>{t('meetings.deleteConfirm')}</span>
+								<div class="meetings-edit-actions">
+									<button type="button" class="btn-ghost" onclick={() => (deletingId = '')}>{t('common.cancel')}</button>
+									<button
+										type="button"
+										class="meetings-btn meetings-btn-danger"
+										disabled={busyId === meeting.id}
+										onclick={() => confirmDelete(meeting.id)}
+									>
+										{busyId === meeting.id ? t('meetings.deleting') : t('meetings.deleteAction')}
+									</button>
+								</div>
+							</div>
+						{/if}
 
 						{#if editingId === meeting.id}
 							<div class="meetings-edit">
@@ -344,6 +409,11 @@
 					</li>
 				{/each}
 			</ul>
+			{#if hasMore}
+				<a class="meetings-btn meetings-more" href="?show={nextShowCount(shown)}" data-sveltekit-noscroll>
+					{t('meetings.showMore')}
+				</a>
+			{/if}
 		{/if}
 	</section>
 </div>
@@ -617,6 +687,36 @@
 		display: flex;
 		justify-content: flex-end;
 		gap: 0.5rem;
+	}
+
+	.meetings-confirm {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.875rem 1.25rem 1.25rem;
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+	}
+
+	.meetings-delete-trigger:hover:not(:disabled) {
+		color: var(--color-danger);
+	}
+
+	.meetings-btn-danger {
+		border-color: transparent;
+		color: var(--color-on-accent, #fff);
+		background: var(--color-danger);
+	}
+
+	.meetings-btn-danger:disabled {
+		opacity: 0.6;
+	}
+
+	.meetings-more {
+		align-self: center;
+		margin-top: 0.75rem;
 	}
 
 	@media (max-width: 900px) {

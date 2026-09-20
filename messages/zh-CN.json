@@ -803,7 +803,13 @@
 		"listHeading": "你的会议",
 		"emptyHint": "你创建的会议会显示在这里，可重复使用——除非你获取新代码，否则代码保持不变。",
 		"open": "打开",
-		"or": "或"
+		"or": "或",
+		"delete": "删除会议",
+		"deleteConfirm": "删除此会议？其加入链接将失效。",
+		"deleteAction": "删除",
+		"deleting": "正在删除…",
+		"couldNotDelete": "无法删除该会议。",
+		"showMore": "显示更多"
 	},
 	"labels": {
 		"title": "标签",
