@@ -761,6 +761,7 @@
 		"screenShareRequested": "Se pidió al anfitrión compartir tu pantalla",
 		"screenShareGranted": "El anfitrión aceptó — tu pantalla se está compartiendo",
 		"screenShareDeclined": "El anfitrión no permitió compartir pantalla",
+		"screenShareCooldown": "Espera {seconds} s antes de volver a pedirlo",
 		"screenShareNoHost": "El anfitrión no está en la llamada para permitirlo",
 		"screenShareReplaced": "{name} empezó a presentar, así que tu pantalla dejó de compartirse",
 		"screenShareUpdateFailed": "No se pudo actualizar el permiso de esa persona",

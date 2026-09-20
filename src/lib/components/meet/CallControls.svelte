@@ -18,6 +18,7 @@
 		screenShareEnabled,
 		canShareScreen,
 		screenShareRequested,
+		shareCooldownSeconds,
 		pipSupported,
 		pipActive,
 		panel,
@@ -52,6 +53,8 @@
 		/** False under "ask the host first" until the host allows it — the button then asks instead. */
 		canShareScreen: boolean;
 		screenShareRequested: boolean;
+		/** Seconds left after a decline before asking again is allowed; 0 means free. */
+		shareCooldownSeconds: number;
 		pipSupported: boolean;
 		pipActive: boolean;
 		panel: 'none' | 'participants' | 'chat' | 'settings';
@@ -71,6 +74,13 @@
 		onTogglePanel: (next: 'participants' | 'chat' | 'settings') => void;
 		onLeave: () => void;
 	} = $props();
+
+	const screenShareLabel = $derived.by(() => {
+		if (screenShareEnabled) return t('meet.screenShareOff');
+		if (screenShareRequested) return t('meet.screenShareCancelRequest');
+		if (shareCooldownSeconds > 0) return t('meet.screenShareCooldown', { seconds: shareCooldownSeconds });
+		return canShareScreen ? t('meet.screenShareOn') : t('meet.screenShareAsk');
+	});
 </script>
 
 <div class="call-controls">
@@ -152,21 +162,10 @@
 			class="call-btn"
 			class:call-btn-active={screenShareEnabled}
 			class:call-btn-pending={screenShareRequested}
+			disabled={!screenShareEnabled && shareCooldownSeconds > 0}
 			onclick={onToggleScreenShare}
-			aria-label={screenShareEnabled
-				? t('meet.screenShareOff')
-				: screenShareRequested
-					? t('meet.screenShareCancelRequest')
-					: canShareScreen
-						? t('meet.screenShareOn')
-						: t('meet.screenShareAsk')}
-			title={screenShareEnabled
-				? t('meet.screenShareOff')
-				: screenShareRequested
-					? t('meet.screenShareCancelRequest')
-					: canShareScreen
-						? t('meet.screenShareOn')
-						: t('meet.screenShareAsk')}
+			aria-label={screenShareLabel}
+			title={screenShareLabel}
 		>
 			<Icon name="computer-line" size={20} />
 		</button>
