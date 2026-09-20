@@ -803,7 +803,13 @@
 		"listHeading": "Rapat Anda",
 		"emptyHint": "Rapat yang Anda buat muncul di sini dan bisa dipakai lagi — kodenya tetap sama sampai Anda membuat kode baru.",
 		"open": "Buka",
-		"or": "atau"
+		"or": "atau",
+		"delete": "Hapus rapat",
+		"deleteConfirm": "Hapus rapat ini? Tautan gabungnya tidak akan berfungsi lagi.",
+		"deleteAction": "Hapus",
+		"deleting": "Menghapus…",
+		"couldNotDelete": "Tidak dapat menghapus rapat itu.",
+		"showMore": "Tampilkan lebih banyak"
 	},
 	"labels": {
 		"title": "Label",

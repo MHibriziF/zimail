@@ -89,7 +89,9 @@ export type MeetingsService = {
 		userId: string,
 		options?: { title?: string; domainId?: string | null; requireApproval?: boolean }
 	): Promise<CreatedMeeting>;
-	list(userId: string): Promise<Meeting[]>;
+	list(userId: string, limit?: number): Promise<Meeting[]>;
+	/** Owner-only. False when the meeting doesn't exist or isn't the caller's. */
+	remove(userId: string, id: string): Promise<boolean>;
 	findByCode(code: string): Promise<Meeting | null>;
 	getForUser(userId: string, id: string): Promise<Meeting | null>;
 	update(userId: string, id: string, changes: MeetingChanges): Promise<Meeting | null>;
@@ -197,7 +199,9 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			throw new Error('Could not generate a unique meeting code');
 		},
 
-		list: (userId) => repo.listForUser(userId),
+		list: (userId, limit) => repo.listForUser(userId, limit),
+
+		remove: (userId, id) => repo.deleteForUser(userId, id),
 		findByCode: (code) => repo.findByCode(code),
 		getForUser: (userId, id) => repo.getForUser(userId, id),
 

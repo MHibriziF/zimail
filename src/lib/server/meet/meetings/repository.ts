@@ -59,7 +59,9 @@ export type MeetingFieldPatch = {
 export type MeetingsRepository = {
 	countForUser(userId: string): Promise<number>;
 	insert(meeting: NewMeeting): Promise<void>;
-	listForUser(userId: string): Promise<Meeting[]>;
+	/** Newest first. `limit` bounds the query so a long history can't load the whole table. */
+	listForUser(userId: string, limit?: number): Promise<Meeting[]>;
+	deleteForUser(userId: string, id: string): Promise<boolean>;
 	findByCode(code: string): Promise<Meeting | null>;
 	getForUser(userId: string, id: string): Promise<Meeting | null>;
 	updateFields(userId: string, id: string, patch: MeetingFieldPatch): Promise<boolean>;
@@ -97,12 +99,22 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 				.run();
 		},
 
-		async listForUser(userId) {
+		async listForUser(userId, limit) {
+			// -1 is SQLite's "no limit", so one statement covers both cases.
 			const { results } = await db
-				.prepare(`SELECT ${SELECT_FIELDS} FROM meetings WHERE user_id = ? ORDER BY created_at DESC`)
-				.bind(userId)
+				.prepare(`SELECT ${SELECT_FIELDS} FROM meetings WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`)
+				.bind(userId, limit ?? -1)
 				.all<MeetingRow>();
 			return results.map(toMeeting);
+		},
+
+		async deleteForUser(userId, id) {
+			// meeting_admissions cascades (migration 0029), so the code stops working too.
+			const result = await db
+				.prepare('DELETE FROM meetings WHERE id = ? AND user_id = ?')
+				.bind(id, userId)
+				.run();
+			return (result.meta.changes ?? 0) > 0;
 		},
 
 		async findByCode(code) {

@@ -803,7 +803,13 @@
 		"listHeading": "Vos réunions",
 		"emptyHint": "Les réunions que vous créez apparaissent ici, prêtes à être réutilisées — le code reste le même jusqu’à ce que vous en demandiez un nouveau.",
 		"open": "Ouvrir",
-		"or": "ou"
+		"or": "ou",
+		"delete": "Supprimer la réunion",
+		"deleteConfirm": "Supprimer cette réunion ? Son lien de participation cessera de fonctionner.",
+		"deleteAction": "Supprimer",
+		"deleting": "Suppression…",
+		"couldNotDelete": "Impossible de supprimer cette réunion.",
+		"showMore": "Afficher plus"
 	},
 	"labels": {
 		"title": "Libellés",

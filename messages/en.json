@@ -803,7 +803,13 @@
 		"listHeading": "Your meetings",
 		"emptyHint": "Meetings you create show up here, ready to reuse — the code stays the same until you get a new one.",
 		"open": "Open",
-		"or": "or"
+		"or": "or",
+		"delete": "Delete meeting",
+		"deleteConfirm": "Delete this meeting? Its join link will stop working.",
+		"deleteAction": "Delete",
+		"deleting": "Deleting…",
+		"couldNotDelete": "Couldn't delete that meeting.",
+		"showMore": "Show more"
 	},
 	"labels": {
 		"title": "Labels",
