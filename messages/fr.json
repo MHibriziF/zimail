@@ -760,6 +760,7 @@
 		"screenShareRequested": "Demande de partage d’écran envoyée à l’hôte",
 		"screenShareGranted": "L’hôte a accepté — votre écran est partagé",
 		"screenShareDeclined": "L’hôte n’a pas autorisé le partage d’écran",
+		"screenShareCooldown": "Attendez {seconds} s avant de redemander",
 		"screenShareNoHost": "L’hôte n’est pas dans l’appel pour autoriser le partage",
 		"screenShareReplaced": "{name} a commencé à présenter : votre partage s’est arrêté",
 		"screenShareUpdateFailed": "Impossible de modifier le partage d’écran de cette personne",

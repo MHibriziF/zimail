@@ -760,6 +760,7 @@
 		"screenShareRequested": "Asked the host to let you share your screen",
 		"screenShareGranted": "The host approved — your screen is now shared",
 		"screenShareDeclined": "The host didn't allow screen sharing",
+		"screenShareCooldown": "Wait {seconds}s before asking again",
 		"screenShareNoHost": "The host isn't in the call to allow screen sharing",
 		"screenShareReplaced": "{name} started presenting, so your screen share stopped",
 		"screenShareUpdateFailed": "Couldn't update screen sharing for that person",

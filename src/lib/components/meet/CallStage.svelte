@@ -19,6 +19,7 @@
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { normalizeDisplayName } from '$lib/meet/display-name';
 	import { isHostIdentity } from '$lib/meet/host-identity';
+	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
 	import {
 		DEFAULT_SCREEN_SHARE,
 		parseScreenShareMode,
@@ -146,6 +147,10 @@
 	let pendingScreenTracks: LocalTrack[] = [];
 	let screenShareRequests = $state<{ identity: string; name: string }[]>([]);
 	let screenShareBusyIdentity = $state('');
+	/** Seconds left before a declined requester may ask again; 0 means the button is free. */
+	let shareCooldownSeconds = $state(0);
+	let shareCooldownTimer: ReturnType<typeof setInterval> | null = null;
+	const requestChimeGate = createRequestChimeGate();
 	/** Active shares, oldest first. */
 	let shareOrder = $state<string[]>([]);
 	/** A share the viewer clicked to watch instead of the newest. */
@@ -469,6 +474,7 @@
 			remoteCount = remoteTiles.size;
 		}
 		removeScreenTile(participant.identity);
+		requestChimeGate.forget(participant.identity);
 		screenShareRequests = screenShareRequests.filter((request) => request.identity !== participant.identity);
 		refreshRoster();
 	}
@@ -504,6 +510,8 @@
 		if (room && participant === room.localParticipant) {
 			const couldShare = canShareScreen;
 			canShareScreen = mayShareScreen(participant);
+			// Being allowed outright settles whatever the earlier decline was about.
+			if (canShareScreen) stopShareCooldown();
 			if (canShareScreen && !couldShare && screenShareRequested) void publishPendingScreenShare();
 			if (!canShareScreen && screenShareEnabled) {
 				void room.localParticipant.setScreenShareEnabled(false).catch(() => {});
@@ -809,6 +817,7 @@
 			// Only a host's answer counts — anyone could send on this topic.
 			if (!isHostIdentity(participantInfo.identity) || !screenShareRequested) return;
 			releasePendingScreenShare();
+			startShareCooldown();
 			showNotice(t('meet.screenShareDeclined'));
 		});
 		instance.registerTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC, async (reader, participantInfo) => {
@@ -879,6 +888,7 @@
 		pipWindow?.close();
 		stopAdmissionsPolling();
 		releasePendingScreenShare();
+		stopShareCooldown();
 		if (noticeTimer) clearTimeout(noticeTimer);
 		// Give the leave chime time to finish before the context that plays it dies.
 		if (soundCtx) {
@@ -1001,6 +1011,23 @@
 		}
 	}
 
+	/** Ticks the countdown down to 0, then stops itself and frees the button. */
+	function startShareCooldown() {
+		const declinedAt = Date.now();
+		shareCooldownSeconds = cooldownSecondsLeft(declinedAt, declinedAt);
+		if (shareCooldownTimer) clearInterval(shareCooldownTimer);
+		shareCooldownTimer = setInterval(() => {
+			shareCooldownSeconds = cooldownSecondsLeft(declinedAt, Date.now());
+			if (shareCooldownSeconds === 0) stopShareCooldown();
+		}, 1000);
+	}
+
+	function stopShareCooldown() {
+		if (shareCooldownTimer) clearInterval(shareCooldownTimer);
+		shareCooldownTimer = null;
+		shareCooldownSeconds = 0;
+	}
+
 	function hostIdentities(): string[] {
 		if (!room) return [];
 		return Array.from(room.remoteParticipants.values())
@@ -1011,6 +1038,10 @@
 	/** Under "only people I allow": pick the screen now, then ask; approval publishes it. */
 	async function requestScreenShare() {
 		if (!room || screenShareRequested) return;
+		if (shareCooldownSeconds > 0) {
+			showNotice(t('meet.screenShareCooldown', { seconds: shareCooldownSeconds }));
+			return;
+		}
 		const hosts = hostIdentities();
 		if (hosts.length === 0) {
 			showNotice(t('meet.screenShareNoHost'));
@@ -1080,7 +1111,9 @@
 		const participant = room.remoteParticipants.get(identity);
 		if (!participant) return;
 		screenShareRequests = [...screenShareRequests, { identity, name: participant.name || t('meet.guest') }];
-		if (!deafened) playAdmissionChime();
+		// The request still shows in the list; only the chime is rate-limited, so
+		// asking again in a loop can't ring the host over and over.
+		if (!deafened && requestChimeGate.shouldRing(identity, Date.now())) playAdmissionChime();
 	}
 
 	async function setScreenShareAllowed(identity: string, allowed: boolean): Promise<boolean> {
@@ -1390,6 +1423,7 @@
 		{screenShareEnabled}
 		{canShareScreen}
 		{screenShareRequested}
+		{shareCooldownSeconds}
 		{pipSupported}
 		{pipActive}
 		{panel}

@@ -760,6 +760,7 @@
 		"screenShareRequested": "已请求主持人允许你共享屏幕",
 		"screenShareGranted": "主持人已同意——你的屏幕正在共享",
 		"screenShareDeclined": "主持人未允许共享屏幕",
+		"screenShareCooldown": "请等待 {seconds} 秒后再次请求",
 		"screenShareNoHost": "主持人不在通话中，无法允许共享屏幕",
 		"screenShareReplaced": "{name} 开始演示，你的屏幕共享已停止",
 		"screenShareUpdateFailed": "无法更新此人的屏幕共享权限",

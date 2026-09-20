@@ -760,6 +760,7 @@
 		"screenShareRequested": "Permintaan berbagi layar dikirim ke host",
 		"screenShareGranted": "Host menyetujui — layar Anda sekarang dibagikan",
 		"screenShareDeclined": "Host tidak mengizinkan berbagi layar",
+		"screenShareCooldown": "Tunggu {seconds} detik sebelum meminta lagi",
 		"screenShareNoHost": "Host tidak ada di panggilan untuk mengizinkan berbagi layar",
 		"screenShareReplaced": "{name} mulai presentasi, jadi berbagi layar Anda dihentikan",
 		"screenShareUpdateFailed": "Tidak dapat memperbarui izin berbagi layar orang itu",
