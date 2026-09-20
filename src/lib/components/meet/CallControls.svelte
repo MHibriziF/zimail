@@ -162,7 +162,7 @@
 			class="call-btn"
 			class:call-btn-active={screenShareEnabled}
 			class:call-btn-pending={screenShareRequested}
-			disabled={shareCooldownSeconds > 0}
+			disabled={!screenShareEnabled && shareCooldownSeconds > 0}
 			onclick={onToggleScreenShare}
 			aria-label={screenShareLabel}
 			title={screenShareLabel}
