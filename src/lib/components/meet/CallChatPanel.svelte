@@ -8,7 +8,7 @@
 		onSend,
 		onClose
 	}: {
-		messages: { id: string; from: string; text: string; isLocal: boolean }[];
+		messages: { id: string; from: string; text: string; isLocal: boolean; isHost: boolean }[];
 		onSend: (text: string) => void;
 		onClose: () => void;
 	} = $props();
@@ -51,7 +51,12 @@
 		{:else}
 			{#each messages as message (message.id)}
 				<div class="call-chat-message" class:own={message.isLocal}>
-					{#if !message.isLocal}<span class="call-chat-from">{message.from}</span>{/if}
+					{#if !message.isLocal}
+						<span class="call-chat-from">
+							{message.from}
+							{#if message.isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
+						</span>
+					{/if}
 					<span class="call-chat-text">{message.text}</span>
 				</div>
 			{/each}
@@ -131,6 +136,9 @@
 	}
 
 	.call-chat-from {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
 		font-size: 0.6875rem;
 		font-weight: 600;
 		color: rgba(255, 255, 255, 0.6);
