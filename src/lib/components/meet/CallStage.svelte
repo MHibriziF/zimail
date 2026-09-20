@@ -156,8 +156,10 @@
 	let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let panel = $state<'none' | 'participants' | 'chat' | 'settings'>('none');
-	let roster = $state<{ identity: string; name: string; isLocal: boolean; canShareScreen: boolean }[]>([]);
-	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean }[]>([]);
+	let roster = $state<
+		{ identity: string; name: string; isLocal: boolean; isHost: boolean; canShareScreen: boolean }[]
+	>([]);
+	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean; isHost: boolean }[]>([]);
 	let unread = $state(0);
 
 	function initialsFor(name: string): string {
@@ -268,11 +270,22 @@
 		deafenedIcon.hidden = true;
 		status.append(micIcon, cameraIcon, deafenedIcon);
 
+		// The label is its own span so renaming can replace the text without
+		// touching the host badge beside it.
+		const nameRow = document.createElement('span');
+		nameRow.className = 'call-tile-name';
 		const name = document.createElement('span');
-		name.className = 'call-tile-name';
+		name.className = 'call-tile-label';
 		name.textContent = label;
+		nameRow.append(name);
+		if (isHostIdentity(identity)) {
+			const badge = document.createElement('span');
+			badge.className = 'call-host-badge';
+			badge.textContent = t('meet.hostBadge');
+			nameRow.append(badge);
+		}
 
-		el.append(avatar, media, status, name);
+		el.append(avatar, media, status, nameRow);
 		return { el, avatar, nameEl: name, media, micIcon, cameraIcon, deafenedIcon };
 	}
 
@@ -479,10 +492,17 @@
 			identity: p.identity,
 			name: p.name || t('meet.guest'),
 			isLocal: false,
+			isHost: isHostIdentity(p.identity),
 			canShareScreen: mayShareScreen(p)
 		}));
 		roster = [
-			{ identity: room.localParticipant.identity, name: localName, isLocal: true, canShareScreen },
+			{
+				identity: room.localParticipant.identity,
+				name: localName,
+				isLocal: true,
+				isHost: isHostIdentity(room.localParticipant.identity),
+				canShareScreen
+			},
 			...remote
 		];
 		refreshPipVideo();
@@ -683,7 +703,10 @@
 
 	function receiveChatMessage(text: string, identity: string) {
 		const from = roster.find((p) => p.identity === identity)?.name || t('meet.guest');
-		messages = [...messages, { id: crypto.randomUUID(), from, text, isLocal: false }];
+		messages = [
+			...messages,
+			{ id: crypto.randomUUID(), from, text, isLocal: false, isHost: isHostIdentity(identity) }
+		];
 		if (panel !== 'chat') unread += 1;
 	}
 
@@ -1176,7 +1199,7 @@
 
 	async function sendChatMessage(text: string) {
 		if (!room) return;
-		messages = [...messages, { id: crypto.randomUUID(), from: localName, text, isLocal: true }];
+		messages = [...messages, { id: crypto.randomUUID(), from: localName, text, isLocal: true, isHost }];
 		try {
 			await room.localParticipant.sendText(text, { topic: CHAT_TOPIC });
 		} catch {
@@ -1324,7 +1347,9 @@
 				}}
 			>
 				<div class="call-tile-media" bind:this={localScreenMediaEl}></div>
-				<span class="call-tile-name">{t('meet.you')} · {t('meet.screenShare')}</span>
+				<span class="call-tile-name">
+					<span class="call-tile-label">{t('meet.you')} · {t('meet.screenShare')}</span>
+				</span>
 			</div>
 			<div class="call-tile call-tile-local">
 				<div class="call-tile-avatar" style="background: {localColor}">{localInitials}</div>
@@ -1334,7 +1359,10 @@
 					{#if !cameraEnabled}<Icon name="camera-off-line" size={14} class="call-tile-status-icon" />{/if}
 					{#if deafened}<Icon name="volume-mute-line" size={14} class="call-tile-status-icon" />{/if}
 				</div>
-				<span class="call-tile-name">{localName} · {t('meet.you')}</span>
+				<span class="call-tile-name">
+					<span class="call-tile-label">{localName} · {t('meet.you')}</span>
+					{#if isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
+				</span>
 			</div>
 			<div class="call-tile-group" bind:this={remoteContainerEl}></div>
 			{#if !connecting && !connectionError && remoteCount === 0}
@@ -1542,15 +1570,35 @@
 		position: absolute;
 		left: 0.5rem;
 		bottom: 0.5rem;
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
 		padding: 0.125rem 0.5rem;
 		font-size: 0.75rem;
 		border-radius: 999px;
 		background: rgba(0, 0, 0, 0.55);
 		color: #fff;
 		max-width: calc(100% - 1rem);
+	}
+
+	/* Only the name ellipsizes; the badge must stay readable to be worth anything. */
+	:global(.call-tile-label) {
+		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	:global(.call-host-badge) {
+		flex-shrink: 0;
+		padding: 0 0.375rem;
+		border-radius: 999px;
+		font-size: 0.625rem;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		text-transform: uppercase;
+		color: #0b0b0d;
+		background: #fbbf24;
 	}
 
 	:global(.call-tile-screen) {

@@ -13,7 +13,7 @@
 		onSetScreenShareAllowed,
 		onClose
 	}: {
-		roster: { identity: string; name: string; isLocal: boolean; canShareScreen: boolean }[];
+		roster: { identity: string; name: string; isLocal: boolean; isHost: boolean; canShareScreen: boolean }[];
 		isHost: boolean;
 		screenSharePolicy: ScreenSharePolicy;
 		screenShareBusyIdentity: string;
@@ -103,6 +103,7 @@
 					</form>
 				{:else}
 					<span class="call-participant-name">{person.name}{person.isLocal ? ` · ${t('meet.you')}` : ''}</span>
+					{#if person.isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
 					{#if person.isLocal}
 						<button
 							type="button"
