@@ -548,13 +548,15 @@
 	async function enforceSingleShare(newIdentity: string) {
 		if (!isHost || !meetingId) return;
 		const stale = shareOrder.filter((key) => key !== newIdentity && key !== LOCAL_SHARE_KEY);
-		for (const identity of stale) {
-			await fetch(`/api/meetings/${encodeURIComponent(meetingId)}/screen-share/stop`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ identity })
-			}).catch(() => {});
-		}
+		await Promise.all(
+			stale.map((identity) =>
+				fetch(`/api/meetings/${encodeURIComponent(meetingId)}/screen-share/stop`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ identity })
+				}).catch(() => {})
+			)
+		);
 	}
 
 	/** "One at a time": someone else just started sharing, so ours makes way. */

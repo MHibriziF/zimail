@@ -23,16 +23,23 @@ export type TrackSourceName = 'camera' | 'microphone' | 'screen_share' | 'screen
 export const ALL_TRACK_SOURCES: TrackSourceName[] = ['camera', 'microphone', 'screen_share', 'screen_share_audio'];
 export const NON_SCREEN_TRACK_SOURCES: TrackSourceName[] = ['camera', 'microphone'];
 
-/** `source` is LiveKit's TrackSource enum name, e.g. `SCREEN_SHARE`. */
-export type RoomTrack = { sid: string; source: string };
+/**
+ * LiveKit's TrackSource. Protobuf JSON may serialize an enum as its name or as
+ * its number depending on the server's encoder, so both are accepted — the
+ * client already relies on the numeric form (`PROTO_SCREEN_SHARE_SOURCE`).
+ */
+export type RoomTrack = { sid: string; source: string | number };
 
 export type RoomParticipant = { identity: string; attributes: Record<string, string>; tracks: RoomTrack[] };
 
-/** The enum names RoomService reports for a shared screen, picture and sound. */
+/** A shared screen's picture and its sound, by enum name and by enum number. */
 const SCREEN_SHARE_SOURCE_NAMES = new Set(['SCREEN_SHARE', 'SCREEN_SHARE_AUDIO']);
+const SCREEN_SHARE_SOURCE_NUMBERS = new Set([3, 4]);
 
 export function isScreenShareTrack(track: RoomTrack): boolean {
-	return SCREEN_SHARE_SOURCE_NAMES.has(track.source.toUpperCase());
+	return typeof track.source === 'number'
+		? SCREEN_SHARE_SOURCE_NUMBERS.has(track.source)
+		: SCREEN_SHARE_SOURCE_NAMES.has(track.source.toUpperCase());
 }
 
 type AccessTokenOptions = {
@@ -123,15 +130,18 @@ export function createLiveKitClient(
 					participants?: {
 						identity: string;
 						attributes?: Record<string, string>;
-						tracks?: { sid?: string; source?: string }[];
+						tracks?: { sid?: unknown; source?: unknown }[];
 					}[];
 				}>('ListParticipants', room, {});
 				return (body.participants ?? []).map((p) => ({
 					identity: p.identity,
 					attributes: p.attributes ?? {},
 					tracks: (p.tracks ?? [])
-						.filter((track): track is { sid: string; source?: string } => typeof track.sid === 'string')
-						.map((track) => ({ sid: track.sid, source: track.source ?? '' }))
+						.filter((track) => typeof track.sid === 'string')
+						.map((track) => ({
+							sid: track.sid as string,
+							source: typeof track.source === 'string' || typeof track.source === 'number' ? track.source : ''
+						}))
 				}));
 			} catch (error) {
 				// A room only exists while someone is in it — no room just means no one to update.

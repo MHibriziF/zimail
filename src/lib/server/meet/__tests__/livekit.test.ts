@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { createLiveKitClient } from '../livekit';
+import { createLiveKitClient, isScreenShareTrack } from '../livekit';
 
 function base64urlDecode(part: string): Uint8Array {
 	const padded = part.replace(/-/g, '+').replace(/_/g, '/').padEnd(part.length + ((4 - (part.length % 4)) % 4), '=');
@@ -171,6 +171,30 @@ describe('screen-share permissions', () => {
 		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
 		const [first] = await client.listParticipants('room-1');
 		assert.deepEqual(first.tracks, [{ sid: 'TR_2', source: '' }]);
+	});
+
+	test('an enum source survives as a number, and anything else becomes empty', async () => {
+		const { fetchImpl } = recordingFetch(() =>
+			Response.json({
+				participants: [{ identity: 'a', tracks: [{ sid: 'TR_1', source: 3 }, { sid: 'TR_2', source: { nope: true } }] }]
+			})
+		);
+		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);
+		const [first] = await client.listParticipants('room-1');
+		assert.deepEqual(first.tracks, [
+			{ sid: 'TR_1', source: 3 },
+			{ sid: 'TR_2', source: '' }
+		]);
+	});
+
+	test('isScreenShareTrack accepts both the enum name and its number', () => {
+		assert.equal(isScreenShareTrack({ sid: 'a', source: 'SCREEN_SHARE' }), true);
+		assert.equal(isScreenShareTrack({ sid: 'a', source: 'screen_share_audio' }), true);
+		assert.equal(isScreenShareTrack({ sid: 'a', source: 3 }), true);
+		assert.equal(isScreenShareTrack({ sid: 'a', source: 4 }), true);
+		assert.equal(isScreenShareTrack({ sid: 'a', source: 'CAMERA' }), false);
+		assert.equal(isScreenShareTrack({ sid: 'a', source: 1 }), false);
+		assert.equal(isScreenShareTrack({ sid: 'a', source: '' }), false);
 	});
 
 	test('muteTrack asks RoomService to mute that one track', async () => {
