@@ -132,14 +132,21 @@ function fakeLiveKit(): LiveKitClient {
 		async listParticipants() {
 			return [];
 		},
-		async setPublishSources() {}
+		async setPublishSources() {},
+		async muteTrack() {}
 	};
+}
+
+/** A person in the room; `tracks` is empty unless the test cares about what they publish. */
+function participant(identity: string, extra: Partial<RoomParticipant> = {}): RoomParticipant {
+	return { identity, attributes: {}, tracks: [], ...extra };
 }
 
 /** Records every token and permission change, with a fixed set of people already in the room. */
 function recordingLiveKit(inRoom: RoomParticipant[] = []) {
 	const tokens: Parameters<LiveKitClient['createAccessToken']>[0][] = [];
 	const permissionChanges: { room: string; identity: string; sources: TrackSourceName[] }[] = [];
+	const mutedTracks: { room: string; identity: string; trackSid: string }[] = [];
 	const client: LiveKitClient = {
 		url: 'wss://livekit.test',
 		async createAccessToken(options) {
@@ -151,9 +158,12 @@ function recordingLiveKit(inRoom: RoomParticipant[] = []) {
 		},
 		async setPublishSources(room, identity, sources) {
 			permissionChanges.push({ room, identity, sources });
+		},
+		async muteTrack(room, identity, trackSid) {
+			mutedTracks.push({ room, identity, trackSid });
 		}
 	};
-	return { client, tokens, permissionChanges };
+	return { client, tokens, permissionChanges, mutedTracks };
 }
 
 describe('create', () => {
@@ -233,6 +243,49 @@ describe('remove', () => {
 		const { repo } = fakeMeetingsRepo([]);
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
 		assert.equal(await service.remove('user-1', 'missing'), false);
+	});
+});
+
+describe('stopScreenShare', () => {
+	const sharing = () =>
+		participant('guest', {
+			tracks: [
+				{ sid: 'TR_cam', source: 'CAMERA' },
+				{ sid: 'TR_screen', source: 'SCREEN_SHARE' },
+				{ sid: 'TR_screen_audio', source: 'SCREEN_SHARE_AUDIO' }
+			]
+		});
+
+	test('mutes the screen tracks and leaves the camera alone', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([sharing()]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.stopScreenShare('user-1', 'meeting-1', 'guest'), 'ok');
+		assert.deepEqual(
+			liveKit.mutedTracks.map((muted) => muted.trackSid),
+			['TR_screen', 'TR_screen_audio']
+		);
+		assert.equal(liveKit.mutedTracks[0].room, 'meeting-1');
+	});
+
+	test('only the meeting owner can stop a share', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([sharing()]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.stopScreenShare('someone-else', 'meeting-1', 'guest'), 'meeting_not_found');
+		assert.deepEqual(liveKit.mutedTracks, []);
+	});
+
+	test('someone who has left, or was never sharing, is not an error', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const liveKit = recordingLiveKit([participant('still-here')]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.stopScreenShare('user-1', 'meeting-1', 'gone'), 'ok');
+		assert.equal(await service.stopScreenShare('user-1', 'meeting-1', 'still-here'), 'ok');
+		assert.deepEqual(liveKit.mutedTracks, []);
 	});
 });
 
@@ -417,10 +470,7 @@ describe('screen-share policy', () => {
 
 	test('changing the policy mid-call re-applies it to everyone in the room except the host', async () => {
 		const { repo } = fakeMeetingsRepo([meeting()]);
-		const liveKit = recordingLiveKit([
-			{ identity: 'host-1', attributes: {} },
-			{ identity: 'guest', attributes: {} }
-		]);
+		const liveKit = recordingLiveKit([participant('host-1'), participant('guest')]);
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
 
 		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'approval' });
@@ -435,7 +485,7 @@ describe('screen-share policy', () => {
 	test('a guest claiming the host role in its attributes is not exempt from a policy change', async () => {
 		// Participants can set their own attributes, so `role: host` proves nothing.
 		const { repo } = fakeMeetingsRepo([meeting()]);
-		const liveKit = recordingLiveKit([{ identity: 'guest', attributes: { role: 'host' } }]);
+		const liveKit = recordingLiveKit([participant('guest', { attributes: { role: 'host' } })]);
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
 
 		await service.update('user-1', 'meeting-1', { screenSharePolicy: 'approval' });
@@ -457,7 +507,7 @@ describe('screen-share policy', () => {
 
 	test('changing only the mode, or re-saving the same policy, touches no one in the room', async () => {
 		const { repo } = fakeMeetingsRepo([meeting()]);
-		const liveKit = recordingLiveKit([{ identity: 'guest', attributes: {} }]);
+		const liveKit = recordingLiveKit([participant('guest')]);
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
 
 		await service.update('user-1', 'meeting-1', { screenShareMode: 'single' });
@@ -467,7 +517,7 @@ describe('screen-share policy', () => {
 
 	test('someone else cannot change the policy of a meeting they do not own', async () => {
 		const { repo, rows } = fakeMeetingsRepo([meeting()]);
-		const liveKit = recordingLiveKit([{ identity: 'guest', attributes: {} }]);
+		const liveKit = recordingLiveKit([participant('guest')]);
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
 
 		assert.equal(await service.update('someone-else', 'meeting-1', { screenSharePolicy: 'approval' }), null);
