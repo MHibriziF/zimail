@@ -8,14 +8,19 @@
 	import { startMeeting } from '$lib/mail/meetings';
 	import { describeMailError } from '$lib/mail/client';
 	import type { Meeting } from '$lib/server/meet/meetings';
-	import { DEFAULT_SCREEN_SHARE } from '$lib/meet/screen-share';
+	import { DEFAULT_SCREEN_SHARE, type ScreenShareMode, type ScreenSharePolicy } from '$lib/meet/screen-share';
 
 	let { meetings }: { meetings: Meeting[] } = $props();
 
 	/** Meetings started from this page this session — prepended ahead of `meetings`. */
 	let created = $state<Meeting[]>([]);
 	/** Edits applied this session, keyed by meeting id — kept separate rather than mutating `meetings` (a plain prop, not reactive state). */
-	let overrides = $state<Record<string, Partial<Pick<Meeting, 'code' | 'title' | 'require_approval'>>>>({});
+	let overrides = $state<
+		Record<
+			string,
+			Partial<Pick<Meeting, 'code' | 'title' | 'require_approval' | 'screen_share_policy' | 'screen_share_mode'>>
+		>
+	>({});
 	const rows = $derived([...created, ...meetings].map((meeting) => ({ ...meeting, ...overrides[meeting.id] })));
 
 	let starting = $state(false);
@@ -27,6 +32,8 @@
 	let editingId = $state('');
 	let editTitle = $state('');
 	let editRequireApproval = $state(false);
+	let editScreenSharePolicy = $state<ScreenSharePolicy>(DEFAULT_SCREEN_SHARE.policy);
+	let editScreenShareMode = $state<ScreenShareMode>(DEFAULT_SCREEN_SHARE.mode);
 	let savingEdit = $state(false);
 
 	// The app's language and saved time zone, not the browser's — and the same on
@@ -119,6 +126,8 @@
 		editingId = meeting.id;
 		editTitle = meeting.title ?? '';
 		editRequireApproval = meeting.require_approval;
+		editScreenSharePolicy = meeting.screen_share_policy;
+		editScreenShareMode = meeting.screen_share_mode;
 	}
 
 	function cancelEdit() {
@@ -134,10 +143,20 @@
 			const response = await fetch(`/api/meetings/${encodeURIComponent(id)}`, {
 				method: 'PATCH',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ title: editTitle, requireApproval: editRequireApproval })
+				body: JSON.stringify({
+					title: editTitle,
+					requireApproval: editRequireApproval,
+					screenSharePolicy: editScreenSharePolicy,
+					screenShareMode: editScreenShareMode
+				})
 			});
 			const body = (await response.json().catch(() => ({}))) as {
-				meeting?: { title: string | null; require_approval: boolean };
+				meeting?: {
+					title: string | null;
+					require_approval: boolean;
+					screen_share_policy: ScreenSharePolicy;
+					screen_share_mode: ScreenShareMode;
+				};
 				error?: string;
 			};
 			if (!response.ok || !body.meeting) {
@@ -146,7 +165,13 @@
 			}
 			overrides = {
 				...overrides,
-				[id]: { ...overrides[id], title: body.meeting.title, require_approval: body.meeting.require_approval }
+				[id]: {
+					...overrides[id],
+					title: body.meeting.title,
+					require_approval: body.meeting.require_approval,
+					screen_share_policy: body.meeting.screen_share_policy,
+					screen_share_mode: body.meeting.screen_share_mode
+				}
 			};
 			editingId = '';
 		} catch {
@@ -264,6 +289,48 @@
 									<label class="meetings-edit-radio">
 										<input type="radio" name="admission-{meeting.id}" checked={editRequireApproval} onchange={() => (editRequireApproval = true)} />
 										{t('meetings.admissionApproval')}
+									</label>
+								</fieldset>
+								<fieldset class="meetings-edit-field">
+									<legend>{t('meet.screenSharePolicyLabel')}</legend>
+									<label class="meetings-edit-radio">
+										<input
+											type="radio"
+											name="share-policy-{meeting.id}"
+											checked={editScreenSharePolicy === 'open'}
+											onchange={() => (editScreenSharePolicy = 'open')}
+										/>
+										{t('meet.screenSharePolicyOpen')}
+									</label>
+									<label class="meetings-edit-radio">
+										<input
+											type="radio"
+											name="share-policy-{meeting.id}"
+											checked={editScreenSharePolicy === 'approval'}
+											onchange={() => (editScreenSharePolicy = 'approval')}
+										/>
+										{t('meet.screenSharePolicyApproval')}
+									</label>
+								</fieldset>
+								<fieldset class="meetings-edit-field">
+									<legend>{t('meet.screenShareModeLabel')}</legend>
+									<label class="meetings-edit-radio">
+										<input
+											type="radio"
+											name="share-mode-{meeting.id}"
+											checked={editScreenShareMode === 'single'}
+											onchange={() => (editScreenShareMode = 'single')}
+										/>
+										{t('meet.screenShareModeSingle')}
+									</label>
+									<label class="meetings-edit-radio">
+										<input
+											type="radio"
+											name="share-mode-{meeting.id}"
+											checked={editScreenShareMode === 'multiple'}
+											onchange={() => (editScreenShareMode = 'multiple')}
+										/>
+										{t('meet.screenShareModeMultiple')}
 									</label>
 								</fieldset>
 								<div class="meetings-edit-actions">
