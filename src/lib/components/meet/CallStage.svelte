@@ -1347,7 +1347,9 @@
 				}}
 			>
 				<div class="call-tile-media" bind:this={localScreenMediaEl}></div>
-				<span class="call-tile-name">{t('meet.you')} · {t('meet.screenShare')}</span>
+				<span class="call-tile-name">
+					<span class="call-tile-label">{t('meet.you')} · {t('meet.screenShare')}</span>
+				</span>
 			</div>
 			<div class="call-tile call-tile-local">
 				<div class="call-tile-avatar" style="background: {localColor}">{localInitials}</div>
