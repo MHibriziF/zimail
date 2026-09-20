@@ -24,9 +24,12 @@ runtime (the Cloudflare deploy button never migrates), so the SQL has to be
 inlined into `src/lib/server/migrations/migrations.generated.ts`. That file is
 committed, and `migrations.generated.test.ts` fails if it drifts.
 
-**`bun run check` after a build.** svelte-check follows `src/worker.ts` into
-`.svelte-kit/output` and reports thousands of phantom errors. Delete the build
-output first. Tracked as issue #39.
+**`allowJs`/`checkJs` are off on purpose.** The repo has no `.js` sources, and
+enabling them let svelte-check follow `src/worker.ts`'s import into
+`.svelte-kit/output` and report ~2,800 errors from the built bundle as soon as
+a build existed. That import is suppressed with `@ts-ignore`, not
+`@ts-expect-error`: whether it resolves depends on whether a build exists, so
+`@ts-expect-error` becomes an error itself once one does. See issue #39.
 
 **Verify in workerd, not vite.** `vite build` and `wrangler deploy --dry-run`
 both pass while the deploy is broken. Real verification is `wrangler dev` plus
