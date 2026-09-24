@@ -21,11 +21,13 @@
 	// Onboarding runs before the user has an address, so the shell would be empty.
 	// /meet is a call — even a signed-in host should see it full-screen, the way
 	// a Gmeet link opens on its own rather than inside Gmail's chrome.
+	// /book is a public booking page, the same for the host as for a guest.
 	const showShell = $derived(
 		Boolean(data.user) &&
 			$page.url.pathname !== '/onboarding' &&
 			$page.url.pathname !== '/account/setup' &&
-			!$page.url.pathname.startsWith('/meet/')
+			!$page.url.pathname.startsWith('/meet/') &&
+			!$page.url.pathname.startsWith('/book/')
 	);
 
 	// The shell is the theme's — everything below it is the same routes either way.
