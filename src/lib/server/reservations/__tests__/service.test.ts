@@ -27,7 +27,8 @@ type SetupOptions = { busy?: CalendarEvent[]; notifyFails?: boolean };
 function setup(options: SetupOptions = {}) {
 	const pages: StoredPage[] = [];
 	const bookings: NewBooking[] = [];
-	const notified: { hostUserId: string; booking: BookingDetails }[] = [];
+	const notified: { hostUserId: string; booking: BookingDetails; kind: string }[] = [];
+	const deletedEvents: string[] = [];
 
 	const repo: ReservationsRepository = {
 		async listForUser(userId) {
@@ -64,6 +65,20 @@ function setup(options: SetupOptions = {}) {
 		async countUpcomingFor(pageId, email) {
 			return bookings.filter((booking) => booking.pageId === pageId && booking.guestEmail === email).length;
 		},
+		async getBookingByEvent(userId, eventId) {
+			const booking = bookings.find((entry) => entry.userId === userId && entry.eventId === eventId);
+			if (!booking) return null;
+			const page = pages.find((entry) => entry.id === booking.pageId)!;
+			return {
+				guestName: booking.guestName,
+				guestEmail: booking.guestEmail,
+				note: booking.note,
+				start: booking.start,
+				end: booking.end,
+				pageTitle: page.title,
+				timeZone: page.timeZone
+			};
+		},
 		async insertBooking(booking) {
 			if (bookings.some((entry) => entry.pageId === booking.pageId && entry.start === booking.start)) {
 				throw new Error('UNIQUE constraint failed: reservations.page_id, reservations.starts_at');
@@ -73,6 +88,13 @@ function setup(options: SetupOptions = {}) {
 	};
 
 	const calendar = {
+		async deleteReservation(userId: string, eventId: string) {
+			const index = bookings.findIndex((entry) => entry.userId === userId && entry.eventId === eventId);
+			if (index < 0) return false;
+			bookings.splice(index, 1);
+			deletedEvents.push(eventId);
+			return true;
+		},
 		async listOverlapping(userId: string) {
 			const booked: CalendarEvent[] = bookings
 				.filter((booking) => booking.userId === userId)
@@ -96,13 +118,13 @@ function setup(options: SetupOptions = {}) {
 		repo,
 		calendar,
 		hostOf: async () => ({ name: 'Izi', email: 'me@example.test' }),
-		notify: async (hostUserId, booking) => {
+		notify: async (hostUserId, booking, kind) => {
 			if (options.notifyFails) throw new Error('provider down');
-			notified.push({ hostUserId, booking });
+			notified.push({ hostUserId, booking, kind });
 		},
 		now: () => NOW
 	});
-	return { service, pages, bookings, notified };
+	return { service, pages, bookings, notified, deletedEvents };
 }
 
 async function withPage(options: SetupOptions = {}) {
@@ -213,6 +235,36 @@ describe('ReservationsService slots and booking', () => {
 		for (const start of starts) outcomes.push((await service.book('office-hours', { ...guest, start })).type);
 		assert.equal(outcomes.filter((type) => type === 'ok').length, MAX_UPCOMING_PER_GUEST);
 		assert.equal(outcomes.at(-1), 'too_many');
+	});
+
+	test('cancelling a booking removes it, frees the slot and sends a cancellation for the same event', async () => {
+		const { service, bookings, notified, deletedEvents } = await withPage();
+		assert.equal((await service.book('office-hours', guest)).type, 'ok');
+		const eventId = bookings[0].eventId;
+
+		assert.equal(await service.cancelBooking('owner', eventId), true);
+		assert.deepEqual(deletedEvents, [eventId]);
+		assert.deepEqual(
+			notified.map((entry) => entry.kind),
+			['request', 'cancel']
+		);
+		assert.equal(notified[1].booking.uid, notified[0].booking.uid);
+		assert.equal(notified[1].booking.guestEmail, 'ana@example.com');
+		assert.equal(notified[1].booking.pageTitle, 'Office hours');
+		assert.equal((await service.book('office-hours', { ...guest, email: 'bo@example.com' })).type, 'ok');
+	});
+
+	test('cancelling something that isn’t a booking sends nothing', async () => {
+		const { service, notified } = await withPage();
+		assert.equal(await service.cancelBooking('owner', 'no-such-event'), false);
+		assert.equal(notified.length, 0);
+	});
+
+	test('a failed cancellation email still cancels', async () => {
+		const { service, bookings } = await withPage({ notifyFails: true });
+		await service.book('office-hours', guest);
+		assert.equal(await service.cancelBooking('owner', bookings[0].eventId), true);
+		assert.equal(bookings.length, 0);
 	});
 
 	test('a failed notification never undoes the booking', async () => {

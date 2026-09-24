@@ -901,7 +901,7 @@
 			"synced": "上次同步 {time} · {count} 个活动"
 		},
 		"cancelBooking": "取消预约",
-		"cancelBookingConfirm": "取消此预约？该时段将重新开放。",
+		"cancelBookingConfirm": "取消此预约？访客会收到取消通知，该时段将重新开放。",
 		"bookingHint": "通过预约页面预订。可以取消，但不能编辑。",
 		"reservations": {
 			"heading": "预约页面",

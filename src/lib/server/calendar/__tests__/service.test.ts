@@ -89,6 +89,21 @@ describe('CalendarService', () => {
 		assert.equal(await service.remove('u1', 'feed-1'), 'read_only');
 	});
 
+	test('a booking is cancelled through the reservations hook when one is wired', async () => {
+		const { repo, rows } = fakeRepo([{ ...feedRow, id: 'booking', source: 'reservation', calendar: null }]);
+		const cancelled: string[] = [];
+		const service = createCalendarService({
+			repo,
+			cancelReservation: async (_userId, id) => {
+				cancelled.push(id);
+				return true;
+			}
+		});
+		assert.equal(await service.remove('u1', 'booking'), 'ok');
+		assert.deepEqual(cancelled, ['booking']);
+		assert.equal(rows.length, 1, 'the hook, not the plain delete, did the work');
+	});
+
 	test('a booking can be cancelled but not edited', async () => {
 		const { repo, rows } = fakeRepo([{ ...feedRow, id: 'booking', source: 'reservation', calendar: null }]);
 		const service = createCalendarService({ repo });

@@ -34,7 +34,13 @@ export type CalendarService = {
 	remove(userId: string, id: string): Promise<'ok' | 'read_only' | 'not_found'>;
 };
 
-export function createCalendarService({ repo }: { repo: CalendarRepository }): CalendarService {
+export type CalendarServiceDeps = {
+	repo: CalendarRepository;
+	/** Cancels a booking and tells the guest; without it, the event is just deleted. */
+	cancelReservation?: (userId: string, id: string) => Promise<boolean>;
+};
+
+export function createCalendarService({ repo, cancelReservation }: CalendarServiceDeps): CalendarService {
 	return {
 		async listBetween(userId, from, to, timeZone) {
 			const span = to.getTime() - from.getTime();
@@ -85,7 +91,7 @@ export function createCalendarService({ repo }: { repo: CalendarRepository }): C
 			if (!isDeletableEvent(existing)) return 'read_only';
 			const removed =
 				existing.source === 'reservation'
-					? await repo.deleteReservation(userId, id)
+					? await (cancelReservation ?? repo.deleteReservation)(userId, id)
 					: await repo.deleteManual(userId, id);
 			return removed ? 'ok' : 'not_found';
 		}

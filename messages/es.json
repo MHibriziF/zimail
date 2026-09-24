@@ -901,7 +901,7 @@
 			"synced": "Última sincronización {time} · {count} eventos"
 		},
 		"cancelBooking": "Cancelar reserva",
-		"cancelBookingConfirm": "¿Cancelar esta reserva? El horario vuelve a quedar libre.",
+		"cancelBookingConfirm": "¿Cancelar esta reserva? El invitado recibe una cancelación y el horario vuelve a quedar libre.",
 		"bookingHint": "Reservado desde una página de reservas. Se puede cancelar, pero no editar.",
 		"reservations": {
 			"heading": "Páginas de reserva",

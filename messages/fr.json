@@ -901,7 +901,7 @@
 			"synced": "Synchronisé {time} · {count} événements"
 		},
 		"cancelBooking": "Annuler la réservation",
-		"cancelBookingConfirm": "Annuler cette réservation ? Le créneau redevient libre.",
+		"cancelBookingConfirm": "Annuler cette réservation ? L'invité reçoit une annulation et le créneau redevient libre.",
 		"bookingHint": "Réservé via une page de réservation. On peut l'annuler, pas le modifier.",
 		"reservations": {
 			"heading": "Pages de réservation",
