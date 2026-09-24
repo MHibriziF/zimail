@@ -89,16 +89,25 @@ jobs:
           set -e
           PROJECT_KEY=$(grep '^sonar.projectKey=' sonar-project.properties | cut -d= -f2)
 
-          STATUS_JSON=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=$PROJECT_KEY")
+          # This step only reports — the scan step already passed or failed the gate — so a
+          # server blip here must not turn a green run red. Retry, then fall back to "unknown".
+          sonar_get() {
+            curl -sf --retry 5 --retry-all-errors --retry-delay 5 --max-time 30 -u "$SONAR_TOKEN:" "$SONAR_HOST_URL$1"
+          }
+
+          STATUS_JSON=$(sonar_get "/api/qualitygates/project_status?projectKey=$PROJECT_KEY" || echo '{"projectStatus":{"status":"UNKNOWN","conditions":[]}}')
           GATE=$(echo "$STATUS_JSON" | jq -r '.projectStatus.status')
 
-          MEASURES_JSON=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/measures/component?component=$PROJECT_KEY&metricKeys=bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density")
+          MEASURES_JSON=$(sonar_get "/api/measures/component?component=$PROJECT_KEY&metricKeys=bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density" || echo '{"component":{"measures":[]}}')
           measure() {
             echo "$MEASURES_JSON" | jq -r --arg k "$1" '(.component.measures[] | select(.metric==$k) | .value) // "n/a"'
           }
 
-          ICON="✅"
-          [ "$GATE" = "OK" ] || ICON="❌"
+          case "$GATE" in
+            OK) ICON="✅" ;;
+            UNKNOWN) ICON="⚠️" ;;
+            *) ICON="❌" ;;
+          esac
 
           FAILED=$(echo "$STATUS_JSON" | jq -r '.projectStatus.conditions[] | select(.status=="ERROR") | "- `\(.metricKey)`: \(.actualValue) (threshold \(.comparator) \(.errorThreshold))"')
 
@@ -106,7 +115,7 @@ jobs:
           # Edition has no PR analysis, so the scan lands on main's new-code period — the same
           # query you'd run by hand. Only new issues; pre-existing debt stays on the dashboard.
           ISSUES_LIMIT=25
-          ISSUES_JSON=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?componentKeys=$PROJECT_KEY&branch=main&statuses=OPEN,CONFIRMED,REOPENED&inNewCodePeriod=true&s=SEVERITY&asc=false&ps=$ISSUES_LIMIT" || echo '{"total":0,"issues":[]}')
+          ISSUES_JSON=$(sonar_get "/api/issues/search?componentKeys=$PROJECT_KEY&branch=main&statuses=OPEN,CONFIRMED,REOPENED&inNewCodePeriod=true&s=SEVERITY&asc=false&ps=$ISSUES_LIMIT" || echo '{"total":0,"issues":[]}')
           ISSUES_TOTAL=$(echo "$ISSUES_JSON" | jq -r '.total // 0')
           ISSUE_ROWS=$(echo "$ISSUES_JSON" | jq -r \
             --arg host "$SONAR_HOST_URL" \
