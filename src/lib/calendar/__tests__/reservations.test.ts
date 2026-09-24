@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
+	isPlausibleEmail,
 	isValidSlug,
 	minutesToTime,
 	slugify,
@@ -90,6 +91,14 @@ describe('validateGuest', () => {
 		assert.deepEqual(validateGuest({ name: 'A', email: 'a@b.com\nBcc: x@y.com' }), { ok: false, error: 'invalid_email' });
 		assert.deepEqual(validateGuest({ name: 'A', email: 'a@b.com, c@d.com' }), { ok: false, error: 'invalid_email' });
 		assert.deepEqual(validateGuest({ name: '', email: 'a@b.com' }), { ok: false, error: 'invalid_name' });
+	});
+
+	test('isPlausibleEmail', () => {
+		for (const good of ['a@b.co', 'first.last+tag@sub.example.org']) assert.ok(isPlausibleEmail(good), good);
+		for (const bad of ['', 'a', '@b.com', 'a@b', 'a@b.', 'a@.b', 'a@@b.com', 'a@b@c.com', 'a b@c.com', 'a@b.com;c@d.com', '"a"@b.com']) {
+			assert.ok(!isPlausibleEmail(bad), bad);
+		}
+		assert.ok(!isPlausibleEmail(`${'a'.repeat(250)}@b.com`));
 	});
 });
 

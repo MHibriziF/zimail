@@ -144,8 +144,21 @@ export function validatePageSettings(
 	};
 }
 
-/** Deliberately loose — the provider is the real judge — but it keeps out junk and header injection. */
-const EMAIL = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
+const FORBIDDEN_IN_EMAIL = new Set([' ', '\t', '\r', '\n', '<', '>', ',', ';', '"']);
+
+/**
+ * Deliberately loose — the provider is the real judge — but it keeps out junk
+ * and anything that could smuggle a second recipient or header. Hand-rolled
+ * rather than a regex, which Sonar scores as backtracking-prone.
+ */
+export function isPlausibleEmail(email: string): boolean {
+	if (email.length > 254 || [...email].some((char) => FORBIDDEN_IN_EMAIL.has(char))) return false;
+	const at = email.indexOf('@');
+	if (at < 1 || at !== email.lastIndexOf('@')) return false;
+	const domain = email.slice(at + 1);
+	const dot = domain.lastIndexOf('.');
+	return dot > 0 && dot < domain.length - 1;
+}
 
 export function validateGuest(
 	input: Record<string, unknown>
@@ -153,7 +166,7 @@ export function validateGuest(
 	const name = clean(input.name, MAX_GUEST_NAME_LENGTH);
 	if (!name) return { ok: false, error: 'invalid_name' };
 	const email = typeof input.email === 'string' ? input.email.trim() : '';
-	if (email.length > 254 || !EMAIL.test(email)) return { ok: false, error: 'invalid_email' };
+	if (!isPlausibleEmail(email)) return { ok: false, error: 'invalid_email' };
 	const note = typeof input.note === 'string' ? input.note.trim().slice(0, MAX_GUEST_NOTE_LENGTH) : '';
 	return { ok: true, value: { name, email, note } };
 }
