@@ -31,11 +31,9 @@ On top of everything upstream ships:
 
 - **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat, and [recording](#recording-a-meeting) in the browser. **Compose → New meeting**, or the **Meetings** view.
 - **[Calendar](#calendar)** — month and agenda views next to the mailbox, with today's and tomorrow's events in the sidebar. Pull in [Google, Outlook or iCloud calendars](#other-calendars) by their iCal address, and share [reservation pages](#reservation-pages) where people book a free slot — checked against every calendar you have, sent as a real calendar invitation, and optionally with its own meeting room. **Calendar** in the sidebar.
-- **Two interfaces** — Zero, the two-pane shell with a command palette and keyboard shortcuts, or Classic, the original stacked layout. Per account, in **Settings → Interface**.
 - **Scheduled send** — pick any future date and time, or one of the presets, from the caret beside **Send**. The message waits in your own outbox and a [cron trigger](#scheduled-send) delivers it, so it works on either mail provider and is not capped at a provider's hold-until horizon. Recall it back to a draft any time before it goes.
 - **Two-factor authentication** — TOTP from any authenticator app, with single-use backup codes, asked for at sign-in. **Settings → Two-factor authentication**.
 - **Recovery address** — link a second mailbox you already own to the account. It is where security notices land and where forgotten-password links are sent, so losing access to this inbox does not lock you out of it. **Settings → Recovery address**.
-- **[Migrations that apply themselves](#database-migrations)** — the Deploy to Cloudflare button never runs them, so upstream's one-click deploy lands on an empty database. Here the Worker brings its own schema up to date.
 - **Broader deletion** — trash that empties itself on a retention period you choose, plus a sweep that moves mail older than a given age to the trash. Drafts and scheduled messages are never swept, and a count is always shown before anything moves. **Settings → Cleanup**.
 - **Recipient chips** — To, Cc and Bcc turn what you have typed into a chip on space, comma, semicolon, <kbd>Enter</kbd> or <kbd>Tab</kbd>, so a mistyped address is visible before you send rather than after.
 - **Recipient suggestions** — the composer offers addresses you have written to before as you type.
@@ -368,24 +366,6 @@ off their calendar.
 A page takes at most 30 bookings a day, and one guest address at most three
 upcoming bookings, so the form can't be used to send mail from your domain in
 bulk.
-
-## Database migrations
-
-*Changed by this fork.*
-
-Upstream leaves the schema to `wrangler d1 migrations apply`, which the **Deploy
-to Cloudflare** button never runs — so a one-click deploy lands on an empty
-database and fails until someone knows to migrate it by hand.
-
-Here the migration files are bundled into the Worker and any pending ones are
-applied on the first request (and by the `email()` and cron handlers, whichever
-arrives first). They are recorded in `d1_migrations` — wrangler's own table, in
-wrangler's own format — so the CLI and the Worker agree about what has run and
-either can go first.
-
-Each migration is sent as a single D1 batch together with the row recording it,
-so it lands whole or not at all, and two requests hitting a cold deploy at once
-cannot apply anything twice.
 
 ## Scheduled send
 
