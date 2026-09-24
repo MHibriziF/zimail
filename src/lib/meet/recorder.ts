@@ -72,10 +72,67 @@ type DisplayMediaOptions = DisplayMediaStreamOptions & {
 	systemAudio?: 'include' | 'exclude';
 };
 
+/** The Web Audio mix a recording's sound comes from; tracks join and leave as people do. */
+export type AudioMix = {
+	track: MediaStreamTrack;
+	add(track: MediaStreamTrack): void;
+	remove(track: MediaStreamTrack): void;
+};
+
+export function createAudioMix(context: AudioContext): AudioMix {
+	const destination = context.createMediaStreamDestination();
+	const sources = new Map<string, MediaStreamAudioSourceNode>();
+	return {
+		track: destination.stream.getAudioTracks()[0],
+		add(track) {
+			if (sources.has(track.id) || track.readyState === 'ended') return;
+			const source = context.createMediaStreamSource(new MediaStream([track]));
+			source.connect(destination);
+			sources.set(track.id, source);
+		},
+		remove(track) {
+			sources.get(track.id)?.disconnect();
+			sources.delete(track.id);
+		}
+	};
+}
+
 /**
- * Asks for the screen (throws if the person cancels the picker), then starts
- * recording. `onEnded` fires if capture stops from outside — the browser's own
- * "Stop sharing" bar — so the caller can save what was recorded.
+ * Runs MediaRecorder over `stream` and returns a `stop` that is safe to call
+ * twice. `cleanup` runs once the file is complete.
+ */
+export function recordStream(
+	stream: MediaStream,
+	mimeType: string,
+	cleanup: () => Promise<void> | void
+): () => Promise<Blob> {
+	const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2_500_000 });
+	const chunks: Blob[] = [];
+	recorder.ondataavailable = (event) => {
+		if (event.data.size > 0) chunks.push(event.data);
+	};
+	const finished = new Promise<Blob>((resolve) => {
+		recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+	});
+	// A one-second timeslice keeps memory in small chunks and loses at most a second if the tab dies.
+	recorder.start(1000);
+
+	let stopping: Promise<Blob> | null = null;
+	return () => {
+		stopping ??= (async () => {
+			if (recorder.state !== 'inactive') recorder.stop();
+			const blob = await finished;
+			await cleanup();
+			return blob;
+		})();
+		return stopping;
+	};
+}
+
+/**
+ * "Record my view": asks for the screen (throws if the person cancels the
+ * picker), then records what it shows. `onEnded` fires if capture stops from
+ * outside — the browser's own "Stop sharing" bar — so the caller can save.
  */
 export async function startRecording(options: {
 	micTrack: MediaStreamTrack | null;
@@ -103,53 +160,28 @@ export async function startRecording(options: {
 		throw error;
 	}
 
-	const mix = context.createMediaStreamDestination();
-	const sources = new Map<string, MediaStreamAudioSourceNode>();
-
-	const addAudioTrack = (track: MediaStreamTrack) => {
-		if (sources.has(track.id) || track.readyState === 'ended') return;
-		const source = context.createMediaStreamSource(new MediaStream([track]));
-		source.connect(mix);
-		sources.set(track.id, source);
-	};
-	const removeAudioTrack = (track: MediaStreamTrack) => {
-		sources.get(track.id)?.disconnect();
-		sources.delete(track.id);
-	};
-
+	const mix = createAudioMix(context);
 	const displayAudio = display.getAudioTracks();
 	const mixesRemoteAudio = shouldMixRemoteAudio(displayAudio.length > 0);
-	for (const track of displayAudio) addAudioTrack(track);
-	if (options.micTrack) addAudioTrack(options.micTrack);
-	if (mixesRemoteAudio) for (const track of options.remoteAudioTracks) addAudioTrack(track);
+	for (const track of displayAudio) mix.add(track);
+	if (options.micTrack) mix.add(options.micTrack);
+	if (mixesRemoteAudio) for (const track of options.remoteAudioTracks) mix.add(track);
 
-	const stream = new MediaStream([...display.getVideoTracks(), ...mix.stream.getAudioTracks()]);
-	const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2_500_000 });
-	const chunks: Blob[] = [];
-	recorder.ondataavailable = (event) => {
-		if (event.data.size > 0) chunks.push(event.data);
-	};
-	const finished = new Promise<Blob>((resolve) => {
-		recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+	const stream = new MediaStream([...display.getVideoTracks(), mix.track]);
+	const stop = recordStream(stream, mimeType, async () => {
+		for (const track of display.getTracks()) track.stop();
+		await context.close().catch(() => undefined);
 	});
-
-	let stopping: Promise<Blob> | null = null;
-	const stop = () => {
-		stopping ??= (async () => {
-			if (recorder.state !== 'inactive') recorder.stop();
-			const blob = await finished;
-			for (const track of display.getTracks()) track.stop();
-			await context.close().catch(() => undefined);
-			return blob;
-		})();
-		return stopping;
-	};
-
 	for (const track of display.getVideoTracks()) track.addEventListener('ended', options.onEnded, { once: true });
-	// A one-second timeslice keeps memory in small chunks and loses at most a second if the tab dies.
-	recorder.start(1000);
 
-	return { mimeType, startedAt: new Date(), mixesRemoteAudio, addAudioTrack, removeAudioTrack, stop };
+	return {
+		mimeType,
+		startedAt: new Date(),
+		mixesRemoteAudio,
+		addAudioTrack: mix.add,
+		removeAudioTrack: mix.remove,
+		stop
+	};
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
