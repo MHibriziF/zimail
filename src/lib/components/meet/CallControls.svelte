@@ -21,6 +21,9 @@
 		shareCooldownSeconds,
 		pipSupported,
 		pipActive,
+		canRecord,
+		recording,
+		recordingSaving,
 		panel,
 		rosterCount,
 		unread,
@@ -35,6 +38,7 @@
 		onShowBackgroundPicker,
 		onToggleScreenShare,
 		onTogglePip,
+		onToggleRecording,
 		onTogglePanel,
 		onLeave
 	}: {
@@ -57,6 +61,10 @@
 		shareCooldownSeconds: number;
 		pipSupported: boolean;
 		pipActive: boolean;
+		/** Host only, and only where the browser can record — see `recordingSupported`. */
+		canRecord: boolean;
+		recording: boolean;
+		recordingSaving: boolean;
 		panel: 'none' | 'participants' | 'chat' | 'settings';
 		rosterCount: number;
 		unread: number;
@@ -71,6 +79,7 @@
 		onShowBackgroundPicker: () => void;
 		onToggleScreenShare: () => void;
 		onTogglePip: () => void;
+		onToggleRecording: () => void;
 		onTogglePanel: (next: 'participants' | 'chat' | 'settings') => void;
 		onLeave: () => void;
 	} = $props();
@@ -168,6 +177,19 @@
 			title={screenShareLabel}
 		>
 			<Icon name="computer-line" size={20} />
+		</button>
+	{/if}
+	{#if canRecord}
+		<button
+			type="button"
+			class="call-btn"
+			class:call-btn-recording={recording}
+			disabled={recordingSaving}
+			onclick={onToggleRecording}
+			aria-label={recording ? t('meet.stopRecording') : t('meet.record')}
+			title={recording ? t('meet.stopRecording') : t('meet.record')}
+		>
+			<Icon name={recording ? 'stop-circle-line' : 'record-circle-line'} size={20} />
 		</button>
 	{/if}
 	{#if pipSupported}
@@ -289,6 +311,15 @@
 	.call-btn-active {
 		background: #3f3f46;
 		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+	}
+
+	.call-btn-recording {
+		color: #fff;
+		background: #dc2626;
+	}
+
+	.call-btn-recording:hover {
+		background: #b91c1c;
 	}
 
 	/* Waiting on the host: a pulsing ring, and pressing again withdraws the request. */

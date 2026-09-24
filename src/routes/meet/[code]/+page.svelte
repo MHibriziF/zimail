@@ -281,6 +281,7 @@
 		initialDeafened={deafened}
 		isLoggedIn={data.isLoggedIn}
 		meetingId={session.meetingId}
+		meetingCode={data.code}
 		initialScreenShare={session.screenShare}
 		{onleave}
 	/>

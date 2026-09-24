@@ -777,7 +777,14 @@
 		"screenShareRequestsLabel": "Demandent à partager leur écran",
 		"screenShareNoRequests": "Personne ne demande.",
 		"screenShareCancelRequest": "Annuler la demande de partage d’écran",
-		"screenShareStartFailed": "L’hôte a accepté, mais le partage a échoué. Réessayez."
+		"screenShareStartFailed": "L’hôte a accepté, mais le partage a échoué. Réessayez.",
+		"record": "Enregistrer l'appel",
+		"stopRecording": "Arrêter l'enregistrement",
+		"recordingSelf": "Enregistrement · {time}",
+		"recordingBy": "{name} enregistre",
+		"recordingSaving": "Enregistrement du fichier…",
+		"recordingSaved": "Enregistrement ajouté à vos téléchargements",
+		"recordingFailed": "Impossible d'enregistrer l'appel"
 	},
 	"meetings": {
 		"title": "Réunions — {app}",

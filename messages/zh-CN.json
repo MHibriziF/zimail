@@ -777,7 +777,14 @@
 		"screenShareRequestsLabel": "请求共享屏幕",
 		"screenShareNoRequests": "暂无请求。",
 		"screenShareCancelRequest": "取消共享屏幕请求",
-		"screenShareStartFailed": "主持人已同意，但屏幕共享失败，请重试。"
+		"screenShareStartFailed": "主持人已同意，但屏幕共享失败，请重试。",
+		"record": "录制通话",
+		"stopRecording": "停止录制",
+		"recordingSelf": "正在录制 · {time}",
+		"recordingBy": "{name} 正在录制",
+		"recordingSaving": "正在保存录制…",
+		"recordingSaved": "录制已保存到你的下载文件夹",
+		"recordingFailed": "无法录制通话"
 	},
 	"meetings": {
 		"title": "会议 — {app}",

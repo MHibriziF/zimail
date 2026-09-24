@@ -777,7 +777,14 @@
 		"screenShareRequestsLabel": "Meminta berbagi layar",
 		"screenShareNoRequests": "Tidak ada yang meminta.",
 		"screenShareCancelRequest": "Batalkan permintaan berbagi layar",
-		"screenShareStartFailed": "Host menyetujui, tetapi layar Anda gagal dibagikan. Coba lagi."
+		"screenShareStartFailed": "Host menyetujui, tetapi layar Anda gagal dibagikan. Coba lagi.",
+		"record": "Rekam panggilan",
+		"stopRecording": "Hentikan rekaman",
+		"recordingSelf": "Merekam · {time}",
+		"recordingBy": "{name} sedang merekam",
+		"recordingSaving": "Menyimpan rekaman…",
+		"recordingSaved": "Rekaman disimpan ke unduhan Anda",
+		"recordingFailed": "Tidak dapat merekam panggilan"
 	},
 	"meetings": {
 		"title": "Rapat — {app}",
