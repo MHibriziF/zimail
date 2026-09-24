@@ -56,7 +56,13 @@ export function createCalendarService({ repo }: { repo: CalendarRepository }): C
 			const valid = validateEventInput(input);
 			if (!valid.ok) return { type: valid.error };
 
-			const event: CalendarEvent = { id: crypto.randomUUID(), ...valid.value, source: 'manual', busy: true };
+			const event: CalendarEvent = {
+				id: crypto.randomUUID(),
+				...valid.value,
+				source: 'manual',
+				busy: true,
+				calendar: null
+			};
 			await repo.insert({ ...valid.value, id: event.id, userId, source: 'manual' });
 			return { type: 'ok', event };
 		},

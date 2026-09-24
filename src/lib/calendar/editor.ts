@@ -2,7 +2,7 @@
  * The event editor works in the viewer's wall time — separate date and time
  * fields — while the API speaks UTC instants. These convert between the two.
  */
-import { instantFromWall, wallIn } from '$lib/timezone';
+import { instantFromWall, wallIn } from '../timezone';
 import { addDays, type CalendarEvent, type CalendarEventInput } from './events';
 import { dateKeyIn } from './grid';
 

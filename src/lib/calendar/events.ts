@@ -2,7 +2,8 @@
  * Calendar event rules shared by the server (which enforces them) and the
  * editor (which checks the same things before a request is made).
  */
-import { instantFromWall } from '$lib/timezone';
+import { instantFromWall } from '../timezone';
+import type { LabelColor } from '../mail/labels';
 
 export const CALENDAR_EVENT_SOURCES = ['manual', 'feed', 'reservation'] as const;
 export type CalendarEventSource = (typeof CALENDAR_EVENT_SOURCES)[number];
@@ -24,7 +25,10 @@ export type CalendarEvent = {
 	location: string | null;
 	notes: string | null;
 	source: CalendarEventSource;
+	/** False for time marked free (a feed's TRANSP:TRANSPARENT) — shown, but blocks nothing. */
 	busy: boolean;
+	/** The subscribed calendar a feed event came from, for its color and label. */
+	calendar: { name: string; color: LabelColor } | null;
 };
 
 export type CalendarEventInput = {

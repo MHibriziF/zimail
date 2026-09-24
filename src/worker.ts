@@ -7,6 +7,7 @@ import {
 import { getEmailProvider } from './lib/server/context';
 import { ensureSchema } from './lib/server/migrations/migrate';
 import { runDueScheduledSends } from './lib/server/scheduled-send';
+import { runDueFeedSyncs } from './lib/server/calendar-feeds';
 // Renamed from `_worker.js` by `scripts/wrap-cloudflare-worker.mjs` after `vite build`.
 // Whether this resolves depends on whether a build exists, so the suppression has
 // to be @ts-ignore: @ts-expect-error itself becomes an error once one does.
@@ -22,7 +23,8 @@ const svelteApp = sveltekit as SvelteKitWorker;
 /**
  * SvelteKit's generated Worker is fetch-only. This wrapper keeps HTTP on
  * SvelteKit and adds the handlers it cannot express: Cloudflare Email
- * Service's `email()` and the cron trigger that sends scheduled mail.
+ * Service's `email()` and the cron trigger that sends scheduled mail and
+ * refreshes subscribed calendars.
  */
 export default {
 	fetch(request: Request, env: Env, ctx: ExecutionContext) {
@@ -80,6 +82,13 @@ export default {
 					}
 				} catch (error) {
 					console.error('scheduled send sweep failed', error);
+				}
+				// Separate from the send sweep so a slow calendar server never delays mail.
+				try {
+					const { synced, failed } = await runDueFeedSyncs(env.DB);
+					if (synced || failed) console.log(`calendar feeds: ${synced} synced, ${failed} failed`);
+				} catch (error) {
+					console.error('calendar feed sync failed', error);
 				}
 			})()
 		);

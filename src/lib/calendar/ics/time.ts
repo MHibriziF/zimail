@@ -5,7 +5,7 @@
  * plus the zone it's read in, because recurrences step in wall time — a weekly
  * 09:00 meeting stays at 09:00 across a DST change.
  */
-import { instantFromWall, isValidTimeZone, wallIn } from '$lib/timezone';
+import { instantFromWall, isValidTimeZone, wallIn } from '../../timezone';
 import type { IcsProperty } from './parse';
 
 export type IcsTime = {
