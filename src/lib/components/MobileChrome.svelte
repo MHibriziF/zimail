@@ -155,6 +155,10 @@
 					<span class="sheet-count">{counts.trash}</span>
 				{/if}
 			</a>
+			<a href="/calendar" class="sheet-link" class:active={$page.url.pathname === '/calendar'}>
+				<Icon name="calendar-line" size={20} />
+				<span>{t('nav.calendar')}</span>
+			</a>
 			<a href="/settings" class="sheet-link" class:active={$page.url.pathname === '/settings'}>
 				<Icon name="user-settings-line" size={20} />
 				<span>{t('nav.settings')}</span>

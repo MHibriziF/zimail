@@ -25,10 +25,10 @@ export function isValidTimeZone(zone: string): boolean {
 	}
 }
 
-type Wall = { year: number; month: number; day: number; hour: number; minute: number; second: number };
+export type Wall = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
 /** The wall-clock reading a zone shows at a given instant. */
-function wallIn(instant: Date, timeZone: string): Wall {
+export function wallIn(instant: Date, timeZone: string): Wall {
 	const parts = new Intl.DateTimeFormat('en-US', {
 		timeZone,
 		hour12: false,

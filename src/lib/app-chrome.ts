@@ -33,6 +33,7 @@ export function isMorePath(pathname: string): boolean {
 		pathname === '/drafts' ||
 		pathname === '/trash' ||
 		pathname === '/archive' ||
+		pathname === '/calendar' ||
 		pathname === '/settings' ||
 		pathname === '/admin' ||
 		pathname.startsWith('/settings/') ||

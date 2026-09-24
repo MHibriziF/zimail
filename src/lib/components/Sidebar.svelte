@@ -7,10 +7,13 @@
 	import { APP_NAME } from '$lib/constants';
 	import type { Domain, MailboxCounts } from '$lib/types';
 	import { LABEL_SWATCH, type Label } from '$lib/mail/labels';
+	import type { CalendarEvent } from '$lib/calendar/events';
+	import UpcomingEvents from './calendar/UpcomingEvents.svelte';
 
 	let {
 		counts,
 		labels = [],
+		upcoming = [],
 		domains,
 		activeDomainId,
 		isAdmin,
@@ -18,6 +21,7 @@
 	}: {
 		counts: MailboxCounts;
 		labels?: Label[];
+		upcoming?: CalendarEvent[];
 		domains: Domain[];
 		activeDomainId: string | null;
 		isAdmin: boolean;
@@ -44,6 +48,7 @@
 	]);
 
 	const tools = $derived<NavItem[]>([
+		{ href: '/calendar', icon: 'calendar-line', label: t('nav.calendar') },
 		{ href: '/meetings', icon: 'vidicon-line', label: t('nav.meetings') },
 		{ href: '/settings', icon: 'user-settings-line', label: t('nav.settings') },
 		...(isAdmin ? [{ href: '/admin', icon: 'settings-3-line', label: t('nav.admin') }] : [])
@@ -110,6 +115,13 @@
 					</a>
 				{/each}
 			</nav>
+		</div>
+	{/if}
+
+	{#if !collapsed && upcoming.length > 0}
+		<div class="section">
+			<p class="section-title">{t('calendar.comingUp')}</p>
+			<UpcomingEvents events={upcoming} />
 		</div>
 	{/if}
 

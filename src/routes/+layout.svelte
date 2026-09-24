@@ -39,6 +39,7 @@
 			activeDomainId: data.activeDomainId,
 			counts: data.counts,
 			labels: data.labels,
+			upcoming: data.upcoming,
 			uiTheme: data.uiTheme
 		};
 	});
