@@ -44,6 +44,16 @@ jobs:
           name: coverage
           path: coverage
 
+      # The scanner fetches a JRE and its analyzer plugins from our SonarQube on every run,
+      # and the server's proxy intermittently resets those large downloads — the scan then
+      # hangs for half an hour or fails outright. With them cached, a normal run fetches
+      # nothing big. The run-id key saves a fresh copy each time; restore takes the newest.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: sonar-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: sonar-cache-${{ runner.os }}-
+
       - uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
