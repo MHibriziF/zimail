@@ -52,6 +52,13 @@ describe('ICS parsing', () => {
 		assert.equal(parsed.events[0].get('DTSTART')![0].params.TZID, 'America/New_York');
 	});
 
+	test('a quoted parameter may contain a semicolon', () => {
+		const parsed = parseIcs(calendar(['ATTENDEE;CN="Doe; Jane";ROLE=REQ-PARTICIPANT:mailto:j@example.com']));
+		const attendee = parsed.events[0].get('ATTENDEE')![0];
+		assert.deepEqual(attendee.params, { CN: 'Doe; Jane', ROLE: 'REQ-PARTICIPANT' });
+		assert.equal(attendee.value, 'mailto:j@example.com');
+	});
+
 	test('time values and durations', () => {
 		assert.deepEqual(parseTimeValue('20260924', 'UTC'), { naive: Date.UTC(2026, 8, 24), allDay: true, timeZone: 'UTC' });
 		assert.equal(parseTimeValue('20260924T0900', 'X')?.naive, Date.UTC(2026, 8, 24, 9));

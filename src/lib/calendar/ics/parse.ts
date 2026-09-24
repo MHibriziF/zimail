@@ -19,22 +19,29 @@ function unfold(text: string): string[] {
 	return text.replaceAll(/\r?\n[ \t]/g, '').split(/\r?\n/);
 }
 
-/** Splits at the first `:` outside a quoted parameter value. */
-function splitValue(line: string): [string, string] | null {
+/** Splits on `separator` wherever it isn't inside a quoted parameter value; `limit` caps the pieces. */
+function splitOutsideQuotes(text: string, separator: string, limit = Infinity): string[] {
+	const parts: string[] = [];
+	let start = 0;
 	let quoted = false;
-	for (let index = 0; index < line.length; index++) {
-		const char = line[index];
+	for (let index = 0; index < text.length && parts.length < limit - 1; index++) {
+		const char = text[index];
 		if (char === '"') quoted = !quoted;
-		else if (char === ':' && !quoted) return [line.slice(0, index), line.slice(index + 1)];
+		else if (char === separator && !quoted) {
+			parts.push(text.slice(start, index));
+			start = index + 1;
+		}
 	}
-	return null;
+	parts.push(text.slice(start));
+	return parts;
 }
 
 export function parseProperty(line: string): IcsProperty | null {
-	const split = splitValue(line);
-	if (!split) return null;
+	const split = splitOutsideQuotes(line, ':', 2);
+	if (split.length < 2) return null;
 	const [head, value] = split;
-	const [name, ...rawParams] = head.split(';');
+	// `CN="Doe; Jane"` is one parameter, not two.
+	const [name, ...rawParams] = splitOutsideQuotes(head, ';');
 	const params: Record<string, string> = {};
 	for (const param of rawParams) {
 		const eq = param.indexOf('=');
