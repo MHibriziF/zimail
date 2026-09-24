@@ -59,6 +59,7 @@ function fold(line: string): string {
 }
 
 export function bookingIcs(details: BookingDetails, now = new Date()): string {
+	const summary = `${details.pageTitle} with ${details.hostName}`;
 	return [
 		'BEGIN:VCALENDAR',
 		'VERSION:2.0',
@@ -69,7 +70,7 @@ export function bookingIcs(details: BookingDetails, now = new Date()): string {
 		`DTSTAMP:${icsTime(now)}`,
 		`DTSTART:${icsTime(details.start)}`,
 		`DTEND:${icsTime(details.end)}`,
-		`SUMMARY:${icsText(`${details.pageTitle} with ${details.hostName}`)}`,
+		`SUMMARY:${icsText(summary)}`,
 		`ORGANIZER;CN=${icsText(details.hostName)}:mailto:${details.hostEmail}`,
 		`ATTENDEE;CN=${icsText(details.guestName)}:mailto:${details.guestEmail}`,
 		...(details.note ? [`DESCRIPTION:${icsText(details.note)}`] : []),
