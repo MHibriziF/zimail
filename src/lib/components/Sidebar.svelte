@@ -174,6 +174,15 @@
 		background: var(--color-surface);
 		box-shadow: inset -1px 0 0 var(--color-line);
 		transition: width 0.18s ease, transform 0.18s ease;
+		/* On a short window (or with labels and upcoming events) the contents outgrow the
+		   screen. Scroll instead of letting flexbox squash every item, Compose included. */
+		overflow-x: hidden;
+		overflow-y: auto;
+		scrollbar-width: thin;
+	}
+
+	.sidebar > :global(*) {
+		flex-shrink: 0;
 	}
 
 	.sidebar.collapsed {
