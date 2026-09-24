@@ -777,7 +777,14 @@
 		"screenShareRequestsLabel": "Piden compartir pantalla",
 		"screenShareNoRequests": "Nadie lo ha pedido.",
 		"screenShareCancelRequest": "Cancelar la solicitud de compartir pantalla",
-		"screenShareStartFailed": "El anfitrión aceptó, pero no se pudo compartir tu pantalla. Inténtalo de nuevo."
+		"screenShareStartFailed": "El anfitrión aceptó, pero no se pudo compartir tu pantalla. Inténtalo de nuevo.",
+		"record": "Grabar la llamada",
+		"stopRecording": "Detener la grabación",
+		"recordingSelf": "Grabando · {time}",
+		"recordingBy": "{name} está grabando",
+		"recordingSaving": "Guardando la grabación…",
+		"recordingSaved": "Grabación guardada en tus descargas",
+		"recordingFailed": "No se pudo grabar la llamada"
 	},
 	"meetings": {
 		"title": "Reuniones — {app}",

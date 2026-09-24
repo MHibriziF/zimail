@@ -19,6 +19,14 @@
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { normalizeDisplayName } from '$lib/meet/display-name';
 	import { isHostIdentity } from '$lib/meet/host-identity';
+	import {
+		downloadBlob,
+		formatElapsed,
+		recordingFilename,
+		recordingSupported,
+		startRecording,
+		type ActiveRecording
+	} from '$lib/meet/recorder';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
 	import {
 		DEFAULT_SCREEN_SHARE,
@@ -50,6 +58,7 @@
 		initialDeafened = false,
 		isLoggedIn = false,
 		meetingId = '',
+		meetingCode = '',
 		initialScreenShare = DEFAULT_SCREEN_SHARE,
 		onleave
 	}: {
@@ -65,6 +74,8 @@
 		isLoggedIn?: boolean;
 		/** The meeting's internal id (LiveKit room name) — needed for the host-only settings/admissions endpoints. */
 		meetingId?: string;
+		/** The public join code — only used to name a recording. */
+		meetingCode?: string;
 		/** As of joining — the host's attributes carry any change made after that. */
 		initialScreenShare?: ScreenShareSettings;
 		onleave: () => void;
@@ -160,10 +171,30 @@
 	let notice = $state('');
 	let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
+	// MediaRecorder + getDisplayMedia: desktop Chromium, Firefox and Safari; not phones.
+	const canRecordHere = typeof window !== 'undefined' && recordingSupported();
+	/** This participant's own recording, if running. Not reactive state — it holds live media objects. */
+	let activeRecording: ActiveRecording | null = null;
+	let recording = $state(false);
+	let recordingSaving = $state(false);
+	let recordingElapsed = $state(0);
+	let recordingTimer: ReturnType<typeof setInterval> | null = null;
+
 	let panel = $state<'none' | 'participants' | 'chat' | 'settings'>('none');
 	let roster = $state<
-		{ identity: string; name: string; isLocal: boolean; isHost: boolean; canShareScreen: boolean }[]
+		{
+			identity: string;
+			name: string;
+			isLocal: boolean;
+			isHost: boolean;
+			canShareScreen: boolean;
+			/** Self-reported through the `recording` attribute — a consent notice, not a permission. */
+			isRecording: boolean;
+		}[]
 	>([]);
+	const othersRecording = $derived(
+		roster.filter((entry) => !entry.isLocal && entry.isRecording).map((entry) => entry.name)
+	);
 	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean; isHost: boolean }[]>([]);
 	let unread = $state(0);
 
@@ -369,6 +400,7 @@
 		const tile = remoteTiles.get(participant.identity);
 		if (tile) updateTileStatus(tile, participant);
 		if (room && participant !== room.localParticipant) readHostScreenShareSettings(participant);
+		refreshRoster();
 	}
 
 	function ensureScreenTile(participant: Participant): Tile {
@@ -455,6 +487,10 @@
 		applySinkId(el);
 		if (track.kind === Track.Kind.Audio && deafened) el.muted = true;
 		tile.media.appendChild(el);
+		// Someone who starts talking mid-recording has to join the mix too.
+		if (track.kind === Track.Kind.Audio && activeRecording?.mixesRemoteAudio) {
+			activeRecording.addAudioTrack(track.mediaStreamTrack);
+		}
 		if (pipActive && track.kind === Track.Kind.Video) refreshPipVideo();
 	}
 
@@ -466,6 +502,7 @@
 		// The avatar layer sits behind the media layer, so emptying it (camera
 		// off, or a full unpublish) is all it takes for the avatar to show again.
 		for (const el of track.detach()) el.remove();
+		if (track.kind === Track.Kind.Audio) activeRecording?.removeAudioTrack(track.mediaStreamTrack);
 		// The screen tile has no avatar fallback, so it only makes sense while sharing.
 		if (track.source === Track.Source.ScreenShare) removeScreenTile(participant.identity);
 		if (pipActive && track.kind === Track.Kind.Video) refreshPipVideo();
@@ -499,7 +536,8 @@
 			name: p.name || t('meet.guest'),
 			isLocal: false,
 			isHost: isHostIdentity(p.identity),
-			canShareScreen: mayShareScreen(p)
+			canShareScreen: mayShareScreen(p),
+			isRecording: p.attributes.recording === '1'
 		}));
 		roster = [
 			{
@@ -507,7 +545,8 @@
 				name: localName,
 				isLocal: true,
 				isHost: isHostIdentity(room.localParticipant.identity),
-				canShareScreen
+				canShareScreen,
+				isRecording: recording
 			},
 			...remote
 		];
@@ -745,6 +784,10 @@
 		if (publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone) {
 			syncLocalAvState();
 		}
+		// A mic first turned on after recording started still belongs in it.
+		if (publication.source === Track.Source.Microphone && publication.track) {
+			activeRecording?.addAudioTrack(publication.track.mediaStreamTrack);
+		}
 		if (publication.source !== Track.Source.ScreenShare || !publication.track) return;
 		screenShareEnabled = true;
 		ownShareStartedAt = Date.now();
@@ -928,6 +971,8 @@
 	});
 
 	onDestroy(() => {
+		// However the call ends — Leave, a dropped connection, closing the page — keep what was recorded.
+		void finishRecording();
 		room?.disconnect();
 		pipWindow?.close();
 		stopAdmissionsPolling();
@@ -1353,7 +1398,64 @@
 		}
 	}
 
+	function remoteAudioTracks(): MediaStreamTrack[] {
+		if (!room) return [];
+		return Array.from(room.remoteParticipants.values()).flatMap((participant) =>
+			Array.from(participant.audioTrackPublications.values()).flatMap((publication) =>
+				publication.track ? [publication.track.mediaStreamTrack] : []
+			)
+		);
+	}
+
+	async function beginRecording() {
+		if (!room || activeRecording || recordingSaving) return;
+		try {
+			activeRecording = await startRecording({
+				micTrack: room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack ?? null,
+				remoteAudioTracks: remoteAudioTracks(),
+				onEnded: () => void finishRecording()
+			});
+		} catch (error) {
+			// Closing the browser's picker is a choice, not a failure worth reporting.
+			if (!(error instanceof DOMException && error.name === 'NotAllowedError')) showNotice(t('meet.recordingFailed'));
+			return;
+		}
+		recording = true;
+		recordingElapsed = 0;
+		recordingTimer = setInterval(() => {
+			if (activeRecording) recordingElapsed = (Date.now() - activeRecording.startedAt.getTime()) / 1000;
+		}, 1000);
+		room.localParticipant.setAttributes({ recording: '1' }).catch(() => {});
+		refreshRoster();
+	}
+
+	async function finishRecording() {
+		const current = activeRecording;
+		if (!current) return;
+		activeRecording = null;
+		recording = false;
+		recordingSaving = true;
+		if (recordingTimer) clearInterval(recordingTimer);
+		recordingTimer = null;
+		room?.localParticipant.setAttributes({ recording: '0' }).catch(() => {});
+		refreshRoster();
+		try {
+			const blob = await current.stop();
+			if (blob.size > 0) downloadBlob(blob, recordingFilename(meetingCode, current.startedAt, current.mimeType));
+			showNotice(t('meet.recordingSaved'));
+		} catch {
+			showNotice(t('meet.recordingFailed'));
+		} finally {
+			recordingSaving = false;
+		}
+	}
+
+	function toggleRecording() {
+		void (activeRecording ? finishRecording() : beginRecording());
+	}
+
 	function leave() {
+		void finishRecording();
 		playLeaveChime();
 		stopAdmissionsPolling();
 		room?.disconnect();
@@ -1379,6 +1481,23 @@
 			</span>
 		{:else if notice}
 			<span class="call-header-notice" role="status">{notice}</span>
+		{/if}
+		{#if recording}
+			<span class="call-header-notice call-header-recording" role="status">
+				<span class="call-recording-dot" aria-hidden="true"></span>
+				{t('meet.recordingSelf', { time: formatElapsed(recordingElapsed) })}
+				<button type="button" class="call-header-notice-action" onclick={() => void finishRecording()}>
+					{t('meet.stopRecording')}
+				</button>
+			</span>
+		{:else if recordingSaving}
+			<span class="call-header-notice" role="status">{t('meet.recordingSaving')}</span>
+		{/if}
+		{#if othersRecording.length > 0}
+			<span class="call-header-notice call-header-recording" role="status">
+				<span class="call-recording-dot" aria-hidden="true"></span>
+				{t('meet.recordingBy', { name: othersRecording.join(', ') })}
+			</span>
 		{/if}
 	</div>
 
@@ -1475,6 +1594,9 @@
 		{shareCooldownSeconds}
 		{pipSupported}
 		{pipActive}
+		canRecord={canRecordHere && isHost}
+		{recording}
+		{recordingSaving}
 		{panel}
 		rosterCount={roster.length}
 		{unread}
@@ -1489,6 +1611,7 @@
 		onShowBackgroundPicker={() => (showBackgroundPicker = true)}
 		onToggleScreenShare={toggleScreenShare}
 		onTogglePip={togglePip}
+		onToggleRecording={toggleRecording}
 		onTogglePanel={togglePanel}
 		onLeave={leave}
 	/>
@@ -1545,6 +1668,39 @@
 		border-radius: 999px;
 		font-size: 0.8125rem;
 		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.call-header-recording {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		color: #fecaca;
+		background: rgba(220, 38, 38, 0.22);
+	}
+
+	.call-header-recording + .call-header-recording,
+	.call-header-notice + .call-header-recording {
+		margin-left: 0.5rem;
+	}
+
+	.call-recording-dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		background: #ef4444;
+		animation: call-recording-blink 1.4s ease-in-out infinite;
+	}
+
+	@keyframes call-recording-blink {
+		50% {
+			opacity: 0.35;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.call-recording-dot {
+			animation: none;
+		}
 	}
 
 	.call-header-waiting {

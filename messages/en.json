@@ -777,7 +777,14 @@
 		"screenShareRequestsLabel": "Asking to share their screen",
 		"screenShareNoRequests": "No one is asking.",
 		"screenShareCancelRequest": "Cancel screen share request",
-		"screenShareStartFailed": "The host approved, but your screen couldn't be shared. Try again."
+		"screenShareStartFailed": "The host approved, but your screen couldn't be shared. Try again.",
+		"record": "Record the call",
+		"stopRecording": "Stop recording",
+		"recordingSelf": "Recording · {time}",
+		"recordingBy": "{name} is recording",
+		"recordingSaving": "Saving the recording…",
+		"recordingSaved": "Recording saved to your downloads",
+		"recordingFailed": "Couldn't record the call"
 	},
 	"meetings": {
 		"title": "Meetings — {app}",
