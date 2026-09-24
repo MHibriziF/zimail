@@ -38,6 +38,14 @@ function fakeRepo(seed: Row[] = []) {
 			Object.assign(row, input);
 			return true;
 		},
+		async deleteReservation(userId, id) {
+			const index = rows.findIndex(
+				(entry) => entry.userId === userId && entry.id === id && entry.source === 'reservation'
+			);
+			if (index < 0) return false;
+			rows.splice(index, 1);
+			return true;
+		},
 		async deleteManual(userId, id) {
 			const index = rows.findIndex((entry) => entry.userId === userId && entry.id === id && entry.source === 'manual');
 			if (index < 0) return false;
@@ -79,6 +87,14 @@ describe('CalendarService', () => {
 		const service = createCalendarService({ repo: fakeRepo([feedRow]).repo });
 		assert.deepEqual(await service.update('u1', 'feed-1', input), { type: 'read_only' });
 		assert.equal(await service.remove('u1', 'feed-1'), 'read_only');
+	});
+
+	test('a booking can be cancelled but not edited', async () => {
+		const { repo, rows } = fakeRepo([{ ...feedRow, id: 'booking', source: 'reservation', calendar: null }]);
+		const service = createCalendarService({ repo });
+		assert.deepEqual(await service.update('u1', 'booking', input), { type: 'read_only' });
+		assert.equal(await service.remove('u1', 'booking'), 'ok');
+		assert.equal(rows.length, 0);
 	});
 
 	test('another user’s event is not found', async () => {

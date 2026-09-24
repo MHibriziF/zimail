@@ -12,7 +12,7 @@ export function calendarWriteResponse(outcome: CalendarWriteOutcome, okStatus = 
 		case 'invalid_time':
 			return json({ error: 'The event has to end after it starts.' }, { status: 400 });
 		case 'read_only':
-			return json({ error: 'This event comes from another calendar and can’t be edited here.' }, { status: 409 });
+			return json({ error: 'Bookings and events from subscribed calendars can’t be edited here.' }, { status: 409 });
 		case 'not_found':
 			return json({ error: 'Event not found' }, { status: 404 });
 	}

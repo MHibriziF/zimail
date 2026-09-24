@@ -1,5 +1,6 @@
 import {
 	eventInterval,
+	isDeletableEvent,
 	isReadOnlyEvent,
 	validateEventInput,
 	type CalendarEvent,
@@ -81,8 +82,12 @@ export function createCalendarService({ repo }: { repo: CalendarRepository }): C
 		async remove(userId, id) {
 			const existing = await repo.get(userId, id);
 			if (!existing) return 'not_found';
-			if (isReadOnlyEvent(existing)) return 'read_only';
-			return (await repo.deleteManual(userId, id)) ? 'ok' : 'not_found';
+			if (!isDeletableEvent(existing)) return 'read_only';
+			const removed =
+				existing.source === 'reservation'
+					? await repo.deleteReservation(userId, id)
+					: await repo.deleteManual(userId, id);
+			return removed ? 'ok' : 'not_found';
 		}
 	};
 }

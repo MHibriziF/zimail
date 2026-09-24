@@ -32,7 +32,11 @@ const PUBLIC_PREFIXES = [
 	// consumed) on every visit. /api/meetings itself (creating a meeting)
 	// stays authenticated; only the join sub-path is public.
 	'/meet',
-	'/api/meetings/join'
+	'/api/meetings/join',
+	// A reservation page is shared with people who have no account. It only
+	// ever reveals free slots, and a booking can only take one of them.
+	'/book',
+	'/api/book'
 ];
 
 function isPublicPath(pathname: string): boolean {

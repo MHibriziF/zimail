@@ -1,3 +1,4 @@
+import type { ReservationPage, ReservationPageSettings } from './reservations';
 import type { CalendarFeed } from './feeds';
 import type { LabelColor } from '../mail/labels';
 import type { CalendarEvent, CalendarEventInput } from './events';
@@ -52,4 +53,22 @@ export async function syncFeed(id: string): Promise<CalendarFeed> {
 export async function removeFeed(id: string): Promise<void> {
 	const response = await fetch(`/api/calendar/feeds/${encodeURIComponent(id)}`, { method: 'DELETE' });
 	await readJson(response, 'Could not remove the calendar');
+}
+
+export async function fetchReservationPages(): Promise<ReservationPage[]> {
+	return (await readJson<{ pages: ReservationPage[] }>(await fetch('/api/reservations'), 'Could not load pages')).pages;
+}
+
+/** Creates when `id` is missing, otherwise replaces that page's settings. */
+export async function saveReservationPage(settings: ReservationPageSettings, id?: string): Promise<ReservationPage> {
+	const response = await fetch(id ? `/api/reservations/${encodeURIComponent(id)}` : '/api/reservations', {
+		method: id ? 'PATCH' : 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(settings)
+	});
+	return (await readJson<{ page: ReservationPage }>(response, 'Could not save the page')).page;
+}
+
+export async function deleteReservationPage(id: string): Promise<void> {
+	await readJson(await fetch(`/api/reservations/${encodeURIComponent(id)}`, { method: 'DELETE' }), 'Could not delete the page');
 }

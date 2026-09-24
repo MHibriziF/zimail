@@ -9,6 +9,7 @@
 		initial,
 		isNew,
 		readOnly = false,
+		deletable = true,
 		busy = false,
 		error = '',
 		onsave,
@@ -19,6 +20,8 @@
 		isNew: boolean;
 		/** Feed and reservation events are shown, not edited. */
 		readOnly?: boolean;
+		/** A booking is read-only but can still be cancelled. */
+		deletable?: boolean;
 		busy?: boolean;
 		error?: string;
 		onsave: (draft: EventDraft) => void;
@@ -28,6 +31,8 @@
 
 	let draft = $state(untrack(() => ({ ...initial })));
 	let confirmingDelete = $state(false);
+
+	const deleteLabel = $derived(readOnly ? t('calendar.cancelBooking') : t('calendar.delete'));
 
 	const heading = $derived.by(() => {
 		if (isNew) return t('calendar.newEvent');
@@ -62,7 +67,7 @@
 		</header>
 
 		{#if readOnly}
-			<p class="cal-editor-note">{t('calendar.readOnlyHint')}</p>
+			<p class="cal-editor-note">{deletable ? t('calendar.bookingHint') : t('calendar.readOnlyHint')}</p>
 		{/if}
 
 		<label class="cal-field">
@@ -127,18 +132,18 @@
 
 		{#if confirmingDelete}
 			<div class="cal-confirm" role="alert">
-				<span>{t('calendar.deleteConfirm')}</span>
+				<span>{readOnly ? t('calendar.cancelBookingConfirm') : t('calendar.deleteConfirm')}</span>
 				<div class="cal-actions">
 					<button type="button" class="btn-ghost" onclick={() => (confirmingDelete = false)}>{t('common.cancel')}</button>
-					<button type="button" class="cal-danger" disabled={busy} onclick={ondelete}>{t('calendar.delete')}</button>
+					<button type="button" class="cal-danger" disabled={busy} onclick={ondelete}>{deleteLabel}</button>
 				</div>
 			</div>
 		{:else}
 			<footer class="cal-actions">
-				{#if !isNew && !readOnly}
+				{#if !isNew && deletable}
 					<button type="button" class="btn-ghost cal-delete" onclick={() => (confirmingDelete = true)}>
 						<Icon name="delete-bin-line" size={16} />
-						{t('calendar.delete')}
+						{deleteLabel}
 					</button>
 				{/if}
 				<span class="cal-spacer"></span>
