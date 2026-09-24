@@ -150,13 +150,20 @@ function sumUnits(text: string, units: Record<string, number>): number | null {
 
 /** An ICS DURATION (`PT1H30M`, `P1D`, `-P1W`) in milliseconds, or `null` if unreadable. M is minutes; months don't exist in DURATION. */
 export function parseDuration(value: string): number | null {
-	const match = /^([+-]?)P([^T]*)(?:T(.*))?$/.exec(value.trim());
-	if (!match) return null;
-	const [, sign, datePart, timePart] = match;
+	let text = value.trim();
+	const negative = text.startsWith('-');
+	if (negative || text.startsWith('+')) text = text.slice(1);
+	if (!text.startsWith('P')) return null;
+
+	const body = text.slice(1);
+	const split = body.indexOf('T');
+	const datePart = split < 0 ? body : body.slice(0, split);
+	const timePart = split < 0 ? null : body.slice(split + 1);
 	// `P` alone, or a `T` with nothing after it, says nothing.
-	if (timePart === '' || (!datePart && timePart === undefined)) return null;
+	if (timePart === '' || (!datePart && timePart === null)) return null;
+
 	const days = sumUnits(datePart, DATE_UNITS);
 	const time = sumUnits(timePart ?? '', TIME_UNITS);
 	if (days === null || time === null) return null;
-	return sign === '-' ? -(days + time) : days + time;
+	return negative ? -(days + time) : days + time;
 }
