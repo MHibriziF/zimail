@@ -13,6 +13,7 @@ import {
 	type TelegramNotificationEnv
 } from '../telegram-notify';
 import { stripHtml } from '../util/html';
+import { isCalendarAttachment } from '../../utils/attachments';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
 import { categoriesServiceForDb, pickClassifyHeaders } from '../categories';
 
@@ -97,7 +98,8 @@ export async function handleCloudflareInbound(
 	const category = await categoriesServiceForDb(env.DB).categorizeInbound(route.userId, {
 		from,
 		subject,
-		headers: pickClassifyHeaders((name) => message.headers.get(name))
+		headers: pickClassifyHeaders((name) => message.headers.get(name)),
+		calendar: parsed.attachments.some((attachment) => isCalendarAttachment(attachment.mimeType, attachment.filename ?? ''))
 	});
 
 	const emailId = await insertEmail(env.DB, {

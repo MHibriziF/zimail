@@ -11,6 +11,8 @@ export type ClassifyInput = {
 	subject: string;
 	/** Lower-cased header names; values as received. Missing headers are fine. */
 	headers: Record<string, string | null | undefined>;
+	/** The message carries a calendar part: an invitation, or someone's answer to one. */
+	calendar?: boolean;
 };
 
 /** Domains whose mail is notifications from a social network. */
@@ -37,8 +39,12 @@ const SOCIAL_DOMAINS = [
 /** Hosted discussion lists — their mail is a forum even without List-Id. */
 const FORUM_DOMAINS = ['googlegroups.com', 'groups.io', 'discoursemail.com', 'freelists.org'];
 
-/** Headers bulk-mail platforms add to marketing sends. */
-const MARKETING_HEADERS = ['x-mailchimp-campaign', 'x-campaign', 'x-campaignid', 'x-mc-user', 'x-sg-eid', 'x-mailgun-tag'];
+/**
+ * Headers only marketing campaigns carry. Not SendGrid's X-SG-EID, Mailgun's
+ * X-Mailgun-Tag or Mandrill's X-MC-User: those platforms stamp them on every
+ * send, sign-in links and receipts included.
+ */
+const MARKETING_HEADERS = ['x-mailchimp-campaign', 'x-campaign', 'x-campaignid'];
 
 /** Sender names that mean a mailing, matched as a whole word at the start (`news@`, `news.eu@`). */
 const PROMOTION_LOCALS = [
@@ -55,19 +61,44 @@ const AUTOMATED_LOCALS = [
 
 const TRANSACTIONAL_WORDS = new Set([
 	'receipt', 'invoice', 'order', 'shipped', 'shipping', 'delivery', 'delivered', 'payment', 'statement',
-	'verify', 'verification', 'confirm', 'password', 'signin', 'login', 'reset', 'booking', 'reservation'
+	'confirm', 'booking', 'reservation'
 ]);
-const TRANSACTIONAL_PHRASES = ['security alert', 'your account', 'sign in', 'sign-in'];
+const TRANSACTIONAL_PHRASES = ['your account'];
+
+/**
+ * Mail about getting into or keeping an account, which the reader is usually
+ * waiting on. Primary, however bulk the sender looks.
+ */
+const ACCOUNT_WORDS = new Set([
+	'signin', 'login', 'logon', 'password', 'passcode', 'otp', '2fa', 'verify', 'verification', 'reset'
+]);
+const ACCOUNT_PHRASES = [
+	'sign in', 'sign-in', 'log in', 'log-in', 'magic link', 'security alert', 'security code', 'one-time',
+	'confirm your email', 'confirm your account'
+];
+const TRIAL_ENDING_WORDS = new Set(['end', 'ends', 'ending', 'ended', 'expire', 'expires', 'expiring', 'expired']);
 
 /** `news` matches `news@` and `news.eu@`, but not `newsom@`. */
 function hasLocalPrefix(local: string, prefixes: readonly string[]): boolean {
 	return prefixes.some((prefix) => local === prefix || (local.startsWith(prefix) && '._+-'.includes(local[prefix.length])));
 }
 
+function subjectWords(subject: string): string[] {
+	return subject.toLowerCase().split(/[^a-z0-9]+/);
+}
+
 function isTransactionalSubject(subject: string): boolean {
 	const lower = subject.toLowerCase();
 	if (TRANSACTIONAL_PHRASES.some((phrase) => lower.includes(phrase))) return true;
-	return lower.split(/[^a-z]+/).some((word) => TRANSACTIONAL_WORDS.has(word));
+	return subjectWords(subject).some((word) => TRANSACTIONAL_WORDS.has(word));
+}
+
+function isAccountSubject(subject: string): boolean {
+	const lower = subject.toLowerCase();
+	if (ACCOUNT_PHRASES.some((phrase) => lower.includes(phrase))) return true;
+	const words = subjectWords(subject);
+	if (words.some((word) => ACCOUNT_WORDS.has(word))) return true;
+	return words.includes('trial') && words.some((word) => TRIAL_ENDING_WORDS.has(word));
 }
 
 /** An address without an `@` has no domain, and all of it is the local part. */
@@ -112,12 +143,15 @@ function isAutomated(local: string, headers: ClassifyInput['headers']): boolean 
 	return Boolean(autoSubmitted && autoSubmitted !== 'no') || hasLocalPrefix(local, AUTOMATED_LOCALS);
 }
 
-export function classifyMail({ from, subject, headers }: ClassifyInput): MailCategory {
+export function classifyMail({ from, subject, headers, calendar }: ClassifyInput): MailCategory {
 	const domain = domainOf(from);
 	const local = localPartOf(from);
 	const bulk = isBulk(headers);
 
+	// Invitations and replies to them are between people, even when a calendar sends them.
+	if (calendar) return 'primary';
 	if (isForum(domain, headers)) return 'forums';
+	if (isAccountSubject(subject)) return 'primary';
 	if (onDomain(domain, SOCIAL_DOMAINS)) return 'social';
 	if (bulk && (hasLocalPrefix(local, PROMOTION_LOCALS) || hasMarketingHeaders(headers))) return 'promotions';
 	if (isAutomated(local, headers) || (bulk && isTransactionalSubject(subject))) return 'updates';
