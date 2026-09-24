@@ -10,8 +10,9 @@
 	import Icon from '../Icon.svelte';
 	import EventEditor from './EventEditor.svelte';
 	import CalendarFeeds from './CalendarFeeds.svelte';
+	import ReservationPages from './ReservationPages.svelte';
 	import { LABEL_SWATCH } from '$lib/mail/labels';
-	import { addDays, dateKeyToUtc, isReadOnlyEvent, type CalendarEvent } from '$lib/calendar/events';
+	import { addDays, dateKeyToUtc, isDeletableEvent, isReadOnlyEvent, type CalendarEvent } from '$lib/calendar/events';
 	import {
 		dateKeyIn,
 		firstDayOfWeek,
@@ -293,6 +294,8 @@
 		</section>
 	{/if}
 
+	<ReservationPages />
+
 	<CalendarFeeds
 		onchange={() => {
 			load();
@@ -306,6 +309,7 @@
 		initial={editing.draft}
 		isNew={!editing.event}
 		readOnly={editing.event ? isReadOnlyEvent(editing.event) : false}
+		deletable={editing.event ? isDeletableEvent(editing.event) : false}
 		busy={saving}
 		error={saveError}
 		onsave={save}
@@ -486,12 +490,13 @@
 
 	.cal-chip,
 	.cal-row {
-		border-left: 3px solid var(--event-color);
+		box-shadow: inset 3px 0 0 var(--event-color);
 	}
 
+	/* Free time (a feed's TRANSP:TRANSPARENT) is shown but doesn't block reservations. */
 	.cal-chip.free,
 	.cal-row.free {
-		border-left-style: dashed;
+		box-shadow: inset 3px 0 0 color-mix(in srgb, var(--event-color) 45%, transparent);
 		opacity: 0.7;
 	}
 
