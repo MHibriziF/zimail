@@ -37,7 +37,7 @@ export function createCalendarService({ repo }: { repo: CalendarRepository }): C
 	return {
 		async listBetween(userId, from, to, timeZone) {
 			const span = to.getTime() - from.getTime();
-			if (!(span > 0) || span > MAX_RANGE_DAYS * DAY_MS) return { type: 'invalid_range' };
+			if (Number.isNaN(span) || span <= 0 || span > MAX_RANGE_DAYS * DAY_MS) return { type: 'invalid_range' };
 
 			const rows = await repo.listOverlapping(
 				userId,

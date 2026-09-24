@@ -21,6 +21,21 @@ const EMPTY_COUNTS: MailboxCounts = {
 	spam: 0
 };
 
+/**
+ * The sidebar's "coming up" list. Two days covers today and tomorrow from any
+ * zone; the component narrows it to the viewer's own days.
+ */
+async function loadUpcoming(platform: App.Platform | undefined, userId: string, timeZone: string): Promise<CalendarEvent[]> {
+	const now = new Date();
+	const outcome = await getCalendarService(platform).listBetween(
+		userId,
+		now,
+		new Date(now.getTime() + 2 * 86_400_000),
+		timeZone
+	);
+	return outcome.type === 'ok' ? outcome.events : [];
+}
+
 export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	const db = platform?.env.DB;
 
@@ -75,19 +90,8 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	// Sidebar label list — changes only when labels are managed, so it has its own dependency.
 	const labels = db && locals.user ? await getLabelsService(platform).list(locals.user.id) : [];
 
-	// The sidebar's "coming up" list. Two days covers today and tomorrow from any
-	// zone; the component narrows it to the viewer's own days.
-	let upcoming: CalendarEvent[] = [];
-	if (db && locals.user) {
-		const now = new Date();
-		const outcome = await getCalendarService(platform).listBetween(
-			locals.user.id,
-			now,
-			new Date(now.getTime() + 2 * 86_400_000),
-			timezoneRow?.timezone ?? 'UTC'
-		);
-		if (outcome.type === 'ok') upcoming = outcome.events;
-	}
+	const upcoming =
+		db && locals.user ? await loadUpcoming(platform, locals.user.id, timezoneRow?.timezone ?? 'UTC') : [];
 
 	return {
 		user: locals.user,
