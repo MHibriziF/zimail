@@ -135,17 +135,21 @@ export function naiveIn(instant: Date, timeZone: string): number {
 const DATE_UNITS: Record<string, number> = { W: 7 * DAY_MS, D: DAY_MS };
 const TIME_UNITS: Record<string, number> = { H: 3_600_000, M: 60_000, S: 1000 };
 
-/** Sums `12H30M`-style pieces; `null` if anything is left over or a unit doesn't belong. */
+/** Sums `12H30M`-style pieces; `null` if a unit doesn't belong or has no number. */
 function sumUnits(text: string, units: Record<string, number>): number | null {
 	let ms = 0;
-	let consumed = 0;
-	for (const [whole, digits, unit] of text.matchAll(/(\d+)([A-Z])/g)) {
-		const size = units[unit];
-		if (!size) return null;
+	let digits = '';
+	for (const char of text) {
+		if (char >= '0' && char <= '9') {
+			digits += char;
+			continue;
+		}
+		const size = units[char];
+		if (!size || !digits) return null;
 		ms += Number(digits) * size;
-		consumed += whole.length;
+		digits = '';
 	}
-	return consumed === text.length ? ms : null;
+	return digits ? null : ms;
 }
 
 /** An ICS DURATION (`PT1H30M`, `P1D`, `-P1W`) in milliseconds, or `null` if unreadable. M is minutes; months don't exist in DURATION. */
