@@ -1010,6 +1010,7 @@
 		"decline": "Keep the current time",
 		"moved": "{name} has been sent the new time.",
 		"kept": "{name} has been told the time stays.",
-		"outdated": "The event has changed since this proposal was sent."
+		"outdated": "The event has changed since this proposal was sent.",
+		"clashes": "That time clashes with your calendar:"
 	}
 }

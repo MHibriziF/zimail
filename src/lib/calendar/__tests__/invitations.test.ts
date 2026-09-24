@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { formatInvitationWhen, otherGuests, type InvitationView } from '../invitations';
+import {
+	answerHeadlineKey,
+	canAcceptProposal,
+	canSettleProposal,
+	formatInvitationWhen,
+	otherGuests,
+	type GuestAnswerView,
+	type InvitationView
+} from '../invitations';
 
 const base: InvitationView = {
 	method: 'REQUEST',
@@ -40,6 +48,36 @@ describe('formatInvitationWhen', () => {
 		assert.equal(formatInvitationWhen(oneDay, 'en-US', 'America/Los_Angeles'), 'Fri, Sep 25');
 		const threeDays = { ...oneDay, end: '2026-09-28T00:00:00.000Z' };
 		assert.equal(formatInvitationWhen(threeDays, 'en-US', 'America/Los_Angeles'), 'Fri, Sep 25 – Sun, Sep 27');
+	});
+});
+
+describe('guest answers', () => {
+	const answer: GuestAnswerView = {
+		method: 'COUNTER',
+		from: { email: 'guest@gmail.test', name: 'Guest' },
+		status: 'accepted',
+		title: 'Demo',
+		current: { start: '2026-09-25T03:30:00.000Z', end: '2026-09-25T04:00:00.000Z', allDay: false },
+		proposed: { start: '2026-09-25T04:30:00.000Z', end: '2026-09-25T05:00:00.000Z', allDay: false },
+		comment: null,
+		outdated: false,
+		applied: false,
+		conflicts: []
+	};
+
+	test('a proposal leads with the new time; a reply with the answer', () => {
+		assert.equal(answerHeadlineKey(answer), 'answer.proposes');
+		assert.equal(answerHeadlineKey({ ...answer, method: 'REPLY', proposed: null }), 'answer.accepted');
+		assert.equal(answerHeadlineKey({ ...answer, method: 'REPLY', proposed: null, status: 'needs-action' }), 'answer.noAnswer');
+	});
+
+	test('accepting is offered only for an open proposal with nothing in the way', () => {
+		assert.equal(canAcceptProposal(answer), true);
+		const clash = { ...answer.current, title: 'Standup' };
+		assert.equal(canAcceptProposal({ ...answer, conflicts: [clash] }), false);
+		assert.equal(canSettleProposal({ ...answer, conflicts: [clash] }), true, 'keeping the time still is');
+		assert.equal(canSettleProposal({ ...answer, applied: true }), false);
+		assert.equal(canSettleProposal({ ...answer, outdated: true }), false);
 	});
 });
 

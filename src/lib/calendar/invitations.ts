@@ -49,6 +49,8 @@ export type GuestAnswerView = {
 	outdated: boolean;
 	/** The event is already at the proposed time. */
 	applied: boolean;
+	/** Other busy events the proposed time overlaps; accepting is refused while there are any. */
+	conflicts: (EventTime & { title: string })[];
 };
 
 export type AnswerAction = 'accept-proposal' | 'decline-proposal';
@@ -68,6 +70,11 @@ export function answerHeadlineKey(answer: GuestAnswerView): string {
 /** Whether the card still offers a choice about the proposed time. */
 export function canSettleProposal(answer: GuestAnswerView): boolean {
 	return answer.proposed !== null && !answer.applied && !answer.outdated;
+}
+
+/** Accepting is only offered when the proposed time is free; keeping the current time always is. */
+export function canAcceptProposal(answer: GuestAnswerView): boolean {
+	return canSettleProposal(answer) && answer.conflicts.length === 0;
 }
 
 export const INVITATION_RESPONSES: readonly InviteResponse[] = ['accepted', 'tentative', 'declined'];

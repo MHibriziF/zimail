@@ -1010,6 +1010,7 @@
 		"decline": "Tetap pada waktu sekarang",
 		"moved": "Waktu baru telah dikirim ke {name}.",
 		"kept": "{name} telah diberi tahu bahwa waktunya tetap.",
-		"outdated": "Acara telah berubah sejak usulan ini dikirim."
+		"outdated": "Acara telah berubah sejak usulan ini dikirim.",
+		"clashes": "Waktu itu bentrok dengan kalender Anda:"
 	}
 }

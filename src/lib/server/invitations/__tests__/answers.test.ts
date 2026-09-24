@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import type { CalendarEvent } from '../../../calendar/events';
 import type { OwnEvent } from '../repository';
 import { createAnswersService, ownEventId } from '../answers';
 import { declineCounterIcs } from '../email';
@@ -31,7 +32,7 @@ function message({
 	].join('\r\n');
 }
 
-function setup(messages: Record<string, string>, event: Partial<OwnEvent> | null = {}) {
+function setup(messages: Record<string, string>, event: Partial<OwnEvent> | null = {}, others: CalendarEvent[] = []) {
 	const own: OwnEvent | null = event && {
 		id: 'ev-1',
 		title: 'Guest · Demo TI',
@@ -66,7 +67,8 @@ function setup(messages: Record<string, string>, event: Partial<OwnEvent> | null
 		},
 		async declineProposal(_userId, target, _proposal, guest) {
 			declines.push(`${target.id}:${guest.email}`);
-		}
+		},
+		eventsBetween: async () => [...others, ...(own ? [{ ...own, location: null, notes: null, busy: true, calendar: null }] : [])]
 	});
 	return { service, statuses, moves, declines };
 }
@@ -102,6 +104,56 @@ describe('answers service', () => {
 		assert.equal((await service.act('u1', 'm1', 'accept-proposal')).type, 'unsupported');
 	});
 
+	test('a proposed time that clashes with the calendar is shown as such and cannot be accepted', async () => {
+		const standup: CalendarEvent = {
+			id: 'other',
+			title: 'Standup',
+			start: '2026-09-25T03:45:00.000Z',
+			end: '2026-09-25T04:15:00.000Z',
+			allDay: false,
+			location: null,
+			notes: null,
+			source: 'manual',
+			busy: true,
+			calendar: null
+		};
+		const { service, moves } = setup({ m1: message() }, {}, [standup]);
+		const answer = await service.inspect('u1', 'm1');
+		assert.deepEqual(answer?.conflicts, [
+			{ title: 'Standup', start: standup.start, end: standup.end, allDay: false }
+		]);
+		assert.equal((await service.act('u1', 'm1', 'accept-proposal')).type, 'conflict');
+		assert.deepEqual(moves, []);
+		assert.equal((await service.act('u1', 'm1', 'decline-proposal')).type, 'ok', 'keeping the time is still offered');
+	});
+
+	test('free time, the event being moved, and events that merely touch the slot do not clash', async () => {
+		const base = { location: null, notes: null, source: 'feed' as const, calendar: null, allDay: false };
+		const free: CalendarEvent = { ...base, id: 'free', title: 'Focus', start: '2026-09-25T03:30:00.000Z', end: '2026-09-25T04:00:00.000Z', busy: false };
+		const before: CalendarEvent = { ...base, id: 'before', title: 'Earlier', start: '2026-09-25T03:00:00.000Z', end: '2026-09-25T03:30:00.000Z', busy: true };
+		const after: CalendarEvent = { ...base, id: 'after', title: 'Later', start: '2026-09-25T04:00:00.000Z', end: '2026-09-25T04:30:00.000Z', busy: true };
+		const { service } = setup({ m1: message() }, { start: '2026-09-25T03:30:00.000Z', end: '2026-09-25T04:00:00.000Z' }, [free, before, after]);
+		assert.deepEqual((await service.inspect('u1', 'm1'))?.conflicts, []);
+	});
+
+	test('an all-day busy event clashes across the whole day in the user’s zone', async () => {
+		const offsite: CalendarEvent = {
+			id: 'offsite',
+			title: 'Offsite',
+			// Floating 25 September: in Jakarta that's 24 Sep 17:00Z – 25 Sep 17:00Z.
+			start: '2026-09-25T00:00:00.000Z',
+			end: '2026-09-26T00:00:00.000Z',
+			allDay: true,
+			location: null,
+			notes: null,
+			source: 'manual',
+			busy: true,
+			calendar: null
+		};
+		const { service } = setup({ m1: message() }, {}, [offsite]);
+		assert.equal((await service.inspect('u1', 'm1'))?.conflicts.length, 1);
+	});
+
 	test('a slot another booking holds is refused', async () => {
 		const { service } = setup({ m1: message({ start: '20260926T033000Z', end: '20260926T040000Z' }) });
 		assert.equal((await service.act('u1', 'm1', 'accept-proposal')).type, 'slot_taken');
@@ -124,7 +176,8 @@ describe('answers service', () => {
 			reschedule: async () => 'ok',
 			declineProposal: async () => {
 				throw new Error('RESEND_API_KEY is not set');
-			}
+			},
+			eventsBetween: async () => []
 		});
 		assert.equal((await failing.act('u1', 'm1', 'decline-proposal')).type, 'not_sent');
 		assert.equal((await service.act('u1', 'm1', 'decline-proposal')).type, 'ok');

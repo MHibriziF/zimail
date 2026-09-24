@@ -1010,6 +1010,7 @@
 		"decline": "Mantener el horario actual",
 		"moved": "Se envió el nuevo horario a {name}.",
 		"kept": "Se avisó a {name} de que el horario se mantiene.",
-		"outdated": "El evento cambió después de que se enviara esta propuesta."
+		"outdated": "El evento cambió después de que se enviara esta propuesta.",
+		"clashes": "Ese horario choca con tu calendario:"
 	}
 }
