@@ -106,6 +106,8 @@ export function createInvitationsService(deps: InvitationsServiceDeps): Invitati
 		const invitation = readInvitation(ics, zone);
 		if (!invitation || !RECEIVED_METHODS.has(invitation.method)) return null;
 		const own = new Set((await deps.ownAddresses(userId)).map((address) => address.toLowerCase()));
+		// The user's own invitation (a booking's copy Bcc'd to them) is already on their calendar.
+		if (invitation.organizer && own.has(invitation.organizer.email)) return null;
 		return { invitation, zone, me: findAttendee(invitation, own), own };
 	}
 

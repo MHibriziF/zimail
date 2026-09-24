@@ -107,6 +107,13 @@ describe('invitations service', () => {
 		assert.equal(events.get('meet-1')?.length, 4);
 	});
 
+	test('the user’s own invitation, Bcc’d back to them, is not offered to them', async () => {
+		const own = invite().replace('ORGANIZER;CN=Ada:mailto:ada@example.com', `ORGANIZER;CN=Me:mailto:${ME}`);
+		const { service } = setup({ m1: own });
+		assert.equal(await service.inspect('u1', 'm1'), null);
+		assert.equal((await service.act('u1', 'm1', 'add')).type, 'not_found');
+	});
+
 	test('not being among the attendees means adding, not answering', async () => {
 		const { service, events, replies } = setup({ m1: invite({ attendee: 'someone@else.test' }) });
 		assert.equal((await service.inspect('u1', 'm1'))?.canReply, false);

@@ -161,6 +161,51 @@ describe('answers service', () => {
 	});
 });
 
+describe('a real Google Calendar proposal', () => {
+	// Verbatim from Gmail's "Proposed new time" email, folded ATTENDEE line and all.
+	const google = [
+		'BEGIN:VCALENDAR',
+		'PRODID:-//Google Inc//Google Calendar 70.9054//EN',
+		'VERSION:2.0',
+		'CALSCALE:GREGORIAN',
+		'METHOD:COUNTER',
+		'BEGIN:VEVENT',
+		'DTSTART:20260925T043000Z',
+		'DTEND:20260925T050000Z',
+		'DTSTAMP:20260924T183420Z',
+		'ORGANIZER;CN=Muhammad Hibrizi Farghana:mailto:izi@mhibrizif.com',
+		'UID:45033627-a786-432e-8fa9-dbd0d1535083@zimail',
+		'ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=Muhamm',
+		' ad Hibrizi Farghana;X-NUM-GUESTS=0:mailto:hibrizifarghana@gmail.com',
+		'CREATED:20260924T124157Z',
+		'DESCRIPTION:',
+		'LAST-MODIFIED:20260924T183419Z',
+		'LOCATION:',
+		'SEQUENCE:0',
+		'STATUS:CONFIRMED',
+		'SUMMARY:Demo TI with Muhammad Hibrizi Farghana',
+		'TRANSP:OPAQUE',
+		'END:VEVENT',
+		'END:VCALENDAR',
+		''
+	].join('\r\n');
+
+	test('reads as a new time for the booking, from the guest who proposed it', async () => {
+		const { service, moves } = setup(
+			{ m1: google },
+			{ id: '45033627-a786-432e-8fa9-dbd0d1535083', start: '2026-09-25T03:30:00.000Z', end: '2026-09-25T04:00:00.000Z' }
+		);
+		const answer = await service.inspect('u1', 'm1');
+		assert.equal(answer?.method, 'COUNTER');
+		assert.deepEqual(answer?.from, { email: 'hibrizifarghana@gmail.com', name: 'Muhammad Hibrizi Farghana' });
+		assert.deepEqual(answer?.proposed, { start: '2026-09-25T04:30:00.000Z', end: '2026-09-25T05:00:00.000Z', allDay: false });
+		assert.equal(answer?.comment, null);
+
+		assert.equal((await service.act('u1', 'm1', 'accept-proposal')).type, 'ok');
+		assert.deepEqual(moves, ['45033627-a786-432e-8fa9-dbd0d1535083:2026-09-25T04:30:00.000Z']);
+	});
+});
+
 describe('declineCounterIcs', () => {
 	test('names the event as it stands, for the guest who proposed', () => {
 		const proposal = readInvitation(message(), 'UTC')!;
