@@ -26,11 +26,14 @@ export type BookingDetails = {
 	timeZone: string;
 	/** The booking's Zimail meeting room, if the page gives one. */
 	meetingUrl?: string | null;
+	/** The revision this message is; defaults to 0 for a new booking and 1 for its cancellation. */
+	sequence?: number;
 };
 
-export type InviteKind = 'request' | 'cancel';
+/** `moved` is an update to the time — still a REQUEST, with a higher SEQUENCE. */
+export type InviteKind = 'request' | 'moved' | 'cancel';
 
-const METHOD: Record<InviteKind, string> = { request: 'REQUEST', cancel: 'CANCEL' };
+const METHOD: Record<InviteKind, string> = { request: 'REQUEST', moved: 'REQUEST', cancel: 'CANCEL' };
 
 function formatWhen(details: BookingDetails): string {
 	const date = new Intl.DateTimeFormat('en-US', {
@@ -52,9 +55,12 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 			footer: 'Reply to this email to find another time.'
 		};
 	}
+	const moved = kind === 'moved';
 	const content: EmailContent = {
-		title: `You're booked: ${details.pageTitle}`,
-		lead: `${details.hostName} has your reservation. Accept the invitation to put it on your calendar.`,
+		title: moved ? `New time: ${details.pageTitle}` : `You're booked: ${details.pageTitle}`,
+		lead: moved
+			? `${details.hostName} moved your reservation to the time below. Your calendar updates when you accept.`
+			: `${details.hostName} has your reservation. Accept the invitation to put it on your calendar.`,
 		details: [{ label: 'When', value: formatWhen(details) }, withHost, { label: 'Name', value: details.guestName }],
 		footer: 'Need to change something? Reply to this email.'
 	};
@@ -89,7 +95,7 @@ export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request'
 		'BEGIN:VEVENT',
 		`UID:${details.uid}`,
 		// A calendar only applies an update whose SEQUENCE is higher than what it holds.
-		`SEQUENCE:${cancelled ? 1 : 0}`,
+		`SEQUENCE:${details.sequence ?? (cancelled ? 1 : 0)}`,
 		`DTSTAMP:${icsTime(now)}`,
 		`DTSTART:${icsTime(details.start)}`,
 		`DTEND:${icsTime(details.end)}`,

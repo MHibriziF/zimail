@@ -36,6 +36,21 @@ export type InvitationsRepository = {
 	/** Swaps one occurrence (by its id within the series) for `event`, or just drops it. */
 	replaceOccurrence(userId: string, uid: string, externalUid: string, event: InviteEventRow | null): Promise<void>;
 	removeEvents(userId: string, uid: string): Promise<void>;
+	/** One of the user's own events that guests were invited to: a booking or a manual event. */
+	findOwnEvent(userId: string, eventId: string): Promise<OwnEvent | null>;
+	/** Records a guest's answer. Only someone already on the guest list is updated. */
+	setGuestStatus(userId: string, eventId: string, email: string, status: PartStat): Promise<boolean>;
+};
+
+/** An event the user organized, as the answers to its invitation need it. */
+export type OwnEvent = {
+	id: string;
+	title: string;
+	start: string;
+	end: string;
+	allDay: boolean;
+	source: 'reservation' | 'manual';
+	sequence: number;
 };
 
 function toStatus(value: string | null): PartStat | null {
@@ -122,6 +137,46 @@ export function createD1InvitationsRepository(db: D1Database): InvitationsReposi
 				.prepare(`DELETE FROM calendar_events WHERE user_id = ? AND source = 'invite' AND source_id = ?`)
 				.bind(userId, uid)
 				.run();
+		},
+
+		async findOwnEvent(userId, eventId) {
+			const row = await db
+				.prepare(
+					`SELECT id, title, starts_at, ends_at, all_day, source, sequence FROM calendar_events
+					 WHERE id = ? AND user_id = ? AND source IN ('reservation', 'manual')`
+				)
+				.bind(eventId, userId)
+				.first<{
+					id: string;
+					title: string;
+					starts_at: string;
+					ends_at: string;
+					all_day: number;
+					source: 'reservation' | 'manual';
+					sequence: number;
+				}>();
+			return row
+				? {
+						id: row.id,
+						title: row.title,
+						start: row.starts_at,
+						end: row.ends_at,
+						allDay: row.all_day === 1,
+						source: row.source,
+						sequence: row.sequence
+					}
+				: null;
+		},
+
+		async setGuestStatus(userId, eventId, email, status) {
+			const result = await db
+				.prepare(
+					`UPDATE event_guests SET status = ?, updated_at = CURRENT_TIMESTAMP
+					 WHERE event_id = ? AND user_id = ? AND email = ?`
+				)
+				.bind(status, eventId, userId, email.toLowerCase())
+				.run();
+			return (result.meta.changes ?? 0) > 0;
 		}
 	};
 }

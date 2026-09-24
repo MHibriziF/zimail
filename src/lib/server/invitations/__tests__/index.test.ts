@@ -43,6 +43,24 @@ describe('applyArrivedInvitation', () => {
 		assert.ok(queries.some((query) => /INSERT INTO calendar_invites/.test(query.sql)));
 	});
 
+	test('a guest’s reply to the user’s own invitation is recorded against that guest', async () => {
+		const reply = cancel
+			.replace('METHOD:CANCEL', 'METHOD:REPLY')
+			.replace('UID:meet-1', 'UID:ev-1@zimail')
+			.replace('END:VEVENT', 'ATTENDEE;PARTSTAT=ACCEPTED:mailto:guest@gmail.test\r\nEND:VEVENT');
+		const { db, queries } = setup((query) => {
+			if (query.sql.includes('FROM calendar_events')) {
+				return [{ id: 'ev-1', title: 'Demo', starts_at: 's', ends_at: 'e', all_day: 0, source: 'reservation', sequence: 0 }];
+			}
+			if (query.sql.startsWith('UPDATE event_guests')) return [{}];
+			return [];
+		});
+		await applyArrivedInvitation(db, 'u1', [{ contentType: 'text/calendar', filename: 'invite.ics', bytes: encode(reply) }]);
+		const update = queries.find((query) => query.sql.startsWith('UPDATE event_guests'));
+		assert.deepEqual(update?.args, ['accepted', 'ev-1', 'u1', 'guest@gmail.test']);
+		assert.ok(!queries.some((query) => query.sql.includes('calendar_invites')), 'not treated as an invitation to the user');
+	});
+
 	test('a message with no calendar part touches nothing', async () => {
 		const { db, queries } = setup(() => []);
 		await applyArrivedInvitation(db, 'u1', [{ contentType: 'image/png', filename: 'a.png', bytes: encode('x') }]);

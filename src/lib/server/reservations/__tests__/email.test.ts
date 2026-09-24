@@ -31,6 +31,17 @@ describe('calendar invitation', () => {
 		assert.equal(inviteContentType('request'), 'text/calendar; method=REQUEST; charset=UTF-8');
 	});
 
+	test('a move is a request for the same event at its next revision', () => {
+		const ics = bookingIcs({ ...details, sequence: 2 }, 'moved', now);
+		assert.match(ics, /\r\nMETHOD:REQUEST\r\n/);
+		assert.match(ics, /\r\nSEQUENCE:2\r\n/);
+		assert.match(ics, /\r\nSTATUS:CONFIRMED\r\n/);
+		assert.equal(inviteContentType('moved'), 'text/calendar; method=REQUEST; charset=UTF-8');
+		assert.match(bookingEmailContent(details, 'moved').title, /^New time: /);
+		assert.match(bookingEmailContent(details, 'moved').lead, /moved your reservation/);
+		assert.match(bookingIcs({ ...details, sequence: 3 }, 'cancel', now), /\r\nSEQUENCE:3\r\n/);
+	});
+
 	test('a cancellation names the same event with a higher sequence', () => {
 		const ics = bookingIcs(details, 'cancel', now);
 		assert.match(ics, /\r\nMETHOD:CANCEL\r\n/);

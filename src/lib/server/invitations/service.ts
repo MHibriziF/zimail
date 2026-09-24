@@ -42,7 +42,10 @@ export type InvitationsService = {
 };
 
 export type InvitationsServiceDeps = {
-	repo: InvitationsRepository;
+	repo: Pick<
+		InvitationsRepository,
+		'get' | 'save' | 'hasEvents' | 'replaceEvents' | 'replaceOccurrence' | 'removeEvents'
+	>;
 	/** The calendar part of one of the user's messages, as text. */
 	loadCalendarPart: (userId: string, emailId: string) => Promise<string | null>;
 	ownAddresses: (userId: string) => Promise<string[]>;
@@ -103,6 +106,8 @@ export function createInvitationsService(deps: InvitationsServiceDeps): Invitati
 		const invitation = readInvitation(ics, zone);
 		if (!invitation || !RECEIVED_METHODS.has(invitation.method)) return null;
 		const own = new Set((await deps.ownAddresses(userId)).map((address) => address.toLowerCase()));
+		// The user's own invitation (a booking's copy Bcc'd to them) is already on their calendar.
+		if (invitation.organizer && own.has(invitation.organizer.email)) return null;
 		return { invitation, zone, me: findAttendee(invitation, own), own };
 	}
 

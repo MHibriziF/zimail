@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import type { InvitationsRepository, InviteEventRow, StoredInvite } from '../repository';
-import { createInvitationsService } from '../service';
+import type { InviteEventRow, StoredInvite } from '../repository';
+import { createInvitationsService, type InvitationsServiceDeps } from '../service';
 import { replyIcs } from '../email';
 import { readInvitation } from '../../../calendar/ics/invite';
 
@@ -38,7 +38,7 @@ function setup(messages: Record<string, string>) {
 	const events = new Map<string, InviteEventRow[]>();
 	const replies: string[] = [];
 
-	const repo: InvitationsRepository = {
+	const repo: InvitationsServiceDeps['repo'] = {
 		async get(_userId, uid) {
 			return invites.get(uid) ?? null;
 		},
@@ -105,6 +105,13 @@ describe('invitations service', () => {
 		const { service, events } = setup({ m1: invite({ extra: ['RRULE:FREQ=WEEKLY;COUNT=4'] }) });
 		await service.act('u1', 'm1', 'accepted');
 		assert.equal(events.get('meet-1')?.length, 4);
+	});
+
+	test('the user’s own invitation, Bcc’d back to them, is not offered to them', async () => {
+		const own = invite().replace('ORGANIZER;CN=Ada:mailto:ada@example.com', `ORGANIZER;CN=Me:mailto:${ME}`);
+		const { service } = setup({ m1: own });
+		assert.equal(await service.inspect('u1', 'm1'), null);
+		assert.equal((await service.act('u1', 'm1', 'add')).type, 'not_found');
 	});
 
 	test('not being among the attendees means adding, not answering', async () => {

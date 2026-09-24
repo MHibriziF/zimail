@@ -995,5 +995,21 @@
 		"moreGuests": "dan {count} lainnya",
 		"repeats": "Berulang",
 		"occurrence": "Satu kejadian dari acara berulang"
+	},
+	"answer": {
+		"reply": "Balasan untuk undangan Anda",
+		"proposal": "Waktu baru diusulkan",
+		"accepted": "{name} akan hadir",
+		"tentative": "{name} mungkin hadir",
+		"declined": "{name} tidak bisa hadir",
+		"noAnswer": "{name} belum memutuskan",
+		"proposes": "{name} mengusulkan waktu baru",
+		"now": "Sekarang",
+		"proposed": "Diusulkan",
+		"accept": "Terima waktu baru",
+		"decline": "Tetap pada waktu sekarang",
+		"moved": "Waktu baru telah dikirim ke {name}.",
+		"kept": "{name} telah diberi tahu bahwa waktunya tetap.",
+		"outdated": "Acara telah berubah sejak usulan ini dikirim."
 	}
 }

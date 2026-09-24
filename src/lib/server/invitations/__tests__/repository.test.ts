@@ -67,6 +67,38 @@ describe('InvitationsRepository', () => {
 		assert.match(queries[2].sql, /external_uid = \?/);
 	});
 
+	test('only the user’s own bookings and events count as theirs to answer', async () => {
+		const row = {
+			id: 'ev-1',
+			title: 'Demo',
+			starts_at: 's',
+			ends_at: 'e',
+			all_day: 0,
+			source: 'reservation',
+			sequence: 1
+		};
+		const { repo, queries } = setup(() => [row]);
+		assert.deepEqual(await repo.findOwnEvent('u1', 'ev-1'), {
+			id: 'ev-1',
+			title: 'Demo',
+			start: 's',
+			end: 'e',
+			allDay: false,
+			source: 'reservation',
+			sequence: 1
+		});
+		assert.match(queries[0].sql, /source IN \('reservation', 'manual'\)/);
+		assert.equal(await setup().repo.findOwnEvent('u1', 'nope'), null);
+	});
+
+	test('a guest’s answer updates only a guest already on the list', async () => {
+		const { repo, queries } = setup(() => [{}]);
+		assert.equal(await repo.setGuestStatus('u1', 'ev-1', 'Guest@Gmail.test', 'accepted'), true);
+		assert.deepEqual(queries[0].args, ['accepted', 'ev-1', 'u1', 'guest@gmail.test']);
+		assert.match(queries[0].sql, /^UPDATE event_guests/);
+		assert.equal(await setup().repo.setGuestStatus('u1', 'ev-1', 'stranger@x.test', 'accepted'), false);
+	});
+
 	test('removing takes every occurrence of the UID, scoped to the user', async () => {
 		const { repo, queries } = setup();
 		await repo.removeEvents('u1', 'meet-1');

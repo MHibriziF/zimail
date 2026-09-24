@@ -30,6 +30,7 @@ function setup(options: SetupOptions = {}) {
 	const bookings: NewBooking[] = [];
 	const notified: { hostUserId: string; booking: BookingDetails; kind: string }[] = [];
 	const deletedEvents: string[] = [];
+	const sequences = new Map<string, number>();
 
 	const repo: ReservationsRepository = {
 		async listForUser(userId) {
@@ -78,7 +79,9 @@ function setup(options: SetupOptions = {}) {
 				end: booking.end,
 				pageTitle: page.title,
 				timeZone: page.timeZone,
-				meetingCode: booking.meetingCode
+				meetingCode: booking.meetingCode,
+				meetingUrl: booking.eventLocation,
+				sequence: sequences.get(booking.eventId) ?? 0
 			};
 		},
 		async insertBooking(booking) {
@@ -87,6 +90,16 @@ function setup(options: SetupOptions = {}) {
 				throw new Error('UNIQUE constraint failed: reservations.page_id, reservations.starts_at');
 			}
 			bookings.push(booking);
+		},
+		async moveBooking(userId, eventId, start, end) {
+			const booking = bookings.find((entry) => entry.userId === userId && entry.eventId === eventId);
+			if (!booking) return false;
+			if (bookings.some((entry) => entry !== booking && entry.pageId === booking.pageId && entry.start === start)) {
+				throw new Error('UNIQUE constraint failed: reservations.page_id, reservations.starts_at');
+			}
+			Object.assign(booking, { start, end });
+			sequences.set(eventId, (sequences.get(eventId) ?? 0) + 1);
+			return true;
 		}
 	};
 
@@ -277,6 +290,34 @@ describe('ReservationsService slots and booking', () => {
 		const { service, notified } = await withPage();
 		assert.equal(await service.cancelBooking('owner', 'no-such-event'), false);
 		assert.equal(notified.length, 0);
+	});
+
+	test('rescheduling moves the booking and sends the guest the next revision', async () => {
+		const { service, bookings, notified } = await withPage();
+		await service.book('office-hours', guest, BASE);
+		const eventId = bookings[0].eventId;
+		const start = new Date('2026-09-30T03:00:00.000Z');
+		const end = new Date('2026-09-30T04:00:00.000Z');
+
+		assert.equal(await service.rescheduleBooking('owner', eventId, start, end), 'ok');
+		assert.equal(bookings[0].start, start.toISOString());
+		assert.equal(notified[1].kind, 'moved');
+		assert.equal(notified[1].booking.uid, notified[0].booking.uid);
+		assert.equal(notified[1].booking.sequence, 1);
+		assert.equal(notified[1].booking.start.toISOString(), start.toISOString());
+
+		assert.equal(await service.cancelBooking('owner', eventId), true);
+		assert.equal(notified[2].booking.sequence, 2, 'the cancellation outranks the move');
+	});
+
+	test('rescheduling onto another booking, or a booking that isn’t there, is refused', async () => {
+		const { service, bookings } = await withPage();
+		await service.book('office-hours', guest, BASE);
+		await service.book('office-hours', { ...guest, email: 'bo@example.com', start: '2026-09-28T03:00:00.000Z' }, BASE);
+		const taken = new Date(bookings[1].start);
+		const end = new Date(bookings[1].end);
+		assert.equal(await service.rescheduleBooking('owner', bookings[0].eventId, taken, end), 'slot_taken');
+		assert.equal(await service.rescheduleBooking('owner', 'no-such-event', taken, end), 'not_found');
 	});
 
 	test('a failed cancellation email still cancels', async () => {
