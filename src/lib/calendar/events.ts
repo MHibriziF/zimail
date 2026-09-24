@@ -125,3 +125,8 @@ export function eventInterval(event: Pick<CalendarEvent, 'start' | 'end' | 'allD
 export function isReadOnlyEvent(event: Pick<CalendarEvent, 'source'>): boolean {
 	return event.source !== 'manual';
 }
+
+/** A booking can't be edited but can be cancelled; a feed event belongs to the other calendar. */
+export function isDeletableEvent(event: Pick<CalendarEvent, 'source'>): boolean {
+	return event.source !== 'feed';
+}
