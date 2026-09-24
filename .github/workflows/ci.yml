@@ -62,7 +62,32 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: bash .github/scripts/sonar-prefetch.sh
 
-      - uses: SonarSource/sonarqube-scan-action@v6
+      # The server drops out for seconds at a time (Cloudflare answers 525), and the scanner
+      # fails on its very first request if it lands in one of those gaps. Wait it out first.
+      - name: Wait for SonarQube
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          for _ in $(seq 1 24); do
+            curl -sf -m 10 "$SONAR_HOST_URL/api/system/status" | grep -q '"UP"' && exit 0
+            sleep 5
+          done
+          echo "::warning::SonarQube did not answer for two minutes; scanning anyway"
+
+      # A second try covers a blip mid-scan. A genuinely red gate just fails twice.
+      - id: scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Wait before retrying the scan
+        if: steps.scan.outcome == 'failure'
+        run: sleep 30
+
+      - if: steps.scan.outcome == 'failure'
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
