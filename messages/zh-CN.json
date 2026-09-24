@@ -882,6 +882,23 @@
 		"more": "还有 {count} 项",
 		"nothingThisDay": "没有安排。",
 		"nothingThisMonth": "本月剩余时间没有安排。",
-		"comingUp": "即将到来"
+		"comingUp": "即将到来",
+		"feeds": {
+			"heading": "其他日历",
+			"hint": "通过私密 iCal 地址订阅 Google、Outlook 或 iCloud 日历。其中的活动会显示在这里并计为忙碌时间。不会向对方发送任何内容——只读取该地址。",
+			"add": "添加日历",
+			"name": "名称",
+			"namePlaceholder": "工作（Google）",
+			"url": "iCal 地址",
+			"urlHelp": "Google 日历：设置 → 你的日历 → 集成日历 → iCal 格式的私密地址。Outlook：设置 → 共享日历 → 发布 → ICS。iCloud：公开共享日历并复制 webcal:// 链接。",
+			"color": "颜色",
+			"subscribe": "订阅",
+			"adding": "正在同步…",
+			"empty": "还没有其他日历。",
+			"syncNow": "立即同步",
+			"remove": "移除",
+			"neverSynced": "尚未同步",
+			"synced": "上次同步 {time} · {count} 个活动"
+		}
 	}
 }

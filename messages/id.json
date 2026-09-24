@@ -882,6 +882,23 @@
 		"more": "+{count} lagi",
 		"nothingThisDay": "Tidak ada jadwal.",
 		"nothingThisMonth": "Tidak ada jadwal untuk sisa bulan ini.",
-		"comingUp": "Akan datang"
+		"comingUp": "Akan datang",
+		"feeds": {
+			"heading": "Kalender lain",
+			"hint": "Berlangganan kalender Google, Outlook, atau iCloud lewat alamat iCal pribadinya. Acaranya tampil di sini dan dihitung sebagai waktu sibuk. Tidak ada yang dikirim ke sana — alamatnya hanya dibaca.",
+			"add": "Tambah kalender",
+			"name": "Nama",
+			"namePlaceholder": "Kerja (Google)",
+			"url": "Alamat iCal",
+			"urlHelp": "Google Kalender: Setelan → kalender Anda → Integrasikan kalender → Alamat rahasia dalam format iCal. Outlook: Setelan → Kalender bersama → Terbitkan → ICS. iCloud: bagikan kalender secara publik lalu salin tautan webcal://.",
+			"color": "Warna",
+			"subscribe": "Berlangganan",
+			"adding": "Menyinkronkan…",
+			"empty": "Belum ada kalender lain.",
+			"syncNow": "Sinkronkan sekarang",
+			"remove": "Hapus",
+			"neverSynced": "Belum disinkronkan",
+			"synced": "Terakhir disinkronkan {time} · {count} acara"
+		}
 	}
 }
