@@ -76,6 +76,22 @@ jobs:
 
           FAILED=$(echo "$STATUS_JSON" | jq -r '.projectStatus.conditions[] | select(.status=="ERROR") | "- `\(.metricKey)`: \(.actualValue) (threshold \(.comparator) \(.errorThreshold))"')
 
+          # The counts above say *that* something failed; this says what and where. Community
+          # Edition has no PR analysis, so the scan lands on main's new-code period — the same
+          # query you'd run by hand. Only new issues; pre-existing debt stays on the dashboard.
+          ISSUES_LIMIT=25
+          ISSUES_JSON=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/issues/search?componentKeys=$PROJECT_KEY&branch=main&statuses=OPEN,CONFIRMED,REOPENED&inNewCodePeriod=true&s=SEVERITY&asc=false&ps=$ISSUES_LIMIT" || echo '{"total":0,"issues":[]}')
+          ISSUES_TOTAL=$(echo "$ISSUES_JSON" | jq -r '.total // 0')
+          ISSUE_ROWS=$(echo "$ISSUES_JSON" | jq -r \
+            --arg host "$SONAR_HOST_URL" \
+            --arg blob "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}" '
+            .issues[]
+            | (.component | sub("^[^:]*:"; "")) as $path
+            | (if .line then "\($path):\(.line)" else $path end) as $where
+            | (if .line then "\($blob)/\($path)#L\(.line)" else "\($blob)/\($path)" end) as $href
+            | (.message | gsub("\\|"; "\\|") | gsub("\n"; " ")) as $message
+            | "| \(.severity) | [`\(.rule)`](\($host)/coding_rules?open=\(.rule | @uri)&rule_key=\(.rule | @uri)) | [`\($where)`](\($href)) | \($message) |"')
+
           {
             echo "<!-- sonarqube-summary -->"
             echo "### $ICON SonarQube Quality Gate: $GATE"
@@ -91,6 +107,20 @@ jobs:
               echo
               echo "**Failing conditions:**"
               echo "$FAILED"
+            fi
+            if [ -n "$ISSUE_ROWS" ]; then
+              echo
+              echo "**New issues ($ISSUES_TOTAL):**"
+              echo
+              echo "| Severity | Rule | Where | Message |"
+              echo "|---|---|---|---|"
+              echo "$ISSUE_ROWS"
+              if [ "$ISSUES_TOTAL" -gt "$ISSUES_LIMIT" ]; then
+                echo
+                echo "…and $((ISSUES_TOTAL - ISSUES_LIMIT)) more on the dashboard."
+              fi
+              echo
+              echo "<sub>Read from main's new-code period, so a PR scanned at the same moment can show up here too.</sub>"
             fi
             echo
             echo "[Full report]($SONAR_HOST_URL/dashboard?id=$PROJECT_KEY)"
