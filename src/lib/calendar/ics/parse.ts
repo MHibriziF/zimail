@@ -13,6 +13,8 @@ export type IcsCalendar = {
 	events: IcsComponent[];
 	/** `X-WR-TIMEZONE`, which Google sets and floating times are read in. */
 	timeZone: string | null;
+	/** The iTIP method (`REQUEST`, `CANCEL`, `REPLY`...), upper-cased; `null` for a published calendar. */
+	method: string | null;
 };
 
 function unfold(text: string): string[] {
@@ -59,6 +61,7 @@ export function unescapeText(value: string): string {
 class Collector {
 	events: IcsComponent[] = [];
 	timeZone: string | null = null;
+	method: string | null = null;
 	private current: IcsComponent | null = null;
 	private depth = 0;
 
@@ -79,6 +82,7 @@ class Collector {
 	property(property: IcsProperty) {
 		if (!this.current) {
 			if (property.name === 'X-WR-TIMEZONE') this.timeZone = property.value.trim();
+			else if (property.name === 'METHOD') this.method = property.value.trim().toUpperCase() || null;
 			return;
 		}
 		if (this.depth > 0) return;
@@ -98,7 +102,7 @@ export function parseIcs(text: string): IcsCalendar {
 		else if (property.name === 'END') collector.end(kind);
 		else collector.property(property);
 	}
-	return { events: collector.events, timeZone: collector.timeZone };
+	return { events: collector.events, timeZone: collector.timeZone, method: collector.method };
 }
 
 export function first(component: IcsComponent, name: string): IcsProperty | undefined {

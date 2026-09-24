@@ -44,6 +44,8 @@ type Series = {
 	/** Milliseconds; whole days for all-day events. */
 	duration: number;
 	component: IcsComponent;
+	/** For a moved instance, the original start it replaces — which is what its id is keyed on. */
+	replaces?: IcsTime;
 };
 
 /** Comparable identity of an occurrence's original start. */
@@ -74,11 +76,12 @@ function readSeries(component: IcsComponent, zone: string): Series | null {
 
 function toFeedEvent(series: Series, start: IcsTime): FeedEvent {
 	const begins = toInstant(start);
+	const key = occurrenceKey(series.replaces ?? start);
 	const summary = first(series.component, 'SUMMARY')?.value;
 	const location = first(series.component, 'LOCATION')?.value;
 	const transparent = first(series.component, 'TRANSP')?.value.trim().toUpperCase() === 'TRANSPARENT';
 	return {
-		uid: `${series.uid}#${occurrenceKey(start)}`,
+		uid: `${series.uid}#${key}`,
 		title: (summary ? unescapeText(summary).trim() : '').slice(0, MAX_TITLE) || 'Busy',
 		start: begins.toISOString(),
 		end: new Date(begins.getTime() + series.duration).toISOString(),
@@ -143,10 +146,11 @@ function sortComponents(components: IcsComponent[], zone: string): Sorted {
 			if (keep) sorted.masters.push(series);
 			continue;
 		}
+		const originals = parseTimeProperty(recurrenceId, zone);
 		const keys = sorted.replaced.get(series.uid) ?? new Set<number>();
-		for (const key of parseTimeProperty(recurrenceId, zone).map(occurrenceKey)) keys.add(key);
+		for (const key of originals.map(occurrenceKey)) keys.add(key);
 		sorted.replaced.set(series.uid, keys);
-		if (keep) sorted.overrides.push(series);
+		if (keep) sorted.overrides.push({ ...series, replaces: originals[0] });
 	}
 	return sorted;
 }
@@ -163,7 +167,7 @@ export function expandCalendar(text: string, window: ExpandWindow): FeedEvent[] 
 		for (const start of occurrencesOf(series, window, skip, limit)) events.push(toFeedEvent(series, start));
 	}
 	for (const series of singles) {
-		// The override's UID matches its series; its own start keeps the occurrence id distinct.
+		// Keyed on the start it replaces, so a later update to the same instance finds it.
 		events.push(toFeedEvent(series, series.start));
 	}
 
@@ -174,4 +178,18 @@ export function expandCalendar(text: string, window: ExpandWindow): FeedEvent[] 
 		.filter((event) => Date.parse(event.start) < to && Date.parse(event.end) > from)
 		.sort((a, b) => a.start.localeCompare(b.start))
 		.slice(0, limit);
+}
+
+/** One VEVENT as a single event at its own start — what an invitation describes. */
+export function readSingleEvent(component: IcsComponent, zone: string): FeedEvent | null {
+	const series = readSeries(component, zone);
+	if (!series) return null;
+	const recurrenceId = first(component, 'RECURRENCE-ID');
+	const replaces = recurrenceId ? parseTimeProperty(recurrenceId, zone)[0] : undefined;
+	return toFeedEvent({ ...series, replaces }, series.start);
+}
+
+/** The calendar's own zone, or `fallback` when it doesn't name one. */
+export function calendarZone(text: string, fallback: string): string {
+	return resolveTzid(parseIcs(text).timeZone ?? undefined) ?? fallback;
 }

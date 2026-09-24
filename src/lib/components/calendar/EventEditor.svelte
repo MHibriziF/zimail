@@ -3,11 +3,17 @@
 	import { t } from '$lib/i18n';
 	import Icon from '../Icon.svelte';
 	import type { EventDraft } from '$lib/calendar/editor';
-	import { MAX_EVENT_LOCATION_LENGTH, MAX_EVENT_NOTES_LENGTH, MAX_EVENT_TITLE_LENGTH } from '$lib/calendar/events';
+	import {
+		MAX_EVENT_LOCATION_LENGTH,
+		MAX_EVENT_NOTES_LENGTH,
+		MAX_EVENT_TITLE_LENGTH,
+		type CalendarEventSource
+	} from '$lib/calendar/events';
 
 	let {
 		initial,
 		isNew,
+		source = 'manual',
 		readOnly = false,
 		deletable = true,
 		busy = false,
@@ -18,7 +24,8 @@
 	}: {
 		initial: EventDraft;
 		isNew: boolean;
-		/** Feed and reservation events are shown, not edited. */
+		source?: CalendarEventSource;
+		/** Feed, reservation and invitation events are shown, not edited. */
 		readOnly?: boolean;
 		/** A booking is read-only but can still be cancelled. */
 		deletable?: boolean;
@@ -32,7 +39,16 @@
 	let draft = $state(untrack(() => ({ ...initial })));
 	let confirmingDelete = $state(false);
 
-	const deleteLabel = $derived(readOnly ? t('calendar.cancelBooking') : t('calendar.delete'));
+	/** A booking is cancelled (the guest is told), an invitation just taken off, anything else deleted. */
+	const removal = $derived.by(() => {
+		if (source === 'invite') {
+			return { label: t('calendar.removeInvite'), confirm: t('calendar.removeInviteConfirm'), hint: t('calendar.inviteHint') };
+		}
+		if (source === 'reservation') {
+			return { label: t('calendar.cancelBooking'), confirm: t('calendar.cancelBookingConfirm'), hint: t('calendar.bookingHint') };
+		}
+		return { label: t('calendar.delete'), confirm: t('calendar.deleteConfirm'), hint: t('calendar.readOnlyHint') };
+	});
 
 	const heading = $derived.by(() => {
 		if (isNew) return t('calendar.newEvent');
@@ -67,7 +83,7 @@
 		</header>
 
 		{#if readOnly}
-			<p class="cal-editor-note">{deletable ? t('calendar.bookingHint') : t('calendar.readOnlyHint')}</p>
+			<p class="cal-editor-note">{removal.hint}</p>
 		{/if}
 
 		<label class="cal-field">
@@ -132,10 +148,10 @@
 
 		{#if confirmingDelete}
 			<div class="cal-confirm" role="alert">
-				<span>{readOnly ? t('calendar.cancelBookingConfirm') : t('calendar.deleteConfirm')}</span>
+				<span>{removal.confirm}</span>
 				<div class="cal-actions">
 					<button type="button" class="btn-ghost" onclick={() => (confirmingDelete = false)}>{t('common.cancel')}</button>
-					<button type="button" class="cal-danger" disabled={busy} onclick={ondelete}>{deleteLabel}</button>
+					<button type="button" class="cal-danger" disabled={busy} onclick={ondelete}>{removal.label}</button>
 				</div>
 			</div>
 		{:else}
@@ -143,7 +159,7 @@
 				{#if !isNew && deletable}
 					<button type="button" class="btn-ghost cal-delete" onclick={() => (confirmingDelete = true)}>
 						<Icon name="delete-bin-line" size={16} />
-						{deleteLabel}
+						{removal.label}
 					</button>
 				{/if}
 				<span class="cal-spacer"></span>

@@ -41,6 +41,12 @@ export type CalendarServiceDeps = {
 };
 
 export function createCalendarService({ repo, cancelReservation }: CalendarServiceDeps): CalendarService {
+	function removeBySource(userId: string, event: CalendarEvent): Promise<boolean> {
+		if (event.source === 'reservation') return (cancelReservation ?? repo.deleteReservation)(userId, event.id);
+		if (event.source === 'invite') return repo.deleteInvite(userId, event.id);
+		return repo.deleteManual(userId, event.id);
+	}
+
 	return {
 		async listBetween(userId, from, to, timeZone) {
 			const span = to.getTime() - from.getTime();
@@ -89,11 +95,7 @@ export function createCalendarService({ repo, cancelReservation }: CalendarServi
 			const existing = await repo.get(userId, id);
 			if (!existing) return 'not_found';
 			if (!isDeletableEvent(existing)) return 'read_only';
-			const removed =
-				existing.source === 'reservation'
-					? await (cancelReservation ?? repo.deleteReservation)(userId, id)
-					: await repo.deleteManual(userId, id);
-			return removed ? 'ok' : 'not_found';
+			return (await removeBySource(userId, existing)) ? 'ok' : 'not_found';
 		}
 	};
 }

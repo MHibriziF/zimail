@@ -14,6 +14,7 @@ import {
 } from '../telegram-notify';
 import { stripHtml } from '../util/html';
 import { isCalendarAttachment } from '../../utils/attachments';
+import { applyArrivedInvitation, hasBytes } from '../invitations';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
 import { categoriesServiceForDb, pickClassifyHeaders } from '../categories';
 
@@ -125,6 +126,7 @@ export async function handleCloudflareInbound(
 	const storedAttachments = await storeInboundAttachments(env, emailId, parsed.attachments);
 	// Mail filed in Spam is kept but never announced.
 	if (await isFiledAsSpam(env.DB, route.userId, emailId)) return;
+	await applyArrivedInvitation(env.DB, route.userId, storedAttachments.filter(hasBytes));
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,

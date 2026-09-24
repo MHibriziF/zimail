@@ -67,6 +67,8 @@ export type CalendarRepository = {
 	deleteManual(userId: string, id: string): Promise<boolean>;
 	/** Cancels a booking: its reservation row and the event that blocks the slot. */
 	deleteReservation(userId: string, id: string): Promise<boolean>;
+	/** Takes a received invitation off the calendar: every occurrence of the series `id` belongs to. */
+	deleteInvite(userId: string, id: string): Promise<boolean>;
 };
 
 export function createD1CalendarRepository(db: D1Database): CalendarRepository {
@@ -152,6 +154,19 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 					.prepare(`DELETE FROM calendar_events WHERE id = ? AND user_id = ? AND source = 'reservation'`)
 					.bind(id, userId)
 			]);
+			return (result.meta.changes ?? 0) > 0;
+		},
+
+		async deleteInvite(userId, id) {
+			const result = await db
+				.prepare(
+					`DELETE FROM calendar_events
+					 WHERE user_id = ? AND source = 'invite' AND source_id = (
+						SELECT source_id FROM calendar_events WHERE id = ? AND user_id = ? AND source = 'invite'
+					 )`
+				)
+				.bind(userId, id, userId)
+				.run();
 			return (result.meta.changes ?? 0) > 0;
 		}
 	};

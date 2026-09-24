@@ -51,6 +51,12 @@ function fakeRepo(seed: Row[] = []) {
 			if (index < 0) return false;
 			rows.splice(index, 1);
 			return true;
+		},
+		async deleteInvite(userId, id) {
+			const index = rows.findIndex((entry) => entry.userId === userId && entry.id === id && entry.source === 'invite');
+			if (index < 0) return false;
+			rows.splice(index, 1);
+			return true;
 		}
 	};
 	return { repo, rows };

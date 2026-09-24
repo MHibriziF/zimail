@@ -946,7 +946,10 @@
 			"withMeetingHint": "Setiap reservasi mendapat tautan panggilan video sendiri, di email konfirmasi, undangan kalender, dan kalender Anda.",
 			"withMeetingUnavailable": "Siapkan rapat video terlebih dahulu (kunci LiveKit) untuk memakai ini.",
 			"meetingBadge": "Ruang rapat"
-		}
+		},
+		"inviteHint": "Anda diundang ke acara ini. Penyelenggaranya yang membuat perubahan, dan perubahan itu muncul di sini.",
+		"removeInvite": "Hapus dari kalender",
+		"removeInviteConfirm": "Hapus acara ini dari kalender Anda? Penyelenggara tidak diberi tahu; jawab email undangannya untuk itu."
 	},
 	"book": {
 		"minutes": "{count} menit",
@@ -967,5 +970,30 @@
 		"poweredBy": "Dipesan dengan {app}",
 		"videoCall": "Panggilan video Zimail",
 		"joinLink": "Gabung ke rapat"
+	},
+	"invitation": {
+		"invitation": "Undangan",
+		"cancelled": "Acara dibatalkan",
+		"event": "Acara",
+		"going": "Hadir?",
+		"yes": "Ya",
+		"maybe": "Mungkin",
+		"no": "Tidak",
+		"add": "Tambahkan ke kalender",
+		"remove": "Hapus dari kalender",
+		"onCalendar": "Ada di kalender Anda",
+		"accepted": "Anda akan hadir",
+		"tentative": "Anda menjawab mungkin",
+		"declined": "Anda menolak",
+		"replied": "Jawaban Anda telah dikirim ke penyelenggara.",
+		"replyFailed": "Tersimpan di sini, tetapi jawaban Anda tidak dapat dikirim ke penyelenggara.",
+		"cancelledNote": "Penyelenggara membatalkan acara ini.",
+		"cancelledGone": "Acara ini tidak ada di kalender Anda.",
+		"outdated": "Undangan ini sudah diperbarui — lihat pesan yang lebih baru.",
+		"organizer": "Penyelenggara",
+		"guests": "Tamu",
+		"moreGuests": "dan {count} lainnya",
+		"repeats": "Berulang",
+		"occurrence": "Satu kejadian dari acara berulang"
 	}
 }

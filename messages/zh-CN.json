@@ -946,7 +946,10 @@
 			"withMeetingHint": "每个预约都有自己的视频通话链接，会出现在确认邮件、日历邀请和你的日历中。",
 			"withMeetingUnavailable": "请先设置视频会议（LiveKit 密钥）才能使用此功能。",
 			"meetingBadge": "会议室"
-		}
+		},
+		"inviteHint": "你受邀参加此活动。由组织者进行更改，更改会显示在这里。",
+		"removeInvite": "从日历中移除",
+		"removeInviteConfirm": "将此活动从你的日历中移除？组织者不会收到通知；如需通知，请回复邀请邮件。"
 	},
 	"book": {
 		"minutes": "{count} 分钟",
@@ -967,5 +970,30 @@
 		"poweredBy": "由 {app} 提供预约",
 		"videoCall": "Zimail 视频通话",
 		"joinLink": "加入会议"
+	},
+	"invitation": {
+		"invitation": "邀请",
+		"cancelled": "活动已取消",
+		"event": "活动",
+		"going": "参加吗？",
+		"yes": "是",
+		"maybe": "可能",
+		"no": "否",
+		"add": "添加到日历",
+		"remove": "从日历中移除",
+		"onCalendar": "已在你的日历中",
+		"accepted": "你将参加",
+		"tentative": "你回复了可能",
+		"declined": "你已拒绝",
+		"replied": "你的回复已发送给组织者。",
+		"replyFailed": "已在此保存，但无法将你的回复发送给组织者。",
+		"cancelledNote": "组织者已取消此活动。",
+		"cancelledGone": "它不在你的日历中。",
+		"outdated": "此邀请之后已更新——请查看较新的邮件。",
+		"organizer": "组织者",
+		"guests": "嘉宾",
+		"moreGuests": "以及另外 {count} 人",
+		"repeats": "重复",
+		"occurrence": "重复活动中的一次"
 	}
 }

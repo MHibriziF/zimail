@@ -2,6 +2,7 @@ import type { ReservationPage, ReservationPageSettings } from './reservations';
 import type { CalendarFeed } from './feeds';
 import type { LabelColor } from '../mail/labels';
 import type { CalendarEvent, CalendarEventInput } from './events';
+import type { InvitationAction, InvitationView } from './invitations';
 
 export class CalendarRequestError extends Error {}
 
@@ -53,6 +54,24 @@ export async function syncFeed(id: string): Promise<CalendarFeed> {
 export async function removeFeed(id: string): Promise<void> {
 	const response = await fetch(`/api/calendar/feeds/${encodeURIComponent(id)}`, { method: 'DELETE' });
 	await readJson(response, 'Could not remove the calendar');
+}
+
+/** The invitation a message carries, or `null` when it has none to act on. */
+export async function fetchInvitation(emailId: string): Promise<InvitationView | null> {
+	const response = await fetch(`/api/mail/${encodeURIComponent(emailId)}/invitation`);
+	return (await readJson<{ invitation: InvitationView | null }>(response, 'Could not read the invitation')).invitation;
+}
+
+export async function actOnInvitation(
+	emailId: string,
+	action: InvitationAction
+): Promise<{ invitation: InvitationView; replied: boolean }> {
+	const response = await fetch(`/api/mail/${encodeURIComponent(emailId)}/invitation`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ action })
+	});
+	return readJson(response, 'Could not update the invitation');
 }
 
 export async function fetchReservationPages(): Promise<{ pages: ReservationPage[]; meetingsAvailable: boolean }> {
