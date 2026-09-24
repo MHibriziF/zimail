@@ -44,10 +44,61 @@ jobs:
           name: coverage
           path: coverage
 
-      - uses: SonarSource/sonarqube-scan-action@v6
+      # The scanner fetches a JRE and its analyzer plugins from our SonarQube on every run,
+      # and the server's proxy intermittently resets those large downloads — the scan then
+      # hangs for half an hour or fails outright. With them cached, a normal run fetches
+      # nothing big. The run-id key saves a fresh copy each time; restore takes the newest.
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.sonar/cache
+          key: sonar-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: sonar-cache-${{ runner.os }}-
+
+      # Fills in whatever the restored cache lacks, retrying the downloads the scanner itself
+      # would try only once. Never fails the job — see the script.
+      - name: Prefetch SonarScanner downloads
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: bash .github/scripts/sonar-prefetch.sh
+
+      # The server drops out for seconds at a time (Cloudflare answers 525), and the scanner
+      # fails on its very first request if it lands in one of those gaps. Wait it out first.
+      - name: Wait for SonarQube
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          for _ in $(seq 1 24); do
+            curl -sf -m 10 "$SONAR_HOST_URL/api/system/status" | grep -q '"UP"' && exit 0
+            sleep 5
+          done
+          echo "::warning::SonarQube did not answer for two minutes; scanning anyway"
+
+      # A second try covers a blip mid-scan. A genuinely red gate just fails twice.
+      - id: scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Wait before retrying the scan
+        if: steps.scan.outcome == 'failure'
+        run: sleep 30
+
+      - if: steps.scan.outcome == 'failure'
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      # Saved even when the scan fails — a red gate or a flaky download is exactly when the
+      # next run most needs what did arrive. The scanner re-checks every file's checksum.
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/.sonar/cache
+          key: sonar-cache-${{ runner.os }}-${{ github.run_id }}
 
       # Community Edition has no PR decoration (that's Developer Edition+), so this posts our
       # own summary — the scan step above already blocked on the Quality Gate before we get here,
@@ -63,18 +114,43 @@ jobs:
           set -e
           PROJECT_KEY=$(grep '^sonar.projectKey=' sonar-project.properties | cut -d= -f2)
 
-          STATUS_JSON=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?projectKey=$PROJECT_KEY")
+          # This step only reports — the scan step already passed or failed the gate — so a
+          # server blip here must not turn a green run red. Retry, then fall back to "unknown".
+          sonar_get() {
+            curl -sf --retry 5 --retry-all-errors --retry-delay 5 --max-time 30 -u "$SONAR_TOKEN:" "$SONAR_HOST_URL$1"
+          }
+
+          STATUS_JSON=$(sonar_get "/api/qualitygates/project_status?projectKey=$PROJECT_KEY" || echo '{"projectStatus":{"status":"UNKNOWN","conditions":[]}}')
           GATE=$(echo "$STATUS_JSON" | jq -r '.projectStatus.status')
 
-          MEASURES_JSON=$(curl -sf -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/measures/component?component=$PROJECT_KEY&metricKeys=bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density")
+          MEASURES_JSON=$(sonar_get "/api/measures/component?component=$PROJECT_KEY&metricKeys=bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density" || echo '{"component":{"measures":[]}}')
           measure() {
             echo "$MEASURES_JSON" | jq -r --arg k "$1" '(.component.measures[] | select(.metric==$k) | .value) // "n/a"'
           }
 
-          ICON="✅"
-          [ "$GATE" = "OK" ] || ICON="❌"
+          case "$GATE" in
+            OK) ICON="✅" ;;
+            UNKNOWN) ICON="⚠️" ;;
+            *) ICON="❌" ;;
+          esac
 
           FAILED=$(echo "$STATUS_JSON" | jq -r '.projectStatus.conditions[] | select(.status=="ERROR") | "- `\(.metricKey)`: \(.actualValue) (threshold \(.comparator) \(.errorThreshold))"')
+
+          # The counts above say *that* something failed; this says what and where. Community
+          # Edition has no PR analysis, so the scan lands on main's new-code period — the same
+          # query you'd run by hand. Only new issues; pre-existing debt stays on the dashboard.
+          ISSUES_LIMIT=25
+          ISSUES_JSON=$(sonar_get "/api/issues/search?componentKeys=$PROJECT_KEY&branch=main&statuses=OPEN,CONFIRMED,REOPENED&inNewCodePeriod=true&s=SEVERITY&asc=false&ps=$ISSUES_LIMIT" || echo '{"total":0,"issues":[]}')
+          ISSUES_TOTAL=$(echo "$ISSUES_JSON" | jq -r '.total // 0')
+          ISSUE_ROWS=$(echo "$ISSUES_JSON" | jq -r \
+            --arg host "$SONAR_HOST_URL" \
+            --arg blob "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.pull_request.head.sha }}" '
+            .issues[]
+            | (.component | sub("^[^:]*:"; "")) as $path
+            | (if .line then "\($path):\(.line)" else $path end) as $where
+            | (if .line then "\($blob)/\($path)#L\(.line)" else "\($blob)/\($path)" end) as $href
+            | (.message | gsub("\\|"; "\\|") | gsub("\n"; " ")) as $message
+            | "| \(.severity) | [`\(.rule)`](\($host)/coding_rules?open=\(.rule | @uri)&rule_key=\(.rule | @uri)) | [`\($where)`](\($href)) | \($message) |"')
 
           {
             echo "<!-- sonarqube-summary -->"
@@ -91,6 +167,20 @@ jobs:
               echo
               echo "**Failing conditions:**"
               echo "$FAILED"
+            fi
+            if [ -n "$ISSUE_ROWS" ]; then
+              echo
+              echo "**New issues ($ISSUES_TOTAL):**"
+              echo
+              echo "| Severity | Rule | Where | Message |"
+              echo "|---|---|---|---|"
+              echo "$ISSUE_ROWS"
+              if [ "$ISSUES_TOTAL" -gt "$ISSUES_LIMIT" ]; then
+                echo
+                echo "…and $((ISSUES_TOTAL - ISSUES_LIMIT)) more on the dashboard."
+              fi
+              echo
+              echo "<sub>Read from main's new-code period, so a PR scanned at the same moment can show up here too.</sub>"
             fi
             echo
             echo "[Full report]($SONAR_HOST_URL/dashboard?id=$PROJECT_KEY)"
