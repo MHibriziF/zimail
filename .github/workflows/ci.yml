@@ -48,7 +48,7 @@ jobs:
       # and the server's proxy intermittently resets those large downloads — the scan then
       # hangs for half an hour or fails outright. With them cached, a normal run fetches
       # nothing big. The run-id key saves a fresh copy each time; restore takes the newest.
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: ~/.sonar/cache
           key: sonar-cache-${{ runner.os }}-${{ github.run_id }}
@@ -58,6 +58,14 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      # Saved even when the scan fails — a red gate or a flaky download is exactly when the
+      # next run most needs what did arrive. The scanner re-checks every file's checksum.
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/.sonar/cache
+          key: sonar-cache-${{ runner.os }}-${{ github.run_id }}
 
       # Community Edition has no PR decoration (that's Developer Edition+), so this posts our
       # own summary — the scan step above already blocked on the Quality Gate before we get here,
