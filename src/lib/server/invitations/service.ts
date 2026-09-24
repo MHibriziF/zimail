@@ -74,6 +74,12 @@ function canReply({ invitation, me, own }: Loaded): boolean {
 	);
 }
 
+/** A cancellation can only be taken off; answering needs the user to be a guest the organizer asked. */
+function allowed(loaded: Loaded, action: InvitationAction): boolean {
+	if (loaded.invitation.method === 'CANCEL') return action === 'remove';
+	return isResponse(action) ? canReply(loaded) : true;
+}
+
 function isOutdated(invitation: Invitation, stored: StoredInvite | null): boolean {
 	return stored !== null && stored.sequence > invitation.sequence;
 }
@@ -194,11 +200,6 @@ export function createInvitationsService(deps: InvitationsServiceDeps): Invitati
 			console.error('Could not send invitation reply', error);
 			return false;
 		}
-	}
-
-	function allowed(loaded: Loaded, action: InvitationAction): boolean {
-		if (loaded.invitation.method === 'CANCEL') return action === 'remove';
-		return isResponse(action) ? canReply(loaded) : true;
 	}
 
 	return {
