@@ -23,6 +23,8 @@ export type BookingDetails = {
 	end: Date;
 	/** The page's zone, so the email states the time the way the host set it up. */
 	timeZone: string;
+	/** The booking's Zimail meeting room, if the page gives one. */
+	meetingUrl?: string | null;
 };
 
 export type InviteKind = 'request' | 'cancel';
@@ -55,6 +57,10 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 		details: [{ label: 'When', value: formatWhen(details) }, withHost, { label: 'Name', value: details.guestName }],
 		footer: 'Need to change something? Reply to this email.'
 	};
+	if (details.meetingUrl) {
+		content.details!.push({ label: 'Meeting', value: details.meetingUrl });
+		content.action = { label: 'Join the meeting', href: details.meetingUrl };
+	}
 	if (details.note) content.details!.push({ label: 'Note', value: details.note });
 	return content;
 }
@@ -88,6 +94,12 @@ function fold(line: string): string {
 	return chunks.join('\r\n ');
 }
 
+function description(details: BookingDetails): string {
+	return [details.meetingUrl ? `Join the Zimail meeting: ${details.meetingUrl}` : '', details.note]
+		.filter(Boolean)
+		.join('\n\n');
+}
+
 export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request', now = new Date()): string {
 	const summary = `${details.pageTitle} with ${details.hostName}`;
 	const cancelled = kind === 'cancel';
@@ -109,7 +121,9 @@ export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request'
 		'TRANSP:OPAQUE',
 		`ORGANIZER;CN=${icsParam(details.hostName)}:mailto:${details.hostEmail}`,
 		`ATTENDEE;CN=${icsParam(details.guestName)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${details.guestEmail}`,
-		...(details.note ? [`DESCRIPTION:${icsText(details.note)}`] : []),
+		// LOCATION is what calendars show and link; URL is the standard field for it.
+		...(details.meetingUrl ? [`LOCATION:${icsText(details.meetingUrl)}`, `URL:${details.meetingUrl}`] : []),
+		...(description(details) ? [`DESCRIPTION:${icsText(description(details))}`] : []),
 		'END:VEVENT',
 		'END:VCALENDAR',
 		''

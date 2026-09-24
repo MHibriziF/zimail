@@ -935,7 +935,11 @@
 			"copy": "复制链接",
 			"pause": "暂停",
 			"resume": "恢复",
-			"edit": "编辑页面"
+			"edit": "编辑页面",
+			"withMeeting": "为每个预约提供 Zimail 会议室",
+			"withMeetingHint": "每个预约都有自己的视频通话链接，会出现在确认邮件、日历邀请和你的日历中。",
+			"withMeetingUnavailable": "请先设置视频会议（LiveKit 密钥）才能使用此功能。",
+			"meetingBadge": "会议室"
 		}
 	},
 	"book": {
@@ -954,6 +958,8 @@
 		"booking": "正在预约…",
 		"confirmed": "预约成功",
 		"confirmationSent": "确认邮件正在发送至 {email}。",
-		"poweredBy": "由 {app} 提供预约"
+		"poweredBy": "由 {app} 提供预约",
+		"videoCall": "Zimail 视频通话",
+		"joinLink": "加入会议"
 	}
 }

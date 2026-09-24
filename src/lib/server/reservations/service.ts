@@ -29,7 +29,7 @@ export type PageWriteOutcome =
 	| { type: 'not_found' };
 
 export type BookingOutcome =
-	| { type: 'ok'; start: string; end: string }
+	| { type: 'ok'; start: string; end: string; meetingUrl: string | null }
 	| { type: 'not_found' }
 	| { type: 'invalid_name' }
 	| { type: 'invalid_email' }
@@ -44,7 +44,8 @@ export type ReservationsService = {
 	/** Active pages only; `null` otherwise, the same as a page that doesn't exist. */
 	publicPage(slug: string): Promise<PublicReservationPage | null>;
 	slots(slug: string, fromKey: string | null): Promise<DaySlots[] | null>;
-	book(slug: string, body: Record<string, unknown>): Promise<BookingOutcome>;
+	/** `baseUrl` is this deployment's origin, for the meeting room's join link. */
+	book(slug: string, body: Record<string, unknown>, baseUrl: string): Promise<BookingOutcome>;
 	/**
 	 * Cancels the booking behind a calendar event and tells the guest, whose
 	 * calendar then drops it. `false` if there was no such booking to remove.
@@ -56,10 +57,20 @@ export type ReservationsServiceDeps = {
 	repo: ReservationsRepository;
 	calendar: CalendarRepository;
 	hostOf: (userId: string) => Promise<{ name: string; email: string } | null>;
+	/** Meeting rooms for bookings; `null` when video meetings aren't set up on this deployment. */
+	meetings: MeetingRooms | null;
 	/** Best effort; a failed email never undoes a booking or a cancellation. */
 	notify: (hostUserId: string, booking: BookingDetails, kind: InviteKind) => Promise<void>;
 	now?: () => Date;
 };
+
+export type MeetingRooms = {
+	/** Opens a room owned by `userId` and returns its join code. */
+	open(userId: string, title: string): Promise<string>;
+	close(userId: string, code: string): Promise<void>;
+};
+
+type Room = { code: string; url: string };
 
 function isUniqueConstraintError(error: unknown): boolean {
 	return error instanceof Error && /unique constraint/i.test(error.message);
@@ -98,6 +109,47 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			2000
 		);
 		return events.filter((event) => event.busy).map((event) => eventInterval(event, page.timeZone));
+	}
+
+	/** Why a booking can't go ahead, or `null` if it can. The slot is re-checked here, not trusted from the page. */
+	async function refuseBooking(
+		page: StoredPage,
+		start: Date,
+		at: Date,
+		email: string
+	): Promise<'slot_taken' | 'too_many' | null> {
+		const dateKey = dateKeyIn(start, page.timeZone);
+		if (!isFreeSlot(page, await busyNear(page, dateKey, 1), start, at, dateKey)) return 'slot_taken';
+		const since = new Date(at.getTime() - DAY_MS).toISOString();
+		if ((await repo.countCreatedSince(page.id, since)) >= MAX_BOOKINGS_PER_DAY) return 'too_many';
+		if ((await repo.countUpcomingFor(page.id, email, at.toISOString())) >= MAX_UPCOMING_PER_GUEST) return 'too_many';
+		return null;
+	}
+
+	/** A booking's own room, when the page asks for one and meetings are set up. A failure books without one. */
+	async function openRoom(page: StoredPage, guestName: string, baseUrl: string): Promise<Room | null> {
+		if (!page.withMeeting || !deps.meetings) return null;
+		try {
+			const code = await deps.meetings.open(page.userId, `${page.title} · ${guestName}`.slice(0, 200));
+			return { code, url: new URL(`/meet/${code}`, baseUrl).href };
+		} catch {
+			return null;
+		}
+	}
+
+	async function closeRoom(userId: string, code: string): Promise<void> {
+		await deps.meetings?.close(userId, code).catch(() => undefined);
+	}
+
+	/** Best effort: the booking or cancellation already happened either way. */
+	async function tellGuest(
+		userId: string,
+		kind: InviteKind,
+		details: Omit<BookingDetails, 'hostName' | 'hostEmail'>
+	): Promise<void> {
+		const host = await deps.hostOf(userId);
+		if (!host) return;
+		await deps.notify(userId, { ...details, hostName: host.name, hostEmail: host.email }, kind).catch(() => undefined);
 	}
 
 	async function write(
@@ -159,6 +211,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				startDate: page.startDate,
 				endDate: page.endDate,
 				slotMinutes: page.slotMinutes,
+				// Only promise a room the booking will actually get.
+				withMeeting: page.withMeeting && deps.meetings !== null,
 				host: host?.name ?? ''
 			};
 		},
@@ -174,7 +228,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			return computeSlots(page, busy, { fromKey: start, days: SLOT_DAYS_PER_REQUEST, now: at });
 		},
 
-		async book(slug, body) {
+		async book(slug, body, baseUrl) {
 			const page = await activePage(slug);
 			if (!page) return { type: 'not_found' };
 			const guest = validateGuest(body);
@@ -183,20 +237,13 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const start = new Date(typeof body.start === 'string' ? body.start : '');
 			if (Number.isNaN(start.getTime())) return { type: 'slot_taken' };
 			const at = now();
-			const dateKey = dateKeyIn(start, page.timeZone);
-			if (!isFreeSlot(page, await busyNear(page, dateKey, 1), start, at, dateKey)) return { type: 'slot_taken' };
-
-			const since = new Date(at.getTime() - DAY_MS).toISOString();
-			if (
-				(await repo.countCreatedSince(page.id, since)) >= MAX_BOOKINGS_PER_DAY ||
-				(await repo.countUpcomingFor(page.id, guest.value.email, at.toISOString())) >= MAX_UPCOMING_PER_GUEST
-			) {
-				return { type: 'too_many' };
-			}
+			const refusal = await refuseBooking(page, start, at, guest.value.email);
+			if (refusal) return { type: refusal };
 
 			const end = new Date(start.getTime() + page.slotMinutes * 60_000);
 			const eventId = crypto.randomUUID();
 			const { name, email, note } = guest.value;
+			const room = await openRoom(page, name, baseUrl);
 			try {
 				await repo.insertBooking({
 					id: crypto.randomUUID(),
@@ -210,62 +257,50 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 					end: end.toISOString(),
 					createdAt: at.toISOString(),
 					eventTitle: `${name} · ${page.title}`.slice(0, 200),
-					eventNotes: [`Booked by ${name} <${email}>`, note].filter(Boolean).join('\n\n')
+					eventNotes: [`Booked by ${name} <${email}>`, room ? `Meeting: ${room.url}` : '', note]
+						.filter(Boolean)
+						.join('\n\n'),
+					meetingCode: room?.code ?? null,
+					eventLocation: room?.url ?? null
 				});
 			} catch (error) {
+				// The slot went to someone else; the room opened for this attempt has no use.
+				if (room) await closeRoom(page.userId, room.code);
 				if (isUniqueConstraintError(error)) return { type: 'slot_taken' };
 				throw error;
 			}
 
-			const host = await deps.hostOf(page.userId);
-			if (host) {
-				await deps
-					.notify(
-						page.userId,
-						{
-							uid: inviteUid(eventId),
-						pageTitle: page.title,
-						hostName: host.name,
-						hostEmail: host.email,
-						guestName: name,
-						guestEmail: email,
-						note,
-							start,
-							end,
-							timeZone: page.timeZone
-						},
-						'request'
-					)
-					.catch(() => undefined);
-			}
-			return { type: 'ok', start: start.toISOString(), end: end.toISOString() };
+			await tellGuest(page.userId, 'request', {
+				uid: inviteUid(eventId),
+				pageTitle: page.title,
+				guestName: name,
+				guestEmail: email,
+				note,
+				start,
+				end,
+				timeZone: page.timeZone,
+				meetingUrl: room?.url ?? null
+			});
+			return { type: 'ok', start: start.toISOString(), end: end.toISOString(), meetingUrl: room?.url ?? null };
 		},
 
 		async cancelBooking(userId, eventId) {
 			// Read before deleting: the guest's details go with the row.
 			const booking = await repo.getBookingByEvent(userId, eventId);
 			if (!(await deps.calendar.deleteReservation(userId, eventId))) return false;
-			const host = booking ? await deps.hostOf(userId) : null;
-			if (booking && host) {
-				await deps
-					.notify(
-						userId,
-						{
-							uid: inviteUid(eventId),
-							pageTitle: booking.pageTitle,
-							hostName: host.name,
-							hostEmail: host.email,
-							guestName: booking.guestName,
-							guestEmail: booking.guestEmail,
-							note: booking.note ?? '',
-							start: new Date(booking.start),
-							end: new Date(booking.end),
-							timeZone: booking.timeZone
-						},
-						'cancel'
-					)
-					.catch(() => undefined);
-			}
+			if (!booking) return true;
+			if (booking.meetingCode) await closeRoom(userId, booking.meetingCode);
+			await tellGuest(userId, 'cancel', {
+				uid: inviteUid(eventId),
+				pageTitle: booking.pageTitle,
+				guestName: booking.guestName,
+				guestEmail: booking.guestEmail,
+				note: booking.note ?? '',
+				start: new Date(booking.start),
+				end: new Date(booking.end),
+				timeZone: booking.timeZone,
+				meetingUrl: null
+			});
 			return true;
 		}
 	};

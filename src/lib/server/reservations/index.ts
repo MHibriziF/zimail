@@ -2,13 +2,39 @@ import { APP_NAME } from '$lib/constants';
 import { createD1CalendarRepository } from '../calendar/repository';
 import { getEmailProvider } from '../context';
 import { listAddressesForUser } from '../domains';
+import { getMeetingsService } from '../meet/meetings';
 import { renderEmailHtml, renderEmailText } from '../outbound/email-template';
 import { sendOutboundEmail } from '../outbound/send-mail';
 import { bookingEmailContent, bookingIcs, inviteContentType, type BookingDetails, type InviteKind } from './email';
 import { createD1ReservationsRepository } from './repository';
-import { createReservationsService, type ReservationsService } from './service';
+import { createReservationsService, type MeetingRooms, type ReservationsService } from './service';
 
 export { createReservationsService, type ReservationsService } from './service';
+
+/** Meeting rooms need LiveKit; without it the option is offered but greyed out. */
+export function meetingsConfigured(platform: App.Platform | undefined | null): boolean {
+	const env = platform?.env;
+	return Boolean(env?.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET && env.LIVEKIT_URL);
+}
+
+function meetingRooms(platform: App.Platform | undefined | null): MeetingRooms | null {
+	if (!meetingsConfigured(platform)) return null;
+	const meetings = getMeetingsService(platform);
+	return {
+		async open(userId, title) {
+			return (await meetings.create(userId, { title })).code;
+		},
+		async close(userId, code) {
+			const meeting = await meetings.findByCode(code);
+			if (meeting?.user_id === userId) await meetings.remove(userId, meeting.id);
+		}
+	};
+}
+
+/** Where join links point: the configured public URL, else the address the request came in on. */
+export function publicBaseUrl(platform: App.Platform | undefined | null, requestOrigin: string): string {
+	return platform?.env.APP_URL?.trim() || requestOrigin;
+}
 
 function utf8Base64(text: string): string {
 	let binary = '';
@@ -33,6 +59,7 @@ export function getReservationsService(platform: App.Platform | undefined | null
 	return createReservationsService({
 		repo: createD1ReservationsRepository(db),
 		calendar: createD1CalendarRepository(db),
+		meetings: meetingRooms(platform),
 		async hostOf(userId) {
 			const found = await host(userId);
 			return found ? { name: found.name, email: found.address.address } : null;

@@ -55,8 +55,11 @@ export async function removeFeed(id: string): Promise<void> {
 	await readJson(response, 'Could not remove the calendar');
 }
 
-export async function fetchReservationPages(): Promise<ReservationPage[]> {
-	return (await readJson<{ pages: ReservationPage[] }>(await fetch('/api/reservations'), 'Could not load pages')).pages;
+export async function fetchReservationPages(): Promise<{ pages: ReservationPage[]; meetingsAvailable: boolean }> {
+	return readJson<{ pages: ReservationPage[]; meetingsAvailable: boolean }>(
+		await fetch('/api/reservations'),
+		'Could not load pages'
+	);
 }
 
 /** Creates when `id` is missing, otherwise replaces that page's settings. */
