@@ -25,13 +25,18 @@ const EMPTY_COUNTS: MailboxCounts = {
  * The sidebar's "coming up" list. Two days covers today and tomorrow from any
  * zone; the component narrows it to the viewer's own days.
  */
-async function loadUpcoming(platform: App.Platform | undefined, userId: string, timeZone: string): Promise<CalendarEvent[]> {
+async function loadUpcoming(
+	platform: App.Platform | undefined,
+	userId: string | undefined,
+	timeZone: string | null | undefined
+): Promise<CalendarEvent[]> {
+	if (!platform?.env.DB || !userId) return [];
 	const now = new Date();
 	const outcome = await getCalendarService(platform).listBetween(
 		userId,
 		now,
 		new Date(now.getTime() + 2 * 86_400_000),
-		timeZone
+		timeZone ?? 'UTC'
 	);
 	return outcome.type === 'ok' ? outcome.events : [];
 }
@@ -90,8 +95,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	// Sidebar label list — changes only when labels are managed, so it has its own dependency.
 	const labels = db && locals.user ? await getLabelsService(platform).list(locals.user.id) : [];
 
-	const upcoming =
-		db && locals.user ? await loadUpcoming(platform, locals.user.id, timezoneRow?.timezone ?? 'UTC') : [];
+	const upcoming = await loadUpcoming(platform, locals.user?.id, timezoneRow?.timezone);
 
 	return {
 		user: locals.user,
