@@ -123,30 +123,39 @@ function exdatesOf(component: IcsComponent, zone: string): number[] {
 	return (component.get('EXDATE') ?? []).flatMap((property) => parseTimeProperty(property, zone).map(occurrenceKey));
 }
 
+type Sorted = {
+	/** Series (or one-off events), cancelled ones dropped. */
+	masters: Series[];
+	/** Individually moved instances, which stand on their own. */
+	overrides: Series[];
+	/** Original starts of moved or cancelled instances, keyed by their series. */
+	replaced: Map<string, Set<number>>;
+};
+
+function sortComponents(components: IcsComponent[], zone: string): Sorted {
+	const sorted: Sorted = { masters: [], overrides: [], replaced: new Map() };
+	for (const component of components) {
+		const series = readSeries(component, zone);
+		if (!series) continue;
+		const recurrenceId = first(component, 'RECURRENCE-ID');
+		const keep = !isCancelled(component);
+		if (!recurrenceId) {
+			if (keep) sorted.masters.push(series);
+			continue;
+		}
+		const keys = sorted.replaced.get(series.uid) ?? new Set<number>();
+		for (const key of parseTimeProperty(recurrenceId, zone).map(occurrenceKey)) keys.add(key);
+		sorted.replaced.set(series.uid, keys);
+		if (keep) sorted.overrides.push(series);
+	}
+	return sorted;
+}
+
 export function expandCalendar(text: string, window: ExpandWindow): FeedEvent[] {
 	const limit = window.limit ?? DEFAULT_LIMIT;
 	const calendar = parseIcs(text);
 	const zone = resolveTzid(calendar.timeZone ?? undefined) ?? window.fallbackTimeZone;
-
-	// Instances moved or cancelled individually, keyed by their series.
-	const replaced = new Map<string, Set<number>>();
-	const masters: Series[] = [];
-	const singles: Series[] = [];
-	for (const component of calendar.events) {
-		const series = readSeries(component, zone);
-		if (!series) continue;
-		const recurrenceId = first(component, 'RECURRENCE-ID');
-		if (!recurrenceId) {
-			if (!isCancelled(component)) masters.push(series);
-			continue;
-		}
-		for (const key of parseTimeProperty(recurrenceId, zone).map(occurrenceKey)) {
-			const set = replaced.get(series.uid) ?? new Set<number>();
-			set.add(key);
-			replaced.set(series.uid, set);
-		}
-		if (!isCancelled(component)) singles.push(series);
-	}
+	const { masters, overrides: singles, replaced } = sortComponents(calendar.events, zone);
 
 	const events: FeedEvent[] = [];
 	for (const series of masters) {

@@ -132,31 +132,31 @@ export function naiveIn(instant: Date, timeZone: string): number {
 	return Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second);
 }
 
-const DURATION_UNITS: Record<string, number> = { W: 7 * DAY_MS, D: DAY_MS, H: 3_600_000, S: 1000 };
+const DATE_UNITS: Record<string, number> = { W: 7 * DAY_MS, D: DAY_MS };
+const TIME_UNITS: Record<string, number> = { H: 3_600_000, M: 60_000, S: 1000 };
 
-/** An ICS DURATION (`PT1H30M`, `P1D`, `-P1W`) in milliseconds, or `null` if unreadable. */
-export function parseDuration(value: string): number | null {
-	let text = value.trim();
-	const negative = text.startsWith('-');
-	if (negative || text.startsWith('+')) text = text.slice(1);
-	if (!text.startsWith('P') || text.length < 3) return null;
-
+/** Sums `12H30M`-style pieces; `null` if anything is left over or a unit doesn't belong. */
+function sumUnits(text: string, units: Record<string, number>): number | null {
 	let ms = 0;
-	let inTime = false;
-	let digits = '';
-	for (const char of text.slice(1)) {
-		if (char >= '0' && char <= '9') {
-			digits += char;
-		} else if (char === 'T' && !digits) {
-			inTime = true;
-		} else {
-			// M is minutes after the T; months don't exist in DURATION.
-			const unit = char === 'M' && inTime ? 60_000 : DURATION_UNITS[char];
-			if (!unit || !digits) return null;
-			ms += Number(digits) * unit;
-			digits = '';
-		}
+	let consumed = 0;
+	for (const [whole, digits, unit] of text.matchAll(/(\d+)([A-Z])/g)) {
+		const size = units[unit];
+		if (!size) return null;
+		ms += Number(digits) * size;
+		consumed += whole.length;
 	}
-	if (digits) return null;
-	return negative ? -ms : ms;
+	return consumed === text.length ? ms : null;
+}
+
+/** An ICS DURATION (`PT1H30M`, `P1D`, `-P1W`) in milliseconds, or `null` if unreadable. M is minutes; months don't exist in DURATION. */
+export function parseDuration(value: string): number | null {
+	const match = /^([+-]?)P([^T]*)(?:T(.*))?$/.exec(value.trim());
+	if (!match) return null;
+	const [, sign, datePart, timePart] = match;
+	// `P` alone, or a `T` with nothing after it, says nothing.
+	if (timePart === '' || (!datePart && timePart === undefined)) return null;
+	const days = sumUnits(datePart, DATE_UNITS);
+	const time = sumUnits(timePart ?? '', TIME_UNITS);
+	if (days === null || time === null) return null;
+	return sign === '-' ? -(days + time) : days + time;
 }

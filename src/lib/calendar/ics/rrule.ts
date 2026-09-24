@@ -155,7 +155,8 @@ function yearlyDays(rule: RecurrenceRule, anchor: Anchor, step: number): number[
 	const days = months.flatMap((month) =>
 		monthDays(rule, year, month, anchor.day).map((day) => Date.UTC(year, month - 1, day))
 	);
-	return applySetPos(rule, days.sort((a, b) => a - b));
+	days.sort((a, b) => a - b);
+	return applySetPos(rule, days);
 }
 
 const PERIOD_DAYS = { DAILY: dailyDays, WEEKLY: weeklyDays, MONTHLY: monthlyDays, YEARLY: yearlyDays };
