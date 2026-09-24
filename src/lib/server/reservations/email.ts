@@ -8,6 +8,7 @@
  * the guest's calendar. A later METHOD:CANCEL with the same UID and a higher
  * SEQUENCE takes it off again.
  */
+import { icsDocument, icsParam, icsText, icsTime } from '../../calendar/ics/write';
 import type { EmailContent } from '../outbound/email-template';
 
 export type BookingDetails = {
@@ -70,30 +71,6 @@ export function inviteContentType(kind: InviteKind): string {
 	return `text/calendar; method=${METHOD[kind]}; charset=UTF-8`;
 }
 
-function icsText(value: string): string {
-	return value
-		.replaceAll('\\', String.raw`\\`)
-		.replaceAll(';', String.raw`\;`)
-		.replaceAll(',', String.raw`\,`)
-		.replaceAll(/\r?\n/g, String.raw`\n`);
-}
-
-/** Parameter values (CN) can't be escaped, only quoted — so quotes themselves are dropped. */
-function icsParam(value: string): string {
-	return `"${value.replaceAll('"', '')}"`;
-}
-
-function icsTime(date: Date): string {
-	return `${date.toISOString().slice(0, 19).replaceAll('-', '').replaceAll(':', '')}Z`;
-}
-
-/** Folds at 75 octets as RFC 5545 asks; long summaries would otherwise break strict parsers. */
-function fold(line: string): string {
-	const chunks: string[] = [];
-	for (let index = 0; index < line.length; index += 73) chunks.push(line.slice(index, index + 73));
-	return chunks.join('\r\n ');
-}
-
 function description(details: BookingDetails): string {
 	return [details.meetingUrl ? `Join the Zimail meeting: ${details.meetingUrl}` : '', details.note]
 		.filter(Boolean)
@@ -103,7 +80,7 @@ function description(details: BookingDetails): string {
 export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request', now = new Date()): string {
 	const summary = `${details.pageTitle} with ${details.hostName}`;
 	const cancelled = kind === 'cancel';
-	return [
+	return icsDocument([
 		'BEGIN:VCALENDAR',
 		'VERSION:2.0',
 		'PRODID:-//Zimail//Reservations//EN',
@@ -125,9 +102,6 @@ export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request'
 		...(details.meetingUrl ? [`LOCATION:${icsText(details.meetingUrl)}`, `URL:${details.meetingUrl}`] : []),
 		...(description(details) ? [`DESCRIPTION:${icsText(description(details))}`] : []),
 		'END:VEVENT',
-		'END:VCALENDAR',
-		''
-	]
-		.map(fold)
-		.join('\r\n');
+		'END:VCALENDAR'
+	]);
 }
