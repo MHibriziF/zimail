@@ -65,6 +65,31 @@ describe('classifyMail', () => {
 		assert.equal(classifyMail(mail('no-reply.eu@bank.test')), 'updates');
 	});
 
+	test('sign-in and verification mail is Primary even from a bulk sender', () => {
+		const unsubscribe = { 'list-unsubscribe': '<https://brand.test/u>' };
+		assert.equal(classifyMail(mail('hello@livekit.test', unsubscribe, 'Your sign-in link for LiveKit')), 'primary');
+		assert.equal(classifyMail(mail('no-reply@claude.test', unsubscribe, 'Sign in to Claude')), 'primary');
+		assert.equal(classifyMail(mail('no-reply@bank.test', {}, 'Your verification code is 123456')), 'primary');
+		assert.equal(classifyMail(mail('security@x.com', {}, 'Reset your password')), 'primary');
+	});
+
+	test('a trial that is ending is Primary; one being advertised is not', () => {
+		const unsubscribe = { 'list-unsubscribe': '<https://brand.test/u>' };
+		assert.equal(classifyMail(mail('hello@claude.test', unsubscribe, 'Your Claude Pro trial is ending')), 'primary');
+		assert.equal(classifyMail(mail('hello@brand.test', unsubscribe, 'Start your free trial today')), 'promotions');
+	});
+
+	test('mail carrying a calendar invitation or reply is Primary', () => {
+		const automated = { 'auto-submitted': 'auto-generated' };
+		assert.equal(classifyMail({ ...mail('ada@gmail.test', automated, 'Proposed new time: Demo'), calendar: true }), 'primary');
+		assert.equal(classifyMail({ ...mail('calendar-notification@google.test', automated, 'Accepted: Demo'), calendar: true }), 'primary');
+	});
+
+	test('sending-platform ids alone do not make a message a campaign', () => {
+		assert.equal(classifyMail(mail('team@brand.test', { 'x-sg-eid': 'abc' })), 'primary');
+		assert.equal(classifyMail(mail('team@brand.test', { 'x-mailgun-tag': 'welcome' })), 'primary');
+	});
+
 	test('a person whose address merely contains a keyword stays Primary', () => {
 		assert.equal(classifyMail(mail('newsom@example.com')), 'primary');
 		assert.equal(classifyMail(mail('salesforce-fan@example.com')), 'primary');

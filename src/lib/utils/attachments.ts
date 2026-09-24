@@ -11,6 +11,12 @@ export function isPreviewableInline(contentType: string): boolean {
 	);
 }
 
+/** An iCalendar part: an invitation, a cancellation, or an answer to one. */
+export function isCalendarAttachment(contentType: string, filename = ''): boolean {
+	const type = contentType.toLowerCase();
+	return type.startsWith('text/calendar') || type.startsWith('application/ics') || filename.toLowerCase().endsWith('.ics');
+}
+
 export function attachmentHref(emailId: string, attachmentId: string, download = false): string {
 	const base = `/api/mail/${emailId}/attachments/${attachmentId}`;
 	return download ? `${base}?download=1` : base;

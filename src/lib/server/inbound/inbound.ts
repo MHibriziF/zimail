@@ -6,7 +6,8 @@ import { collectInboundRecipients, parseEmailIdentity } from '../util/email-addr
 import { recordUnroutedEmail, resolveInboundRoute } from '../domains';
 import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } from '../mail-store';
 import { scheduleNewMailNotification, type PushNotificationEnv } from '../push-notifications';
-import type { ResendClient } from '../providers/resend-client';
+import type { ReceivedAttachment, ResendClient } from '../providers/resend-client';
+import { isCalendarAttachment } from '../../utils/attachments';
 import {
 	scheduleTelegramNotification,
 	type StoredAttachment,
@@ -144,10 +145,12 @@ async function handleInboundEmail(
 
 	// Resend hands headers over as a plain object; don't rely on its key casing.
 	const headerMap = new Map(Object.entries(received.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]));
+	const listed = await listInboundAttachments(client, providerId);
 	const category = await categoriesServiceForDb(env.DB).categorizeInbound(route.userId, {
 		from,
 		subject,
-		headers: pickClassifyHeaders((name) => headerMap.get(name))
+		headers: pickClassifyHeaders((name) => headerMap.get(name)),
+		calendar: listed.some((attachment) => isCalendarAttachment(attachment.content_type, attachment.filename))
 	});
 
 	const emailId = await insertEmail(env.DB, {
@@ -173,7 +176,7 @@ async function handleInboundEmail(
 		category
 	});
 
-	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId);
+	const storedAttachments = await storeInboundAttachments(env, client, providerId, emailId, listed);
 	// Mail filed in Spam is kept but never announced.
 	if (await isFiledAsSpam(env.DB, route.userId, emailId)) {
 		return { handled: true, note: `Filed ${providerId} as spam for ${route.address}` };
@@ -199,21 +202,24 @@ async function handleInboundEmail(
 	};
 }
 
-/** Returns the attachments that actually made it into storage. */
-export async function storeInboundAttachments(
-	env: InboundEnv,
-	client: ResendClient,
-	providerId: string,
-	emailId: string
-): Promise<StoredAttachment[]> {
-	let attachments;
+async function listInboundAttachments(client: ResendClient, providerId: string): Promise<ReceivedAttachment[]> {
 	try {
-		attachments = await client.listReceivedAttachments(providerId);
+		return await client.listReceivedAttachments(providerId);
 	} catch (error) {
 		console.error('Failed to list inbound attachments', providerId, error);
 		return [];
 	}
+}
 
+/** Returns the attachments that actually made it into storage. Pass `listed` to skip listing them again. */
+export async function storeInboundAttachments(
+	env: InboundEnv,
+	client: ResendClient,
+	providerId: string,
+	emailId: string,
+	listed?: ReceivedAttachment[]
+): Promise<StoredAttachment[]> {
+	const attachments = listed ?? (await listInboundAttachments(client, providerId));
 	const stored: StoredAttachment[] = [];
 
 	for (const attachment of attachments.slice(0, MAX_ATTACHMENTS_PER_EMAIL)) {
