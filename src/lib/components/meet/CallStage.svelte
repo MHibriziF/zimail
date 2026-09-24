@@ -1454,8 +1454,9 @@
 		void (activeRecording ? finishRecording() : beginRecording());
 	}
 
-	function leave() {
-		void finishRecording();
+	async function leave() {
+		// Save first: MediaRecorder only hands over its last chunk after stop() settles.
+		await finishRecording();
 		playLeaveChime();
 		stopAdmissionsPolling();
 		room?.disconnect();

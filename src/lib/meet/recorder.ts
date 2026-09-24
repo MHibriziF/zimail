@@ -85,15 +85,24 @@ export async function startRecording(options: {
 	const mimeType = pickMimeType((type) => MediaRecorder.isTypeSupported(type));
 	if (!mimeType) throw new Error('Recording is not supported in this browser');
 
-	const display = await navigator.mediaDevices.getDisplayMedia({
-		video: { frameRate: 30 },
-		audio: true,
-		preferCurrentTab: true,
-		selfBrowserSurface: 'include',
-		systemAudio: 'exclude'
-	} as DisplayMediaOptions);
-
+	// Made before the first await, while the click that started this still counts as a user
+	// gesture — an AudioContext created after it can start suspended and record silence.
 	const context = new AudioContext();
+	let display: MediaStream;
+	try {
+		display = await navigator.mediaDevices.getDisplayMedia({
+			video: { frameRate: 30 },
+			audio: true,
+			preferCurrentTab: true,
+			selfBrowserSurface: 'include',
+			systemAudio: 'exclude'
+		} as DisplayMediaOptions);
+		if (context.state === 'suspended') await context.resume();
+	} catch (error) {
+		await context.close().catch(() => undefined);
+		throw error;
+	}
+
 	const mix = context.createMediaStreamDestination();
 	const sources = new Map<string, MediaStreamAudioSourceNode>();
 
