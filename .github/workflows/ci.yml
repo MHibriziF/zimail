@@ -54,6 +54,14 @@ jobs:
           key: sonar-cache-${{ runner.os }}-${{ github.run_id }}
           restore-keys: sonar-cache-${{ runner.os }}-
 
+      # Fills in whatever the restored cache lacks, retrying the downloads the scanner itself
+      # would try only once. Never fails the job — see the script.
+      - name: Prefetch SonarScanner downloads
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: bash .github/scripts/sonar-prefetch.sh
+
       - uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
