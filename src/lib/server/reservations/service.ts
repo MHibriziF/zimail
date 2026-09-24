@@ -131,7 +131,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		if (!page.withMeeting || !deps.meetings) return null;
 		try {
 			const code = await deps.meetings.open(page.userId, `${page.title} · ${guestName}`.slice(0, 200));
-			return { code, url: `${baseUrl.replace(/\/+$/, '')}/meet/${code}` };
+			return { code, url: new URL(`/meet/${code}`, baseUrl).href };
 		} catch {
 			return null;
 		}
