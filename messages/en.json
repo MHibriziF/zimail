@@ -901,7 +901,7 @@
 			"synced": "Last synced {time} · {count} events"
 		},
 		"cancelBooking": "Cancel booking",
-		"cancelBookingConfirm": "Cancel this booking? The slot opens up again.",
+		"cancelBookingConfirm": "Cancel this booking? The guest gets a cancellation and the slot opens up again.",
 		"bookingHint": "Booked through a reservation page. It can be cancelled but not edited.",
 		"reservations": {
 			"heading": "Reservation pages",

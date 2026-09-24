@@ -1,3 +1,4 @@
+import { getReservationsService } from '../reservations';
 import { createD1CalendarRepository } from './repository';
 import { createCalendarService, type CalendarService } from './service';
 
@@ -11,5 +12,8 @@ type PlatformLike = App.Platform | undefined | null;
 export function getCalendarService(platform: PlatformLike): CalendarService {
 	const db = platform?.env.DB;
 	if (!db) throw new Error('Database unavailable');
-	return createCalendarService({ repo: createD1CalendarRepository(db) });
+	return createCalendarService({
+		repo: createD1CalendarRepository(db),
+		cancelReservation: (userId, id) => getReservationsService(platform).cancelBooking(userId, id)
+	});
 }

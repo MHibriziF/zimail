@@ -13,7 +13,7 @@ import {
 } from '../../calendar/reservations';
 import { computeSlots, isFreeSlot, type DaySlots, type Interval } from '../../calendar/slots';
 import type { CalendarRepository } from '../calendar/repository';
-import type { BookingDetails } from './email';
+import type { BookingDetails, InviteKind } from './email';
 import type { ReservationsRepository, StoredPage } from './repository';
 
 const DAY_MS = 86_400_000;
@@ -45,14 +45,19 @@ export type ReservationsService = {
 	publicPage(slug: string): Promise<PublicReservationPage | null>;
 	slots(slug: string, fromKey: string | null): Promise<DaySlots[] | null>;
 	book(slug: string, body: Record<string, unknown>): Promise<BookingOutcome>;
+	/**
+	 * Cancels the booking behind a calendar event and tells the guest, whose
+	 * calendar then drops it. `false` if there was no such booking to remove.
+	 */
+	cancelBooking(userId: string, eventId: string): Promise<boolean>;
 };
 
 export type ReservationsServiceDeps = {
 	repo: ReservationsRepository;
 	calendar: CalendarRepository;
 	hostOf: (userId: string) => Promise<{ name: string; email: string } | null>;
-	/** Best effort; a failed email never undoes a booking. */
-	notify: (hostUserId: string, booking: BookingDetails) => Promise<void>;
+	/** Best effort; a failed email never undoes a booking or a cancellation. */
+	notify: (hostUserId: string, booking: BookingDetails, kind: InviteKind) => Promise<void>;
 	now?: () => Date;
 };
 
@@ -62,6 +67,11 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 function withoutOwner({ userId: _userId, ...page }: StoredPage): ReservationPage {
 	return page;
+}
+
+/** The invitation's UID: fixed per booking, so the cancellation names the same event. */
+export function inviteUid(eventId: string): string {
+	return `${eventId}@zimail`;
 }
 
 function randomSuffix(): string {
@@ -210,21 +220,53 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const host = await deps.hostOf(page.userId);
 			if (host) {
 				await deps
-					.notify(page.userId, {
-						uid: `${eventId}@zimail`,
+					.notify(
+						page.userId,
+						{
+							uid: inviteUid(eventId),
 						pageTitle: page.title,
 						hostName: host.name,
 						hostEmail: host.email,
 						guestName: name,
 						guestEmail: email,
 						note,
-						start,
-						end,
-						timeZone: page.timeZone
-					})
+							start,
+							end,
+							timeZone: page.timeZone
+						},
+						'request'
+					)
 					.catch(() => undefined);
 			}
 			return { type: 'ok', start: start.toISOString(), end: end.toISOString() };
+		},
+
+		async cancelBooking(userId, eventId) {
+			// Read before deleting: the guest's details go with the row.
+			const booking = await repo.getBookingByEvent(userId, eventId);
+			if (!(await deps.calendar.deleteReservation(userId, eventId))) return false;
+			const host = booking ? await deps.hostOf(userId) : null;
+			if (booking && host) {
+				await deps
+					.notify(
+						userId,
+						{
+							uid: inviteUid(eventId),
+							pageTitle: booking.pageTitle,
+							hostName: host.name,
+							hostEmail: host.email,
+							guestName: booking.guestName,
+							guestEmail: booking.guestEmail,
+							note: booking.note ?? '',
+							start: new Date(booking.start),
+							end: new Date(booking.end),
+							timeZone: booking.timeZone
+						},
+						'cancel'
+					)
+					.catch(() => undefined);
+			}
+			return true;
 		}
 	};
 }

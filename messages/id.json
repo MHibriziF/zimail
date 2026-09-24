@@ -901,7 +901,7 @@
 			"synced": "Terakhir disinkronkan {time} · {count} acara"
 		},
 		"cancelBooking": "Batalkan reservasi",
-		"cancelBookingConfirm": "Batalkan reservasi ini? Slotnya akan terbuka lagi.",
+		"cancelBookingConfirm": "Batalkan reservasi ini? Tamu akan menerima pembatalan dan slotnya terbuka lagi.",
 		"bookingHint": "Dipesan lewat halaman reservasi. Bisa dibatalkan, tetapi tidak bisa diubah.",
 		"reservations": {
 			"heading": "Halaman reservasi",

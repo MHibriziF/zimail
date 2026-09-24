@@ -81,6 +81,18 @@ export type ReservationsRepository = {
 	countUpcomingFor(pageId: string, email: string, now: string): Promise<number>;
 	/** The reservation and its calendar event, in one batch. Throws on a taken slot. */
 	insertBooking(booking: NewBooking): Promise<void>;
+	/** The booking behind a calendar event, with what a cancellation email needs. */
+	getBookingByEvent(userId: string, eventId: string): Promise<StoredBooking | null>;
+};
+
+export type StoredBooking = {
+	guestName: string;
+	guestEmail: string;
+	note: string | null;
+	start: string;
+	end: string;
+	pageTitle: string;
+	timeZone: string;
 };
 
 function settingsValues(page: ReservationPageSettings): unknown[] {
@@ -185,6 +197,35 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				.bind(pageId, email, now)
 				.first<{ count: number }>();
 			return row?.count ?? 0;
+		},
+
+		async getBookingByEvent(userId, eventId) {
+			const row = await db
+				.prepare(
+					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, p.title, p.time_zone
+					 FROM reservations r JOIN reservation_pages p ON p.id = r.page_id
+					 WHERE r.event_id = ? AND r.user_id = ?`
+				)
+				.bind(eventId, userId)
+				.first<{
+					guest_name: string;
+					guest_email: string;
+					note: string | null;
+					starts_at: string;
+					ends_at: string;
+					title: string;
+					time_zone: string;
+				}>();
+			if (!row) return null;
+			return {
+				guestName: row.guest_name,
+				guestEmail: row.guest_email,
+				note: row.note,
+				start: row.starts_at,
+				end: row.ends_at,
+				pageTitle: row.title,
+				timeZone: row.time_zone
+			};
 		},
 
 		async insertBooking(booking) {
