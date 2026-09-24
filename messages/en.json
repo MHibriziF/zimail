@@ -946,7 +946,10 @@
 			"withMeetingHint": "Every booking gets its own video call link, in the confirmation email, the calendar invite and your calendar.",
 			"withMeetingUnavailable": "Set up video meetings first (LiveKit keys) to use this.",
 			"meetingBadge": "Meeting room"
-		}
+		},
+		"inviteHint": "You were invited to this event. Its organizer makes the changes, and they show up here.",
+		"removeInvite": "Remove from calendar",
+		"removeInviteConfirm": "Take this event off your calendar? The organizer is not told; answer the invitation email for that."
 	},
 	"book": {
 		"minutes": "{count} min",
@@ -967,5 +970,30 @@
 		"poweredBy": "Booked with {app}",
 		"videoCall": "Zimail video call",
 		"joinLink": "Join the meeting"
+	},
+	"invitation": {
+		"invitation": "Invitation",
+		"cancelled": "Cancelled event",
+		"event": "Event",
+		"going": "Going?",
+		"yes": "Yes",
+		"maybe": "Maybe",
+		"no": "No",
+		"add": "Add to calendar",
+		"remove": "Remove from calendar",
+		"onCalendar": "On your calendar",
+		"accepted": "You're going",
+		"tentative": "You said maybe",
+		"declined": "You declined",
+		"replied": "Your answer was sent to the organizer.",
+		"replyFailed": "Saved here, but your answer could not be sent to the organizer.",
+		"cancelledNote": "The organizer cancelled this event.",
+		"cancelledGone": "It isn't on your calendar.",
+		"outdated": "This invitation has since been updated — see the newer message.",
+		"organizer": "Organizer",
+		"guests": "Guests",
+		"moreGuests": "and {count} more",
+		"repeats": "Repeats",
+		"occurrence": "One occurrence of a repeating event"
 	}
 }

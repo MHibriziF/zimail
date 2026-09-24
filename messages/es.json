@@ -946,7 +946,10 @@
 			"withMeetingHint": "Cada reserva recibe su propio enlace de videollamada, en el correo de confirmación, la invitación y tu calendario.",
 			"withMeetingUnavailable": "Configura primero las reuniones de vídeo (claves de LiveKit) para usar esto.",
 			"meetingBadge": "Sala de reunión"
-		}
+		},
+		"inviteHint": "Te invitaron a este evento. Su organizador hace los cambios y aparecen aquí.",
+		"removeInvite": "Quitar del calendario",
+		"removeInviteConfirm": "¿Quitar este evento de tu calendario? No se avisa al organizador; para eso, responde al correo de invitación."
 	},
 	"book": {
 		"minutes": "{count} min",
@@ -967,5 +970,30 @@
 		"poweredBy": "Reservado con {app}",
 		"videoCall": "Videollamada de Zimail",
 		"joinLink": "Unirse a la reunión"
+	},
+	"invitation": {
+		"invitation": "Invitación",
+		"cancelled": "Evento cancelado",
+		"event": "Evento",
+		"going": "¿Asistirás?",
+		"yes": "Sí",
+		"maybe": "Quizás",
+		"no": "No",
+		"add": "Añadir al calendario",
+		"remove": "Quitar del calendario",
+		"onCalendar": "En tu calendario",
+		"accepted": "Asistirás",
+		"tentative": "Respondiste quizás",
+		"declined": "Rechazaste",
+		"replied": "Tu respuesta se envió al organizador.",
+		"replyFailed": "Guardado aquí, pero no se pudo enviar tu respuesta al organizador.",
+		"cancelledNote": "El organizador canceló este evento.",
+		"cancelledGone": "No está en tu calendario.",
+		"outdated": "Esta invitación se actualizó después: consulta el mensaje más reciente.",
+		"organizer": "Organizador",
+		"guests": "Invitados",
+		"moreGuests": "y {count} más",
+		"repeats": "Se repite",
+		"occurrence": "Una instancia de un evento periódico"
 	}
 }

@@ -4,6 +4,8 @@
 	import AttachmentList from './AttachmentList.svelte';
 	import DeliveryStatus from './DeliveryStatus.svelte';
 	import EmailBody from './EmailBody.svelte';
+	import InvitationCard from './InvitationCard.svelte';
+	import { isCalendarAttachment } from '$lib/utils/attachments';
 	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import { formatFullDate, formatRelativeDate } from '$lib/utils/date';
 	import { splitQuotedText } from '$lib/utils/quotes';
@@ -126,6 +128,10 @@
 				<DeliveryStatus status={message.status} detail={message.status_detail} />
 			{/if}
 		</header>
+
+		{#if !outbound && message.attachments.some((part) => isCalendarAttachment(part.content_type, part.filename))}
+			<InvitationCard emailId={message.id} />
+		{/if}
 
 		<div class="body mail-body">
 			{#if message.body_html}

@@ -946,7 +946,10 @@
 			"withMeetingHint": "Chaque réservation reçoit son propre lien d'appel vidéo, dans l'e-mail de confirmation, l'invitation et votre agenda.",
 			"withMeetingUnavailable": "Configurez d'abord les réunions vidéo (clés LiveKit) pour l'utiliser.",
 			"meetingBadge": "Salle de réunion"
-		}
+		},
+		"inviteHint": "Vous êtes invité à cet événement. Son organisateur fait les modifications, et elles s'affichent ici.",
+		"removeInvite": "Retirer de l'agenda",
+		"removeInviteConfirm": "Retirer cet événement de votre agenda ? L'organisateur n'est pas prévenu ; répondez à l'e-mail d'invitation pour cela."
 	},
 	"book": {
 		"minutes": "{count} min",
@@ -967,5 +970,30 @@
 		"poweredBy": "Réservé avec {app}",
 		"videoCall": "Appel vidéo Zimail",
 		"joinLink": "Rejoindre la réunion"
+	},
+	"invitation": {
+		"invitation": "Invitation",
+		"cancelled": "Événement annulé",
+		"event": "Événement",
+		"going": "Vous participez ?",
+		"yes": "Oui",
+		"maybe": "Peut-être",
+		"no": "Non",
+		"add": "Ajouter à l'agenda",
+		"remove": "Retirer de l'agenda",
+		"onCalendar": "Dans votre agenda",
+		"accepted": "Vous participez",
+		"tentative": "Vous avez répondu peut-être",
+		"declined": "Vous avez décliné",
+		"replied": "Votre réponse a été envoyée à l'organisateur.",
+		"replyFailed": "Enregistré ici, mais votre réponse n'a pas pu être envoyée à l'organisateur.",
+		"cancelledNote": "L'organisateur a annulé cet événement.",
+		"cancelledGone": "Il n'est pas dans votre agenda.",
+		"outdated": "Cette invitation a été mise à jour depuis — voir le message plus récent.",
+		"organizer": "Organisateur",
+		"guests": "Invités",
+		"moreGuests": "et {count} de plus",
+		"repeats": "Se répète",
+		"occurrence": "Une occurrence d'un événement récurrent"
 	}
 }

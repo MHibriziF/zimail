@@ -308,6 +308,7 @@
 	<EventEditor
 		initial={editing.draft}
 		isNew={!editing.event}
+		source={editing.event?.source}
 		readOnly={editing.event ? isReadOnlyEvent(editing.event) : false}
 		deletable={editing.event ? isDeletableEvent(editing.event) : false}
 		busy={saving}

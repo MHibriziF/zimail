@@ -13,7 +13,8 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { formatMailDate, formatMailTime, shouldShowSeparateTime } from '$lib/utils/date';
-	import { attachmentHref } from '$lib/utils/attachments';
+	import { attachmentHref, isCalendarAttachment } from '$lib/utils/attachments';
+	import InvitationCard from './InvitationCard.svelte';
 	import {
 		cancelScheduledSend,
 		describeMailError,
@@ -700,6 +701,9 @@
 					{#if isOpen}
 						{@const files = visibleAttachments(message.body_html, message.attachments)}
 						<div class="z-msg-body">
+							{#if message.direction === 'inbound' && message.attachments.some((part) => isCalendarAttachment(part.content_type, part.filename))}
+								<InvitationCard emailId={message.id} />
+							{/if}
 							<div class="z-msg-html">
 								{#if message.body_html}
 									<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
