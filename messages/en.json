@@ -781,10 +781,16 @@
 		"record": "Record the call",
 		"stopRecording": "Stop recording",
 		"recordingSelf": "Recording · {time}",
-		"recordingBy": "{name} is recording",
+		"recordingBy": "{name} is recording their view",
 		"recordingSaving": "Saving the recording…",
 		"recordingSaved": "Recording saved to your downloads",
-		"recordingFailed": "Couldn't record the call"
+		"recordingFailed": "Couldn't record the call",
+		"recordMeeting": "Record the meeting",
+		"recordMeetingHint": "Everyone's video, shared screens and voices — no controls or panels.",
+		"recordView": "Record my view",
+		"recordViewHint": "Exactly what your screen shows, for your own notes.",
+		"recordingMeetingSelf": "Recording the meeting · {time}",
+		"recordingMeetingBy": "{name} is recording the meeting"
 	},
 	"meetings": {
 		"title": "Meetings — {app}",

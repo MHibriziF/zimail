@@ -781,10 +781,16 @@
 		"record": "Enregistrer l'appel",
 		"stopRecording": "Arrêter l'enregistrement",
 		"recordingSelf": "Enregistrement · {time}",
-		"recordingBy": "{name} enregistre",
+		"recordingBy": "{name} enregistre son affichage",
 		"recordingSaving": "Enregistrement du fichier…",
 		"recordingSaved": "Enregistrement ajouté à vos téléchargements",
-		"recordingFailed": "Impossible d'enregistrer l'appel"
+		"recordingFailed": "Impossible d'enregistrer l'appel",
+		"recordMeeting": "Enregistrer la réunion",
+		"recordMeetingHint": "La vidéo, les écrans partagés et les voix de chacun — sans commandes ni panneaux.",
+		"recordView": "Enregistrer mon affichage",
+		"recordViewHint": "Exactement ce qu'affiche votre écran, pour vos propres notes.",
+		"recordingMeetingSelf": "Enregistrement de la réunion · {time}",
+		"recordingMeetingBy": "{name} enregistre la réunion"
 	},
 	"meetings": {
 		"title": "Réunions — {app}",

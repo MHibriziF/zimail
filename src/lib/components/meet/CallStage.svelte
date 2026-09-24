@@ -27,6 +27,8 @@
 		startRecording,
 		type ActiveRecording
 	} from '$lib/meet/recorder';
+	import { meetingRecordingSupported, startMeetingRecording, type CompositeSource } from '$lib/meet/composite-recorder';
+	import { parseRecordingAttribute, recordingChoices, type RecordingKind } from '$lib/meet/recording-kind';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
 	import {
 		DEFAULT_SCREEN_SHARE,
@@ -172,10 +174,13 @@
 	let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// MediaRecorder + getDisplayMedia: desktop Chromium, Firefox and Safari; not phones.
-	const canRecordHere = typeof window !== 'undefined' && recordingSupported();
+	const canRecordView = typeof window !== 'undefined' && recordingSupported();
+	const canRecordMeeting = typeof window !== 'undefined' && meetingRecordingSupported();
 	/** This participant's own recording, if running. Not reactive state — it holds live media objects. */
 	let activeRecording: ActiveRecording | null = null;
 	let recording = $state(false);
+	/** Which kind is running, for the header and for what everyone else is told. */
+	let recordingKind = $state<RecordingKind>('view');
 	let recordingSaving = $state(false);
 	let recordingElapsed = $state(0);
 	let recordingTimer: ReturnType<typeof setInterval> | null = null;
@@ -189,11 +194,11 @@
 			isHost: boolean;
 			canShareScreen: boolean;
 			/** Self-reported through the `recording` attribute — a consent notice, not a permission. */
-			isRecording: boolean;
+			recording: RecordingKind | null;
 		}[]
 	>([]);
 	const othersRecording = $derived(
-		roster.filter((entry) => !entry.isLocal && entry.isRecording).map((entry) => entry.name)
+		roster.filter((entry) => !entry.isLocal && entry.recording !== null)
 	);
 	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean; isHost: boolean }[]>([]);
 	let unread = $state(0);
@@ -537,7 +542,7 @@
 			isLocal: false,
 			isHost: isHostIdentity(p.identity),
 			canShareScreen: mayShareScreen(p),
-			isRecording: p.attributes.recording === '1'
+			recording: parseRecordingAttribute(p.attributes.recording)
 		}));
 		roster = [
 			{
@@ -546,7 +551,7 @@
 				isLocal: true,
 				isHost: isHostIdentity(room.localParticipant.identity),
 				canShareScreen,
-				isRecording: recording
+				recording: recording ? recordingKind : null
 			},
 			...remote
 		];
@@ -1407,25 +1412,56 @@
 		);
 	}
 
-	async function beginRecording() {
+	/** What "Record meeting" draws each frame: everyone's camera (or initials) and any screen share. */
+	function compositeSources(): CompositeSource[] {
+		if (!room) return [];
+		const local = room.localParticipant;
+		return [local, ...room.remoteParticipants.values()].flatMap((participant) => {
+			const name = participant === local ? localName : participant.name || t('meet.guest');
+			const camera = participant.getTrackPublication(Track.Source.Camera);
+			const screen = participant.getTrackPublication(Track.Source.ScreenShare);
+			const person: CompositeSource = {
+				key: participant.identity,
+				label: name,
+				video: camera?.track && !camera.isMuted ? camera.track.mediaStreamTrack : null,
+				screen: false,
+				color: colorFor(participant.identity),
+				initials: initialsFor(name)
+			};
+			if (!screen?.track) return [person];
+			return [
+				{
+					...person,
+					key: `${participant.identity}:screen`,
+					label: t('meet.screenShareOf', { name }),
+					video: screen.track.mediaStreamTrack,
+					screen: true
+				},
+				person
+			];
+		});
+	}
+
+	async function beginRecording(kind: RecordingKind) {
 		if (!room || activeRecording || recordingSaving) return;
+		const micTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack ?? null;
 		try {
-			activeRecording = await startRecording({
-				micTrack: room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack ?? null,
-				remoteAudioTracks: remoteAudioTracks(),
-				onEnded: () => void finishRecording()
-			});
+			activeRecording =
+				kind === 'meeting'
+					? await startMeetingRecording({ getSources: compositeSources, micTrack, remoteAudioTracks: remoteAudioTracks() })
+					: await startRecording({ micTrack, remoteAudioTracks: remoteAudioTracks(), onEnded: () => void finishRecording() });
 		} catch (error) {
 			// Closing the browser's picker is a choice, not a failure worth reporting.
 			if (!(error instanceof DOMException && error.name === 'NotAllowedError')) showNotice(t('meet.recordingFailed'));
 			return;
 		}
 		recording = true;
+		recordingKind = kind;
 		recordingElapsed = 0;
 		recordingTimer = setInterval(() => {
 			if (activeRecording) recordingElapsed = (Date.now() - activeRecording.startedAt.getTime()) / 1000;
 		}, 1000);
-		room.localParticipant.setAttributes({ recording: '1' }).catch(() => {});
+		room.localParticipant.setAttributes({ recording: kind }).catch(() => {});
 		refreshRoster();
 	}
 
@@ -1450,9 +1486,9 @@
 		}
 	}
 
-	function toggleRecording() {
-		void (activeRecording ? finishRecording() : beginRecording());
-	}
+	const recordChoices = $derived(
+		recordingChoices({ isHost, meetingSupported: canRecordMeeting, viewSupported: canRecordView })
+	);
 
 	async function leave() {
 		// Save first: MediaRecorder only hands over its last chunk after stop() settles.
@@ -1486,7 +1522,9 @@
 		{#if recording}
 			<span class="call-header-notice call-header-recording" role="status">
 				<span class="call-recording-dot" aria-hidden="true"></span>
-				{t('meet.recordingSelf', { time: formatElapsed(recordingElapsed) })}
+				{recordingKind === 'meeting'
+					? t('meet.recordingMeetingSelf', { time: formatElapsed(recordingElapsed) })
+					: t('meet.recordingSelf', { time: formatElapsed(recordingElapsed) })}
 				<button type="button" class="call-header-notice-action" onclick={() => void finishRecording()}>
 					{t('meet.stopRecording')}
 				</button>
@@ -1494,12 +1532,14 @@
 		{:else if recordingSaving}
 			<span class="call-header-notice" role="status">{t('meet.recordingSaving')}</span>
 		{/if}
-		{#if othersRecording.length > 0}
+		{#each othersRecording as other (other.identity)}
 			<span class="call-header-notice call-header-recording" role="status">
 				<span class="call-recording-dot" aria-hidden="true"></span>
-				{t('meet.recordingBy', { name: othersRecording.join(', ') })}
+				{other.recording === 'meeting'
+					? t('meet.recordingMeetingBy', { name: other.name })
+					: t('meet.recordingBy', { name: other.name })}
 			</span>
-		{/if}
+		{/each}
 	</div>
 
 	<div class="call-body">
@@ -1595,7 +1635,7 @@
 		{shareCooldownSeconds}
 		{pipSupported}
 		{pipActive}
-		canRecord={canRecordHere && isHost}
+		{recordChoices}
 		{recording}
 		{recordingSaving}
 		{panel}
@@ -1612,7 +1652,8 @@
 		onShowBackgroundPicker={() => (showBackgroundPicker = true)}
 		onToggleScreenShare={toggleScreenShare}
 		onTogglePip={togglePip}
-		onToggleRecording={toggleRecording}
+		onRecord={(kind) => void beginRecording(kind)}
+		onStopRecording={() => void finishRecording()}
 		onTogglePanel={togglePanel}
 		onLeave={leave}
 	/>
