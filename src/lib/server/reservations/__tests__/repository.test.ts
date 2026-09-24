@@ -49,7 +49,7 @@ describe('ReservationsRepository', () => {
 		assert.match(queries[1].sql, /INSERT INTO calendar_events .*'reservation'/s);
 		assert.match(queries[1].sql, /, 0, \?, \?, 1\)/);
 		assert.ok(queries[0].args.includes('abc-defg-hij'));
-		assert.ok(queries[1].args.includes('https://mail.test/meet/abc-defg-hij'));
+		assert.ok(queries[1].args.some((arg) => arg === 'https://mail.test/meet/abc-defg-hij'));
 	});
 
 	test('weekdays round-trip through their comma list, dropping junk', async () => {
