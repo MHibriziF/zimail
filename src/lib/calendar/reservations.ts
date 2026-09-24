@@ -61,6 +61,8 @@ function clean(value: unknown, max: number): string {
 	return typeof value === 'string' ? value.trim().replaceAll(/\s+/g, ' ').slice(0, max).trim() : '';
 }
 
+const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+
 const isInt = (value: unknown, min: number, max: number): value is number =>
 	typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
 
@@ -85,14 +87,14 @@ export function isValidSlug(slug: string): boolean {
 }
 
 function checkWindow(input: Record<string, unknown>): ReservationPageError | null {
-	const start = dateKeyToUtc(String(input.startDate ?? ''));
-	const end = dateKeyToUtc(String(input.endDate ?? ''));
+	const start = dateKeyToUtc(text(input.startDate));
+	const end = dateKeyToUtc(text(input.endDate));
 	if (!start || !end || end < start || end.getTime() - start.getTime() > MAX_WINDOW_DAYS * DAY_MS) {
 		return 'invalid_dates';
 	}
 	const slot = input.slotMinutes;
 	const hoursOk =
-		SLOT_LENGTHS.some((length) => length === slot) &&
+		(SLOT_LENGTHS as readonly unknown[]).includes(slot) &&
 		isInt(input.dayStart, 0, 1440) &&
 		isInt(input.dayEnd, 0, 1440) &&
 		(input.dayEnd as number) - (input.dayStart as number) >= (slot as number) &&
@@ -131,8 +133,8 @@ export function validatePageSettings(
 			description,
 			slug,
 			timeZone,
-			startDate: String(input.startDate),
-			endDate: String(input.endDate),
+			startDate: text(input.startDate),
+			endDate: text(input.endDate),
 			weekdays,
 			dayStart: input.dayStart as number,
 			dayEnd: input.dayEnd as number,

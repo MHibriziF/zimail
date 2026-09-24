@@ -44,7 +44,11 @@ export function bookingEmailContent(details: BookingDetails): EmailContent {
 }
 
 function icsText(value: string): string {
-	return value.replaceAll('\\', '\\\\').replaceAll(';', '\\;').replaceAll(',', '\\,').replaceAll(/\r?\n/g, '\\n');
+	return value
+		.replaceAll('\\', String.raw`\\`)
+		.replaceAll(';', String.raw`\;`)
+		.replaceAll(',', String.raw`\,`)
+		.replaceAll(/\r?\n/g, String.raw`\n`);
 }
 
 function icsTime(date: Date): string {
