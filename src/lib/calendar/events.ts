@@ -5,7 +5,7 @@
 import { instantFromWall } from '../timezone';
 import type { LabelColor } from '../mail/labels';
 
-export const CALENDAR_EVENT_SOURCES = ['manual', 'feed', 'reservation'] as const;
+export const CALENDAR_EVENT_SOURCES = ['manual', 'feed', 'reservation', 'invite'] as const;
 export type CalendarEventSource = (typeof CALENDAR_EVENT_SOURCES)[number];
 
 export const MAX_EVENT_TITLE_LENGTH = 200;
@@ -126,7 +126,10 @@ export function isReadOnlyEvent(event: Pick<CalendarEvent, 'source'>): boolean {
 	return event.source !== 'manual';
 }
 
-/** A booking can't be edited but can be cancelled; a feed event belongs to the other calendar. */
+/**
+ * A booking can't be edited but can be cancelled, and an invitation can be
+ * taken off; a feed event belongs to the other calendar.
+ */
 export function isDeletableEvent(event: Pick<CalendarEvent, 'source'>): boolean {
 	return event.source !== 'feed';
 }

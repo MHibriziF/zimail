@@ -8,6 +8,7 @@ import { emailExistsByProviderId, insertEmail, updateEmailStatusByProviderId } f
 import { scheduleNewMailNotification, type PushNotificationEnv } from '../push-notifications';
 import type { ReceivedAttachment, ResendClient } from '../providers/resend-client';
 import { isCalendarAttachment } from '../../utils/attachments';
+import { applyArrivedInvitation, hasBytes } from '../invitations';
 import {
 	scheduleTelegramNotification,
 	type StoredAttachment,
@@ -181,6 +182,7 @@ async function handleInboundEmail(
 	if (await isFiledAsSpam(env.DB, route.userId, emailId)) {
 		return { handled: true, note: `Filed ${providerId} as spam for ${route.address}` };
 	}
+	await applyArrivedInvitation(env.DB, route.userId, storedAttachments.filter(hasBytes));
 	await scheduleNewMailNotification(env, {
 		emailId,
 		userId: route.userId,

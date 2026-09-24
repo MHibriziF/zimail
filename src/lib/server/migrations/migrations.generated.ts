@@ -164,5 +164,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0040_reservation_meetings.sql",
 		sql: "-- A reservation page can give every booking its own Zimail meeting room. The\n-- room is an ordinary row in `meetings`, owned by the page's owner; the\n-- booking keeps its join code so cancelling can close the room again.\nALTER TABLE reservation_pages ADD COLUMN with_meeting INTEGER NOT NULL DEFAULT 0;\nALTER TABLE reservations ADD COLUMN meeting_code TEXT;\n"
+	},
+	{
+		name: "0041_calendar_invites.sql",
+		sql: "-- Invitations the user received (iTIP REQUEST), by the organizer's UID. Their\n-- occurrences sit in calendar_events as source 'invite' (source_id = uid,\n-- external_uid = the occurrence), read-only like feed events.\n--\n-- `sequence` is the newest revision applied: an older invitation opened later\n-- must not undo a newer one. `response` is the user's answer ('accepted',\n-- 'tentative', 'declined'), or NULL when it was added without answering.\n-- A row here is also what lets later updates and cancellations from the\n-- organizer apply on arrival; an invitation never opened isn't touched.\nCREATE TABLE calendar_invites (\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\tuid TEXT NOT NULL,\n\tsequence INTEGER NOT NULL DEFAULT 0,\n\tresponse TEXT,\n\tupdated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n\tPRIMARY KEY (user_id, uid)\n);\n"
 	}
 ];
