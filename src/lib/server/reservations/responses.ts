@@ -28,7 +28,9 @@ const BOOKING_ERRORS: Record<Exclude<BookingOutcome['type'], 'ok'>, [string, num
 };
 
 export function bookingResponse(outcome: BookingOutcome): Response {
-	if (outcome.type === 'ok') return json({ start: outcome.start, end: outcome.end }, { status: 201 });
+	if (outcome.type === 'ok') {
+		return json({ start: outcome.start, end: outcome.end, meetingUrl: outcome.meetingUrl }, { status: 201 });
+	}
 	const [error, status] = BOOKING_ERRORS[outcome.type];
 	return json({ error, code: outcome.type }, { status });
 }

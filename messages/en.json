@@ -935,7 +935,11 @@
 			"copy": "Copy link",
 			"pause": "Pause",
 			"resume": "Resume",
-			"edit": "Edit page"
+			"edit": "Edit page",
+			"withMeeting": "Give each booking a Zimail meeting room",
+			"withMeetingHint": "Every booking gets its own video call link, in the confirmation email, the calendar invite and your calendar.",
+			"withMeetingUnavailable": "Set up video meetings first (LiveKit keys) to use this.",
+			"meetingBadge": "Meeting room"
 		}
 	},
 	"book": {
@@ -954,6 +958,8 @@
 		"booking": "Booking…",
 		"confirmed": "You're booked",
 		"confirmationSent": "A confirmation is on its way to {email}.",
-		"poweredBy": "Booked with {app}"
+		"poweredBy": "Booked with {app}",
+		"videoCall": "Zimail video call",
+		"joinLink": "Join the meeting"
 	}
 }

@@ -40,12 +40,16 @@ describe('ReservationsRepository', () => {
 			end: 'e2',
 			createdAt: 'c',
 			eventTitle: 'Ana · Office hours',
-			eventNotes: 'Booked by Ana'
+			eventNotes: 'Booked by Ana',
+			meetingCode: 'abc-defg-hij',
+			eventLocation: 'https://mail.test/meet/abc-defg-hij'
 		});
 		assert.equal(queries.length, 2);
 		assert.match(queries[0].sql, /INSERT INTO reservations/);
 		assert.match(queries[1].sql, /INSERT INTO calendar_events .*'reservation'/s);
-		assert.match(queries[1].sql, /, 0, \?, 1\)/);
+		assert.match(queries[1].sql, /, 0, \?, \?, 1\)/);
+		assert.ok(queries[0].args.includes('abc-defg-hij'));
+		assert.ok(queries[1].args.includes('https://mail.test/meet/abc-defg-hij'));
 	});
 
 	test('weekdays round-trip through their comma list, dropping junk', async () => {
@@ -65,11 +69,13 @@ describe('ReservationsRepository', () => {
 				slot_minutes: 30,
 				buffer_minutes: 0,
 				notice_minutes: 0,
-				active: 0
+				active: 0,
+				with_meeting: 1
 			}
 		]);
 		const page = await repo.getBySlug('s');
 		assert.deepEqual(page?.weekdays, [1, 3]);
 		assert.equal(page?.active, false);
+		assert.equal(page?.withMeeting, true);
 	});
 });

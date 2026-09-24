@@ -935,7 +935,11 @@
 			"copy": "Salin tautan",
 			"pause": "Jeda",
 			"resume": "Lanjutkan",
-			"edit": "Ubah halaman"
+			"edit": "Ubah halaman",
+			"withMeeting": "Beri setiap reservasi ruang rapat Zimail",
+			"withMeetingHint": "Setiap reservasi mendapat tautan panggilan video sendiri, di email konfirmasi, undangan kalender, dan kalender Anda.",
+			"withMeetingUnavailable": "Siapkan rapat video terlebih dahulu (kunci LiveKit) untuk memakai ini.",
+			"meetingBadge": "Ruang rapat"
 		}
 	},
 	"book": {
@@ -954,6 +958,8 @@
 		"booking": "Memesan…",
 		"confirmed": "Reservasi berhasil",
 		"confirmationSent": "Konfirmasi sedang dikirim ke {email}.",
-		"poweredBy": "Dipesan dengan {app}"
+		"poweredBy": "Dipesan dengan {app}",
+		"videoCall": "Panggilan video Zimail",
+		"joinLink": "Gabung ke rapat"
 	}
 }

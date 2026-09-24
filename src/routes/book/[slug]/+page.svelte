@@ -36,7 +36,7 @@
 	let note = $state('');
 	let submitting = $state(false);
 	let submitError = $state('');
-	let booked = $state<{ start: string; end: string } | null>(null);
+	let booked = $state<{ start: string; end: string; meetingUrl: string | null } | null>(null);
 
 	/** The same free slots, regrouped by the guest's own dates. */
 	const groups = $derived.by(() => {
@@ -91,9 +91,15 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ start: chosen, name, email, note })
 			});
-			const body = (await response.json().catch(() => ({}))) as { start?: string; end?: string; error?: string; code?: string };
+			const body = (await response.json().catch(() => ({}))) as {
+				start?: string;
+				end?: string;
+				meetingUrl?: string | null;
+				error?: string;
+				code?: string;
+			};
 			if (response.ok && body.start && body.end) {
-				booked = { start: body.start, end: body.end };
+				booked = { start: body.start, end: body.end, meetingUrl: body.meetingUrl ?? null };
 				return;
 			}
 			submitError = body.error ?? t('book.couldNotBook');
@@ -122,6 +128,9 @@
 			<p class="book-meta">
 				<span><Icon name="time-line" size={15} />{t('book.minutes', { count: reservation.slotMinutes })}</span>
 				<span><Icon name="global-line" size={15} />{t('book.timesIn', { zone: guestZone })}</span>
+				{#if reservation.withMeeting}
+					<span><Icon name="vidicon-line" size={15} />{t('book.videoCall')}</span>
+				{/if}
 			</p>
 			{#if reservation.description}<p class="book-description">{reservation.description}</p>{/if}
 		</header>
@@ -131,6 +140,13 @@
 				<Icon name="checkbox-circle-line" size={36} />
 				<h2>{t('book.confirmed')}</h2>
 				<p>{fullFormat.format(new Date(booked.start))}</p>
+				{#if booked.meetingUrl}
+					<a class="btn-primary book-join" href={booked.meetingUrl}>
+						<Icon name="vidicon-line" size={16} />
+						{t('book.joinLink')}
+					</a>
+					<p class="book-hint book-link">{booked.meetingUrl}</p>
+				{/if}
 				<p class="book-hint">{t('book.confirmationSent', { email })}</p>
 			</div>
 		{:else}
@@ -368,6 +384,20 @@
 	.book-done p {
 		margin: 0;
 		color: var(--color-text);
+	}
+
+	.book-join {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin-top: 0.75rem;
+		text-decoration: none;
+	}
+
+	.book-link {
+		font-family: var(--font-mono, monospace);
+		font-size: 0.75rem;
+		word-break: break-all;
 	}
 
 	.book-foot {

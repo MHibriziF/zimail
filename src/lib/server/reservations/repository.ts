@@ -17,6 +17,7 @@ type PageRow = {
 	buffer_minutes: number;
 	notice_minutes: number;
 	active: number;
+	with_meeting: number;
 };
 
 export type StoredPage = ReservationPage & { userId: string };
@@ -40,12 +41,13 @@ function toPage(row: PageRow): StoredPage {
 		slotMinutes: row.slot_minutes,
 		bufferMinutes: row.buffer_minutes,
 		noticeMinutes: row.notice_minutes,
-		active: row.active === 1
+		active: row.active === 1,
+		withMeeting: row.with_meeting === 1
 	};
 }
 
 const COLUMNS = `id, user_id, slug, title, description, time_zone, start_date, end_date, weekdays,
-	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active`;
+	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting`;
 
 export type NewBooking = {
 	id: string;
@@ -60,6 +62,10 @@ export type NewBooking = {
 	createdAt: string;
 	eventTitle: string;
 	eventNotes: string;
+	/** The booking's own meeting room, when the page gives one. */
+	meetingCode: string | null;
+	/** The join link, shown as the calendar event's location. */
+	eventLocation: string | null;
 };
 
 /**
@@ -93,6 +99,7 @@ export type StoredBooking = {
 	end: string;
 	pageTitle: string;
 	timeZone: string;
+	meetingCode: string | null;
 };
 
 function settingsValues(page: ReservationPageSettings): unknown[] {
@@ -109,7 +116,8 @@ function settingsValues(page: ReservationPageSettings): unknown[] {
 		page.slotMinutes,
 		page.bufferMinutes,
 		page.noticeMinutes,
-		page.active ? 1 : 0
+		page.active ? 1 : 0,
+		page.withMeeting ? 1 : 0
 	];
 }
 
@@ -152,8 +160,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				.prepare(
 					`INSERT INTO reservation_pages
 					 (id, user_id, slug, title, description, time_zone, start_date, end_date, weekdays,
-					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(page.id, page.userId, ...settingsValues(page))
 				.run();
@@ -164,7 +172,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				.prepare(
 					`UPDATE reservation_pages
 					 SET slug = ?, title = ?, description = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
-					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?
+					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?,
+					     with_meeting = ?
 					 WHERE id = ? AND user_id = ?`
 				)
 				.bind(...settingsValues(page), id, userId)
@@ -202,7 +211,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 		async getBookingByEvent(userId, eventId) {
 			const row = await db
 				.prepare(
-					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, p.title, p.time_zone
+					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, r.meeting_code, p.title, p.time_zone
 					 FROM reservations r JOIN reservation_pages p ON p.id = r.page_id
 					 WHERE r.event_id = ? AND r.user_id = ?`
 				)
@@ -213,6 +222,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					note: string | null;
 					starts_at: string;
 					ends_at: string;
+					meeting_code: string | null;
 					title: string;
 					time_zone: string;
 				}>();
@@ -224,7 +234,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				start: row.starts_at,
 				end: row.ends_at,
 				pageTitle: row.title,
-				timeZone: row.time_zone
+				timeZone: row.time_zone,
+				meetingCode: row.meeting_code
 			};
 		},
 
@@ -233,8 +244,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				db
 					.prepare(
 						`INSERT INTO reservations
-						 (id, page_id, user_id, event_id, guest_name, guest_email, note, starts_at, ends_at, created_at)
-						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+						 (id, page_id, user_id, event_id, guest_name, guest_email, note, starts_at, ends_at, created_at, meeting_code)
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 					)
 					.bind(
 						booking.id,
@@ -246,12 +257,13 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 						booking.note,
 						booking.start,
 						booking.end,
-						booking.createdAt
+						booking.createdAt,
+						booking.meetingCode
 					),
 				db
 					.prepare(
-						`INSERT INTO calendar_events (id, user_id, source, source_id, title, starts_at, ends_at, all_day, notes, busy)
-						 VALUES (?, ?, 'reservation', ?, ?, ?, ?, 0, ?, 1)`
+						`INSERT INTO calendar_events (id, user_id, source, source_id, title, starts_at, ends_at, all_day, location, notes, busy)
+						 VALUES (?, ?, 'reservation', ?, ?, ?, ?, 0, ?, ?, 1)`
 					)
 					.bind(
 						booking.eventId,
@@ -260,6 +272,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 						booking.eventTitle,
 						booking.start,
 						booking.end,
+						booking.eventLocation,
 						booking.eventNotes
 					)
 			]);

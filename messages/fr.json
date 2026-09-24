@@ -935,7 +935,11 @@
 			"copy": "Copier le lien",
 			"pause": "Mettre en pause",
 			"resume": "Reprendre",
-			"edit": "Modifier la page"
+			"edit": "Modifier la page",
+			"withMeeting": "Donner à chaque réservation une salle de réunion Zimail",
+			"withMeetingHint": "Chaque réservation reçoit son propre lien d'appel vidéo, dans l'e-mail de confirmation, l'invitation et votre agenda.",
+			"withMeetingUnavailable": "Configurez d'abord les réunions vidéo (clés LiveKit) pour l'utiliser.",
+			"meetingBadge": "Salle de réunion"
 		}
 	},
 	"book": {
@@ -954,6 +958,8 @@
 		"booking": "Réservation…",
 		"confirmed": "C'est réservé",
 		"confirmationSent": "Une confirmation part vers {email}.",
-		"poweredBy": "Réservé avec {app}"
+		"poweredBy": "Réservé avec {app}",
+		"videoCall": "Appel vidéo Zimail",
+		"joinLink": "Rejoindre la réunion"
 	}
 }

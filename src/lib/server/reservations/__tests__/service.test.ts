@@ -7,6 +7,7 @@ import type { NewBooking, ReservationsRepository, StoredPage } from '../reposito
 import { createReservationsService, MAX_UPCOMING_PER_GUEST } from '../service';
 
 const NOW = new Date('2026-09-24T00:00:00.000Z');
+const BASE = 'https://mail.test';
 
 const body = {
 	title: 'Office hours',
@@ -22,7 +23,7 @@ const body = {
 	noticeMinutes: 0
 };
 
-type SetupOptions = { busy?: CalendarEvent[]; notifyFails?: boolean };
+type SetupOptions = { busy?: CalendarEvent[]; notifyFails?: boolean; meetings?: boolean; roomFails?: boolean; insertConflict?: boolean };
 
 function setup(options: SetupOptions = {}) {
 	const pages: StoredPage[] = [];
@@ -76,10 +77,12 @@ function setup(options: SetupOptions = {}) {
 				start: booking.start,
 				end: booking.end,
 				pageTitle: page.title,
-				timeZone: page.timeZone
+				timeZone: page.timeZone,
+				meetingCode: booking.meetingCode
 			};
 		},
 		async insertBooking(booking) {
+			if (options.insertConflict) throw new Error('UNIQUE constraint failed: reservations.page_id, reservations.starts_at');
 			if (bookings.some((entry) => entry.pageId === booking.pageId && entry.start === booking.start)) {
 				throw new Error('UNIQUE constraint failed: reservations.page_id, reservations.starts_at');
 			}
@@ -114,9 +117,24 @@ function setup(options: SetupOptions = {}) {
 		}
 	} as unknown as CalendarRepository;
 
+	const rooms = { opened: [] as { userId: string; title: string; code: string }[], closed: [] as string[] };
+	const meetings = options.meetings
+		? {
+				async open(userId: string, title: string) {
+					if (options.roomFails) throw new Error('livekit down');
+					const code = `room-${rooms.opened.length + 1}`;
+					rooms.opened.push({ userId, title, code });
+					return code;
+				},
+				async close(_userId: string, code: string) {
+					rooms.closed.push(code);
+				}
+			}
+		: null;
 	const service = createReservationsService({
 		repo,
 		calendar,
+		meetings,
 		hostOf: async () => ({ name: 'Izi', email: 'me@example.test' }),
 		notify: async (hostUserId, booking, kind) => {
 			if (options.notifyFails) throw new Error('provider down');
@@ -124,7 +142,7 @@ function setup(options: SetupOptions = {}) {
 		},
 		now: () => NOW
 	});
-	return { service, pages, bookings, notified, deletedEvents };
+	return { service, pages, bookings, notified, deletedEvents, rooms };
 }
 
 async function withPage(options: SetupOptions = {}) {
@@ -200,31 +218,32 @@ describe('ReservationsService slots and booking', () => {
 
 	test('booking a free slot stores it, notifies, and then blocks it', async () => {
 		const { service, bookings, notified } = await withPage();
-		assert.deepEqual(await service.book('office-hours', guest), {
+		assert.deepEqual(await service.book('office-hours', guest, BASE), {
 			type: 'ok',
 			start: '2026-09-28T02:00:00.000Z',
-			end: '2026-09-28T03:00:00.000Z'
+			end: '2026-09-28T03:00:00.000Z',
+			meetingUrl: null
 		});
 		assert.equal(bookings[0].eventTitle, 'Ana · Office hours');
 		assert.match(bookings[0].eventNotes, /ana@example.com/);
 		assert.equal(notified[0].hostUserId, 'owner');
 		assert.equal(notified[0].booking.guestEmail, 'ana@example.com');
 
-		assert.deepEqual(await service.book('office-hours', { ...guest, email: 'bo@example.com' }), { type: 'slot_taken' });
+		assert.deepEqual(await service.book('office-hours', { ...guest, email: 'bo@example.com' }, BASE), { type: 'slot_taken' });
 	});
 
 	test('a time that isn’t a slot start is refused', async () => {
 		const { service } = await withPage();
-		assert.deepEqual(await service.book('office-hours', { ...guest, start: '2026-09-28T02:30:00.000Z' }), {
+		assert.deepEqual(await service.book('office-hours', { ...guest, start: '2026-09-28T02:30:00.000Z' }, BASE), {
 			type: 'slot_taken'
 		});
-		assert.deepEqual(await service.book('office-hours', { ...guest, start: 'soon' }), { type: 'slot_taken' });
+		assert.deepEqual(await service.book('office-hours', { ...guest, start: 'soon' }, BASE), { type: 'slot_taken' });
 	});
 
 	test('guest details are validated before anything is stored', async () => {
 		const { service, bookings } = await withPage();
-		assert.deepEqual(await service.book('office-hours', { ...guest, email: 'nope' }), { type: 'invalid_email' });
-		assert.deepEqual(await service.book('office-hours', { ...guest, name: '' }), { type: 'invalid_name' });
+		assert.deepEqual(await service.book('office-hours', { ...guest, email: 'nope' }, BASE), { type: 'invalid_email' });
+		assert.deepEqual(await service.book('office-hours', { ...guest, name: '' }, BASE), { type: 'invalid_name' });
 		assert.equal(bookings.length, 0);
 	});
 
@@ -232,14 +251,14 @@ describe('ReservationsService slots and booking', () => {
 		const { service } = await withPage();
 		const starts = ['2026-09-28T02:00:00.000Z', '2026-09-28T03:00:00.000Z', '2026-09-28T04:00:00.000Z', '2026-09-29T02:00:00.000Z'];
 		const outcomes = [];
-		for (const start of starts) outcomes.push((await service.book('office-hours', { ...guest, start })).type);
+		for (const start of starts) outcomes.push((await service.book('office-hours', { ...guest, start }, BASE)).type);
 		assert.equal(outcomes.filter((type) => type === 'ok').length, MAX_UPCOMING_PER_GUEST);
 		assert.equal(outcomes.at(-1), 'too_many');
 	});
 
 	test('cancelling a booking removes it, frees the slot and sends a cancellation for the same event', async () => {
 		const { service, bookings, notified, deletedEvents } = await withPage();
-		assert.equal((await service.book('office-hours', guest)).type, 'ok');
+		assert.equal((await service.book('office-hours', guest, BASE)).type, 'ok');
 		const eventId = bookings[0].eventId;
 
 		assert.equal(await service.cancelBooking('owner', eventId), true);
@@ -251,7 +270,7 @@ describe('ReservationsService slots and booking', () => {
 		assert.equal(notified[1].booking.uid, notified[0].booking.uid);
 		assert.equal(notified[1].booking.guestEmail, 'ana@example.com');
 		assert.equal(notified[1].booking.pageTitle, 'Office hours');
-		assert.equal((await service.book('office-hours', { ...guest, email: 'bo@example.com' })).type, 'ok');
+		assert.equal((await service.book('office-hours', { ...guest, email: 'bo@example.com' }, BASE)).type, 'ok');
 	});
 
 	test('cancelling something that isn’t a booking sends nothing', async () => {
@@ -262,14 +281,63 @@ describe('ReservationsService slots and booking', () => {
 
 	test('a failed cancellation email still cancels', async () => {
 		const { service, bookings } = await withPage({ notifyFails: true });
-		await service.book('office-hours', guest);
+		await service.book('office-hours', guest, BASE);
 		assert.equal(await service.cancelBooking('owner', bookings[0].eventId), true);
 		assert.equal(bookings.length, 0);
 	});
 
+	test('a page with a meeting room gives each booking its own room, everywhere the guest looks', async () => {
+		const state = setup({ meetings: true });
+		assert.equal((await state.service.create('owner', { ...body, withMeeting: true })).type, 'ok');
+		assert.equal((await state.service.publicPage('office-hours'))?.withMeeting, true);
+
+		const outcome = await state.service.book('office-hours', guest, BASE + '/');
+		assert.equal(outcome.type === 'ok' && outcome.meetingUrl, 'https://mail.test/meet/room-1');
+		assert.deepEqual(state.rooms.opened, [{ userId: 'owner', title: 'Office hours · Ana', code: 'room-1' }]);
+		assert.equal(state.bookings[0].meetingCode, 'room-1');
+		assert.equal(state.bookings[0].eventLocation, 'https://mail.test/meet/room-1');
+		assert.match(state.bookings[0].eventNotes, /Meeting: https:\/\/mail\.test\/meet\/room-1/);
+		assert.equal(state.notified[0].booking.meetingUrl, 'https://mail.test/meet/room-1');
+
+		assert.equal((await state.service.book('office-hours', { ...guest, email: 'bo@example.com', start: '2026-09-28T03:00:00.000Z' }, BASE)).type, 'ok');
+		assert.equal(state.rooms.opened[1].code, 'room-2', 'every booking gets its own room');
+	});
+
+	test('cancelling closes the booking’s room', async () => {
+		const state = setup({ meetings: true });
+		await state.service.create('owner', { ...body, withMeeting: true });
+		await state.service.book('office-hours', guest, BASE);
+		assert.equal(await state.service.cancelBooking('owner', state.bookings[0].eventId), true);
+		assert.deepEqual(state.rooms.closed, ['room-1']);
+	});
+
+	test('losing the slot race closes the room opened for it', async () => {
+		const state = setup({ meetings: true, insertConflict: true });
+		await state.service.create('owner', { ...body, withMeeting: true });
+		assert.deepEqual(await state.service.book('office-hours', guest, BASE), { type: 'slot_taken' });
+		assert.deepEqual(state.rooms.closed, ['room-1']);
+	});
+
+	test('without meetings set up, a room-enabled page books without one and doesn’t promise one', async () => {
+		const state = setup({ meetings: false });
+		await state.service.create('owner', { ...body, withMeeting: true });
+		assert.equal((await state.service.publicPage('office-hours'))?.withMeeting, false);
+		const outcome = await state.service.book('office-hours', guest, BASE);
+		assert.equal(outcome.type === 'ok' && outcome.meetingUrl, null);
+		assert.equal(state.bookings[0].meetingCode, null);
+	});
+
+	test('a room that fails to open still books, just without a room', async () => {
+		const state = setup({ meetings: true, roomFails: true });
+		await state.service.create('owner', { ...body, withMeeting: true });
+		const outcome = await state.service.book('office-hours', guest, BASE);
+		assert.equal(outcome.type === 'ok' && outcome.meetingUrl, null);
+		assert.equal(state.bookings.length, 1);
+	});
+
 	test('a failed notification never undoes the booking', async () => {
 		const { service, bookings } = await withPage({ notifyFails: true });
-		assert.equal((await service.book('office-hours', guest)).type, 'ok');
+		assert.equal((await service.book('office-hours', guest, BASE)).type, 'ok');
 		assert.equal(bookings.length, 1);
 	});
 });

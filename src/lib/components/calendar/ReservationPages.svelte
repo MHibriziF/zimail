@@ -26,6 +26,7 @@
 	const REFERENCE_SUNDAY = Date.UTC(2026, 8, 27);
 
 	let pages = $state<ReservationPage[]>([]);
+	let meetingsAvailable = $state(false);
 	let loaded = $state(false);
 	let editingId = $state<string | null>(null);
 	let draft = $state<Draft | null>(null);
@@ -46,7 +47,10 @@
 
 	$effect(() => {
 		fetchReservationPages()
-			.then((list) => (pages = list))
+			.then((result) => {
+				pages = result.pages;
+				meetingsAvailable = result.meetingsAvailable;
+			})
 			.catch((failure) => (error = failure instanceof Error ? failure.message : t('common.networkError')))
 			.finally(() => (loaded = true));
 	});
@@ -72,7 +76,8 @@
 			slotMinutes: 30,
 			bufferMinutes: 0,
 			noticeMinutes: 240,
-			active: true
+			active: true,
+			withMeeting: meetingsAvailable
 		};
 	}
 
@@ -232,6 +237,13 @@
 					<input class="resv-input" type="text" bind:value={draft.slug} maxlength={40} placeholder={t('calendar.reservations.slugPlaceholder')} />
 				</div>
 			</label>
+			<label class="resv-check">
+				<input type="checkbox" bind:checked={draft.withMeeting} disabled={!meetingsAvailable} />
+				<span>
+					{t('calendar.reservations.withMeeting')}
+					<small>{meetingsAvailable ? t('calendar.reservations.withMeetingHint') : t('calendar.reservations.withMeetingUnavailable')}</small>
+				</span>
+			</label>
 			<p class="resv-hint">{t('calendar.reservations.zoneNote', { zone: draft.timeZone })}</p>
 			<div class="resv-actions">
 				<button type="button" class="btn-ghost" onclick={() => (draft = null)}>{t('common.cancel')}</button>
@@ -252,6 +264,7 @@
 						<span class="resv-name">
 							{item.title}
 							{#if !item.active}<span class="resv-badge">{t('calendar.reservations.paused')}</span>{/if}
+							{#if item.withMeeting}<span class="resv-badge">{t('calendar.reservations.meetingBadge')}</span>{/if}
 						</span>
 						<a class="resv-link" href="/book/{item.slug}" target="_blank" rel="noopener">/book/{item.slug}</a>
 						<span class="resv-meta">
@@ -424,6 +437,24 @@
 		color: var(--color-on-accent);
 		background: var(--color-accent);
 		box-shadow: none;
+	}
+
+	.resv-check {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+		color: var(--color-text);
+	}
+
+	.resv-check input {
+		margin-top: 0.2rem;
+	}
+
+	.resv-check small {
+		display: block;
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
 	}
 
 	.resv-slug {

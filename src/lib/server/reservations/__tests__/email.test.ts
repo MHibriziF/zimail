@@ -44,6 +44,22 @@ describe('calendar invitation', () => {
 		assert.ok(content.details?.some((detail) => detail.label === 'Was'));
 	});
 
+	test('a meeting room goes in the invitation and the email', () => {
+		const withRoom = { ...details, meetingUrl: 'https://mail.test/meet/abc-defg-hij' };
+		const lines = bookingIcs(withRoom, 'request', now).replaceAll('\r\n ', '').split('\r\n');
+		assert.ok(lines.includes('LOCATION:https://mail.test/meet/abc-defg-hij'));
+		assert.ok(lines.includes('URL:https://mail.test/meet/abc-defg-hij'));
+		assert.ok(
+			lines.includes(String.raw`DESCRIPTION:Join the Zimail meeting: https://mail.test/meet/abc-defg-hij\n\nLine one\nLine two`)
+		);
+
+		const content = bookingEmailContent(withRoom);
+		assert.deepEqual(content.action, { label: 'Join the meeting', href: 'https://mail.test/meet/abc-defg-hij' });
+		assert.ok(content.details?.some((detail) => detail.label === 'Meeting'));
+		assert.equal(bookingEmailContent(details).action, undefined);
+		assert.ok(!bookingIcs(details, 'request', now).includes('LOCATION:'));
+	});
+
 	test('quotes in a name are dropped rather than breaking the parameter', () => {
 		const ics = bookingIcs({ ...details, guestName: 'Ana "the" Guest' }, 'request', now);
 		assert.match(ics.replaceAll('\r\n ', ''), /ATTENDEE;CN="Ana the Guest";/);

@@ -36,6 +36,8 @@ export type ReservationPageSettings = {
 	bufferMinutes: number;
 	noticeMinutes: number;
 	active: boolean;
+	/** Give every booking its own Zimail meeting room. */
+	withMeeting: boolean;
 };
 
 export type ReservationPage = ReservationPageSettings & { id: string };
@@ -43,7 +45,7 @@ export type ReservationPage = ReservationPageSettings & { id: string };
 /** What a guest sees: nothing about the owner's other events. */
 export type PublicReservationPage = Pick<
 	ReservationPageSettings,
-	'title' | 'description' | 'timeZone' | 'startDate' | 'endDate' | 'slotMinutes'
+	'title' | 'description' | 'timeZone' | 'startDate' | 'endDate' | 'slotMinutes' | 'withMeeting'
 > & { slug: string; host: string };
 
 export type ReservationPageError =
@@ -141,7 +143,8 @@ export function validatePageSettings(
 			slotMinutes: input.slotMinutes as number,
 			bufferMinutes: input.bufferMinutes as number,
 			noticeMinutes: input.noticeMinutes as number,
-			active: input.active !== false
+			active: input.active !== false,
+			withMeeting: input.withMeeting === true
 		}
 	};
 }

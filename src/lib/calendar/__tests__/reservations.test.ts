@@ -26,7 +26,7 @@ const settings = {
 	noticeMinutes: 0
 };
 
-const page: ReservationPageSettings = { ...settings, description: null, active: true };
+const page: ReservationPageSettings = { ...settings, description: null, active: true, withMeeting: false };
 const now = new Date('2026-09-24T00:00:00.000Z');
 
 describe('validatePageSettings', () => {
@@ -35,6 +35,11 @@ describe('validatePageSettings', () => {
 		assert.ok(result.ok);
 		assert.deepEqual(result.value.weekdays, [1, 5]);
 		assert.equal(result.value.active, true);
+		assert.equal(result.value.withMeeting, false);
+		const withRoom = validatePageSettings({ ...settings, withMeeting: true });
+		assert.equal(withRoom.ok && withRoom.value.withMeeting, true);
+		const junk = validatePageSettings({ ...settings, withMeeting: 'yes' });
+		assert.equal(junk.ok && junk.value.withMeeting, false);
 	});
 
 	test('rejects each broken field', () => {
