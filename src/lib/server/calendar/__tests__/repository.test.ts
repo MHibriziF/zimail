@@ -43,6 +43,14 @@ describe('CalendarRepository', () => {
 		for (const query of queries) assert.match(query.sql, /source = 'manual'/);
 	});
 
+	test('taking an invitation off removes every occurrence of its series', async () => {
+		const { repo, queries } = setup(() => [{}, {}, {}]);
+		assert.equal(await repo.deleteInvite('user-1', 'e1'), true);
+		assert.match(queries[0].sql, /source = 'invite' AND source_id = \(\s*SELECT source_id/);
+		assert.deepEqual(queries[0].args, ['user-1', 'e1', 'user-1']);
+		assert.equal(await setup().repo.deleteInvite('user-1', 'nope'), false);
+	});
+
 	test('overlap is start < to and end > from', async () => {
 		const { repo, queries } = setup();
 		await repo.listOverlapping('user-1', 'FROM', 'TO', 10);

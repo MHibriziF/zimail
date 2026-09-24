@@ -35,27 +35,10 @@ export class InvitationCard {
 			this.view = result.invitation;
 			if (this.view.canReply && action !== 'add' && action !== 'remove') this.replied = result.replied;
 			await invalidate('app:calendar');
-		} catch (failure) {
-			this.error = failure instanceof Error ? failure.message : String(failure);
+		} catch (error_) {
+			this.error = error_ instanceof Error ? error_.message : String(error_);
 		} finally {
 			this.busy = null;
 		}
 	}
-}
-
-/** "Fri, Sep 25 · 10:30 – 11:00" in the reader's zone; all-day events as dates. */
-export function formatInvitationWhen(view: InvitationView, locale: string, timeZone: string): string {
-	const start = new Date(view.start);
-	const end = new Date(view.end);
-	if (view.allDay) {
-		const date = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
-		const last = new Date(end.getTime() - 86_400_000);
-		return last.getTime() > start.getTime() ? `${date.format(start)} – ${date.format(last)}` : date.format(start);
-	}
-	const day = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
-	const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });
-	const sameDay = day.format(start) === day.format(end);
-	return sameDay
-		? `${day.format(start)} · ${time.format(start)} – ${time.format(end)}`
-		: `${day.format(start)} ${time.format(start)} – ${day.format(end)} ${time.format(end)}`;
 }

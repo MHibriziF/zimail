@@ -65,6 +65,29 @@ function isGoing(response: PartStat | null | undefined): boolean {
 	return response === 'accepted' || response === 'tentative';
 }
 
+function canReply({ invitation, me, own }: Loaded): boolean {
+	return (
+		invitation.method === 'REQUEST' &&
+		me !== null &&
+		invitation.organizer !== null &&
+		!own.has(invitation.organizer.email)
+	);
+}
+
+function isOutdated(invitation: Invitation, stored: StoredInvite | null): boolean {
+	return stored !== null && stored.sequence > invitation.sequence;
+}
+
+function describeParty(party: InviteParty): string {
+	return party.name ? `${party.name} <${party.email}>` : party.email;
+}
+
+/** What the calendar event's notes say: who organized it, then the organizer's description. */
+function notesFor(invitation: Invitation): string | null {
+	const from = invitation.organizer ? `Organizer: ${describeParty(invitation.organizer)}` : '';
+	return [from, invitation.description ?? ''].filter(Boolean).join('\n\n').slice(0, 4000) || null;
+}
+
 export function createInvitationsService(deps: InvitationsServiceDeps): InvitationsService {
 	const { repo } = deps;
 	const now = deps.now ?? (() => new Date());
@@ -81,19 +104,6 @@ export function createInvitationsService(deps: InvitationsServiceDeps): Invitati
 		const ics = await deps.loadCalendarPart(userId, emailId);
 		const parsed = ics ? await parse(userId, ics) : null;
 		return parsed && ics ? { ...parsed, ics } : null;
-	}
-
-	function canReply({ invitation, me, own }: Loaded): boolean {
-		return (
-			invitation.method === 'REQUEST' &&
-			me !== null &&
-			invitation.organizer !== null &&
-			!own.has(invitation.organizer.email)
-		);
-	}
-
-	function isOutdated(invitation: Invitation, stored: StoredInvite | null): boolean {
-		return stored !== null && stored.sequence > invitation.sequence;
 	}
 
 	async function view(userId: string, loaded: Loaded): Promise<InvitationView> {
@@ -117,12 +127,6 @@ export function createInvitationsService(deps: InvitationsServiceDeps): Invitati
 			outdated: isOutdated(invitation, stored),
 			canReply: canReply(loaded)
 		};
-	}
-
-	function notesFor(invitation: Invitation): string | null {
-		const organizer = invitation.organizer;
-		const from = organizer ? `Organizer: ${organizer.name ? `${organizer.name} <${organizer.email}>` : organizer.email}` : '';
-		return [from, invitation.description ?? ''].filter(Boolean).join('\n\n').slice(0, 4000) || null;
 	}
 
 	/** Puts the invitation on the calendar, replacing whatever an earlier revision put there. */

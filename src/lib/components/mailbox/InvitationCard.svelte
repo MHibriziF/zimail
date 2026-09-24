@@ -4,8 +4,8 @@
 	import { t } from '$lib/i18n';
 	import { DEFAULT_LOCALE, intlLocale } from '$lib/i18n/locales';
 	import { detectTimeZone } from '$lib/timezone';
-	import { InvitationCard, formatInvitationWhen } from '$lib/calendar/invitation-card.svelte';
-	import { SHOWN_GUESTS, otherGuests } from '$lib/calendar/invitations';
+	import { InvitationCard } from '$lib/calendar/invitation-card.svelte';
+	import { SHOWN_GUESTS, formatInvitationWhen, otherGuests } from '$lib/calendar/invitations';
 	import type { InviteResponse } from '$lib/calendar/ics/invite';
 	import Icon from '../Icon.svelte';
 
