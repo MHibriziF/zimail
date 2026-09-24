@@ -2,6 +2,7 @@
 	import Icon from '../Icon.svelte';
 	import DeviceSelect from './DeviceSelect.svelte';
 	import { t } from '$lib/i18n';
+	import type { RecordingKind } from '$lib/meet/recording-kind';
 
 	let {
 		deafened,
@@ -21,7 +22,7 @@
 		shareCooldownSeconds,
 		pipSupported,
 		pipActive,
-		canRecord,
+		recordChoices,
 		recording,
 		recordingSaving,
 		panel,
@@ -38,7 +39,8 @@
 		onShowBackgroundPicker,
 		onToggleScreenShare,
 		onTogglePip,
-		onToggleRecording,
+		onRecord,
+		onStopRecording,
 		onTogglePanel,
 		onLeave
 	}: {
@@ -61,8 +63,8 @@
 		shareCooldownSeconds: number;
 		pipSupported: boolean;
 		pipActive: boolean;
-		/** Host only, and only where the browser can record — see `recordingSupported`. */
-		canRecord: boolean;
+		/** What this participant may record here — see `recordingChoices`. Empty hides the button. */
+		recordChoices: RecordingKind[];
 		recording: boolean;
 		recordingSaving: boolean;
 		panel: 'none' | 'participants' | 'chat' | 'settings';
@@ -79,10 +81,25 @@
 		onShowBackgroundPicker: () => void;
 		onToggleScreenShare: () => void;
 		onTogglePip: () => void;
-		onToggleRecording: () => void;
+		onRecord: (kind: RecordingKind) => void;
+		onStopRecording: () => void;
 		onTogglePanel: (next: 'participants' | 'chat' | 'settings') => void;
 		onLeave: () => void;
 	} = $props();
+
+	let recordMenuOpen = $state(false);
+
+	/** One choice starts straight away; two (the host's) ask which. */
+	function pressRecord() {
+		if (recording) onStopRecording();
+		else if (recordChoices.length === 1) onRecord(recordChoices[0]);
+		else recordMenuOpen = !recordMenuOpen;
+	}
+
+	function choose(kind: RecordingKind) {
+		recordMenuOpen = false;
+		onRecord(kind);
+	}
 
 	const screenShareLabel = $derived.by(() => {
 		if (screenShareEnabled) return t('meet.screenShareOff');
@@ -179,18 +196,35 @@
 			<Icon name="computer-line" size={20} />
 		</button>
 	{/if}
-	{#if canRecord}
-		<button
-			type="button"
-			class="call-btn"
-			class:call-btn-recording={recording}
-			disabled={recordingSaving}
-			onclick={onToggleRecording}
-			aria-label={recording ? t('meet.stopRecording') : t('meet.record')}
-			title={recording ? t('meet.stopRecording') : t('meet.record')}
-		>
-			<Icon name={recording ? 'stop-circle-line' : 'record-circle-line'} size={20} />
-		</button>
+	{#if recordChoices.length > 0}
+		<div class="call-record">
+			<button
+				type="button"
+				class="call-btn"
+				class:call-btn-recording={recording}
+				disabled={recordingSaving}
+				onclick={pressRecord}
+				aria-label={recording ? t('meet.stopRecording') : t('meet.record')}
+				aria-haspopup={recordChoices.length > 1 && !recording ? 'menu' : undefined}
+				aria-expanded={recordChoices.length > 1 && !recording ? recordMenuOpen : undefined}
+				title={recording ? t('meet.stopRecording') : t('meet.record')}
+			>
+				<Icon name={recording ? 'stop-circle-line' : 'record-circle-line'} size={20} />
+			</button>
+			{#if recordMenuOpen && !recording}
+				<div class="call-record-menu" role="menu">
+					{#each recordChoices as kind (kind)}
+						<button type="button" role="menuitem" onclick={() => choose(kind)}>
+							<Icon name={kind === 'meeting' ? 'group-line' : 'computer-line'} size={16} />
+							<span>
+								{kind === 'meeting' ? t('meet.recordMeeting') : t('meet.recordView')}
+								<small>{kind === 'meeting' ? t('meet.recordMeetingHint') : t('meet.recordViewHint')}</small>
+							</span>
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
 	{/if}
 	{#if pipSupported}
 		<button
@@ -311,6 +345,49 @@
 	.call-btn-active {
 		background: #3f3f46;
 		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+	}
+
+	.call-record {
+		position: relative;
+	}
+
+	.call-record-menu {
+		position: absolute;
+		bottom: calc(100% + 0.5rem);
+		left: 50%;
+		z-index: 20;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		width: 16rem;
+		padding: 0.375rem;
+		border-radius: 0.75rem;
+		background: #1f1f23;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+		transform: translateX(-50%);
+	}
+
+	.call-record-menu button {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.625rem;
+		padding: 0.5rem 0.625rem;
+		border-radius: 0.5rem;
+		font-size: 0.875rem;
+		text-align: left;
+		color: #fff;
+		background: transparent;
+	}
+
+	.call-record-menu button:hover {
+		background: #34343a;
+	}
+
+	.call-record-menu small {
+		display: block;
+		margin-top: 0.125rem;
+		font-size: 0.75rem;
+		color: #a1a1aa;
 	}
 
 	.call-btn-recording {

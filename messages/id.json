@@ -781,10 +781,16 @@
 		"record": "Rekam panggilan",
 		"stopRecording": "Hentikan rekaman",
 		"recordingSelf": "Merekam · {time}",
-		"recordingBy": "{name} sedang merekam",
+		"recordingBy": "{name} sedang merekam tampilannya",
 		"recordingSaving": "Menyimpan rekaman…",
 		"recordingSaved": "Rekaman disimpan ke unduhan Anda",
-		"recordingFailed": "Tidak dapat merekam panggilan"
+		"recordingFailed": "Tidak dapat merekam panggilan",
+		"recordMeeting": "Rekam rapat",
+		"recordMeetingHint": "Video, layar yang dibagikan, dan suara semua orang — tanpa kontrol atau panel.",
+		"recordView": "Rekam tampilan saya",
+		"recordViewHint": "Persis seperti yang tampil di layar Anda, untuk catatan pribadi.",
+		"recordingMeetingSelf": "Merekam rapat · {time}",
+		"recordingMeetingBy": "{name} sedang merekam rapat"
 	},
 	"meetings": {
 		"title": "Rapat — {app}",

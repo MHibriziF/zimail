@@ -781,10 +781,16 @@
 		"record": "录制通话",
 		"stopRecording": "停止录制",
 		"recordingSelf": "正在录制 · {time}",
-		"recordingBy": "{name} 正在录制",
+		"recordingBy": "{name} 正在录制自己的画面",
 		"recordingSaving": "正在保存录制…",
 		"recordingSaved": "录制已保存到你的下载文件夹",
-		"recordingFailed": "无法录制通话"
+		"recordingFailed": "无法录制通话",
+		"recordMeeting": "录制会议",
+		"recordMeetingHint": "所有人的视频、共享屏幕和声音——不含控制栏或面板。",
+		"recordView": "录制我的画面",
+		"recordViewHint": "与你屏幕显示的完全一致，供个人记录。",
+		"recordingMeetingSelf": "正在录制会议 · {time}",
+		"recordingMeetingBy": "{name} 正在录制会议"
 	},
 	"meetings": {
 		"title": "会议 — {app}",

@@ -781,10 +781,16 @@
 		"record": "Grabar la llamada",
 		"stopRecording": "Detener la grabación",
 		"recordingSelf": "Grabando · {time}",
-		"recordingBy": "{name} está grabando",
+		"recordingBy": "{name} está grabando su vista",
 		"recordingSaving": "Guardando la grabación…",
 		"recordingSaved": "Grabación guardada en tus descargas",
-		"recordingFailed": "No se pudo grabar la llamada"
+		"recordingFailed": "No se pudo grabar la llamada",
+		"recordMeeting": "Grabar la reunión",
+		"recordMeetingHint": "El vídeo, las pantallas compartidas y las voces de todos — sin controles ni paneles.",
+		"recordView": "Grabar mi vista",
+		"recordViewHint": "Exactamente lo que muestra tu pantalla, para tus propias notas.",
+		"recordingMeetingSelf": "Grabando la reunión · {time}",
+		"recordingMeetingBy": "{name} está grabando la reunión"
 	},
 	"meetings": {
 		"title": "Reuniones — {app}",
