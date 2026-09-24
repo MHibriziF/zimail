@@ -1,3 +1,5 @@
+import type { CalendarFeed } from './feeds';
+import type { LabelColor } from '../mail/labels';
 import type { CalendarEvent, CalendarEventInput } from './events';
 
 export class CalendarRequestError extends Error {}
@@ -27,4 +29,27 @@ export async function saveEvent(input: CalendarEventInput, id?: string): Promise
 export async function deleteEvent(id: string): Promise<void> {
 	const response = await fetch(`/api/calendar/events/${encodeURIComponent(id)}`, { method: 'DELETE' });
 	await readJson(response, 'Could not delete the event');
+}
+
+export async function fetchFeeds(): Promise<CalendarFeed[]> {
+	return (await readJson<{ feeds: CalendarFeed[] }>(await fetch('/api/calendar/feeds'), 'Could not load calendars')).feeds;
+}
+
+export async function addFeed(input: { name: string; url: string; color: LabelColor }): Promise<CalendarFeed> {
+	const response = await fetch('/api/calendar/feeds', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(input)
+	});
+	return (await readJson<{ feed: CalendarFeed }>(response, 'Could not add the calendar')).feed;
+}
+
+export async function syncFeed(id: string): Promise<CalendarFeed> {
+	const response = await fetch(`/api/calendar/feeds/${encodeURIComponent(id)}/sync`, { method: 'POST' });
+	return (await readJson<{ feed: CalendarFeed }>(response, 'Could not sync the calendar')).feed;
+}
+
+export async function removeFeed(id: string): Promise<void> {
+	const response = await fetch(`/api/calendar/feeds/${encodeURIComponent(id)}`, { method: 'DELETE' });
+	await readJson(response, 'Could not remove the calendar');
 }

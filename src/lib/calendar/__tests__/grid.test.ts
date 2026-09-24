@@ -22,7 +22,8 @@ function event(partial: Partial<CalendarEvent>): CalendarEvent {
 		location: null,
 		notes: null,
 		source: 'manual',
-		busy: true
+		busy: true,
+		calendar: null
 	};
 }
 

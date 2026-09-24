@@ -36,7 +36,8 @@ describe('event drafts', () => {
 			location: 'Cafe',
 			notes: null,
 			source: 'manual',
-			busy: true
+			busy: true,
+			calendar: null
 		};
 		const draft = draftFromEvent(event, zone);
 		assert.equal(draft.startTime, '12:00');
@@ -57,7 +58,8 @@ describe('event drafts', () => {
 			location: null,
 			notes: null,
 			source: 'manual',
-			busy: true
+			busy: true,
+			calendar: null
 		};
 		const draft = draftFromEvent(event, zone);
 		assert.equal(draft.endDate, '2026-09-26');

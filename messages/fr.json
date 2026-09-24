@@ -882,6 +882,23 @@
 		"more": "+{count} de plus",
 		"nothingThisDay": "Rien de prévu.",
 		"nothingThisMonth": "Rien de prévu pour le reste du mois.",
-		"comingUp": "À venir"
+		"comingUp": "À venir",
+		"feeds": {
+			"heading": "Autres agendas",
+			"hint": "Abonnez-vous à des agendas Google, Outlook ou iCloud grâce à leur adresse iCal privée. Leurs événements s'affichent ici et comptent comme occupés. Rien ne leur est envoyé : l'adresse est seulement lue.",
+			"add": "Ajouter un agenda",
+			"name": "Nom",
+			"namePlaceholder": "Travail (Google)",
+			"url": "Adresse iCal",
+			"urlHelp": "Google Agenda : Paramètres → votre agenda → Intégrer l'agenda → Adresse secrète au format iCal. Outlook : Paramètres → Calendriers partagés → Publier → ICS. iCloud : partagez l'agenda publiquement et copiez le lien webcal://.",
+			"color": "Couleur",
+			"subscribe": "S'abonner",
+			"adding": "Synchronisation…",
+			"empty": "Aucun autre agenda pour l'instant.",
+			"syncNow": "Synchroniser",
+			"remove": "Retirer",
+			"neverSynced": "Pas encore synchronisé",
+			"synced": "Synchronisé {time} · {count} événements"
+		}
 	}
 }

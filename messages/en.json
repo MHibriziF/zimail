@@ -882,6 +882,23 @@
 		"more": "+{count} more",
 		"nothingThisDay": "Nothing scheduled.",
 		"nothingThisMonth": "Nothing scheduled for the rest of this month.",
-		"comingUp": "Coming up"
+		"comingUp": "Coming up",
+		"feeds": {
+			"heading": "Other calendars",
+			"hint": "Subscribe to Google, Outlook or iCloud calendars by their private iCal address. Their events show here and count as busy time. Nothing is sent to them — the address is only read.",
+			"add": "Add calendar",
+			"name": "Name",
+			"namePlaceholder": "Work (Google)",
+			"url": "iCal address",
+			"urlHelp": "Google Calendar: Settings → your calendar → Integrate calendar → Secret address in iCal format. Outlook: Settings → Shared calendars → Publish → ICS. iCloud: share the calendar publicly and copy the webcal:// link.",
+			"color": "Color",
+			"subscribe": "Subscribe",
+			"adding": "Syncing…",
+			"empty": "No other calendars yet.",
+			"syncNow": "Sync now",
+			"remove": "Remove",
+			"neverSynced": "Not synced yet",
+			"synced": "Last synced {time} · {count} events"
+		}
 	}
 }

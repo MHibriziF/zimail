@@ -46,7 +46,7 @@ describe('CalendarRepository', () => {
 	test('overlap is start < to and end > from', async () => {
 		const { repo, queries } = setup();
 		await repo.listOverlapping('user-1', 'FROM', 'TO', 10);
-		assert.match(queries[0].sql, /starts_at < \? AND ends_at > \?/);
+		assert.match(queries[0].sql, /e\.starts_at < \? AND e\.ends_at > \?/);
 		assert.deepEqual(queries[0].args, ['user-1', 'TO', 'FROM', 10]);
 	});
 
@@ -61,7 +61,9 @@ describe('CalendarRepository', () => {
 				location: null,
 				notes: 'n',
 				source: 'mystery',
-				busy: 0
+				busy: 0,
+				feed_name: null,
+				feed_color: null
 			}
 		]);
 		assert.deepEqual(await repo.get('user-1', 'e1'), {
@@ -73,7 +75,27 @@ describe('CalendarRepository', () => {
 			location: null,
 			notes: 'n',
 			source: 'manual',
-			busy: false
+			busy: false,
+			calendar: null
 		});
+	});
+
+	test('a feed event carries its calendar, with an unknown color read as blue', async () => {
+		const { repo } = setup(() => [
+			{
+				id: 'e1',
+				title: 'X',
+				starts_at: valid.start,
+				ends_at: valid.end,
+				all_day: 0,
+				location: null,
+				notes: null,
+				source: 'feed',
+				busy: 1,
+				feed_name: 'Work',
+				feed_color: 'plaid'
+			}
+		]);
+		assert.deepEqual((await repo.get('user-1', 'e1'))?.calendar, { name: 'Work', color: 'blue' });
 	});
 });

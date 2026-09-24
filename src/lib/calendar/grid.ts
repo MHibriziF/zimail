@@ -2,7 +2,7 @@
  * Laying events out on days. Every day boundary is the viewer's zone, never
  * the host's, so a server in UTC and a browser in Jakarta draw the same grid.
  */
-import { instantFromWall, wallIn } from '$lib/timezone';
+import { instantFromWall, wallIn } from '../timezone';
 import { addDays, dateKeyToUtc, utcToDateKey, type CalendarEvent } from './events';
 
 export type YearMonth = { year: number; month: number };

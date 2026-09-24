@@ -5,6 +5,7 @@ import {
 	type CalendarEventSource,
 	type ValidEventInput
 } from '../../calendar/events';
+import { LABEL_COLORS } from '../../mail/labels';
 
 type EventRow = {
 	id: string;
@@ -16,9 +17,14 @@ type EventRow = {
 	notes: string | null;
 	source: string;
 	busy: number;
+	feed_name: string | null;
+	feed_color: string | null;
 };
 
-const COLUMNS = 'id, title, starts_at, ends_at, all_day, location, notes, source, busy';
+const COLUMNS = `e.id, e.title, e.starts_at, e.ends_at, e.all_day, e.location, e.notes, e.source, e.busy,
+	f.name AS feed_name, f.color AS feed_color`;
+/** Feed events carry their calendar's name and color; the join finds nothing for other sources. */
+const FROM = `calendar_events e LEFT JOIN calendar_feeds f ON e.source = 'feed' AND f.id = e.source_id`;
 
 function toEvent(row: EventRow): CalendarEvent {
 	return {
@@ -30,7 +36,11 @@ function toEvent(row: EventRow): CalendarEvent {
 		location: row.location,
 		notes: row.notes,
 		source: CALENDAR_EVENT_SOURCES.find((source) => source === row.source) ?? 'manual',
-		busy: row.busy === 1
+		busy: row.busy === 1,
+		calendar:
+			row.feed_name === null
+				? null
+				: { name: row.feed_name, color: LABEL_COLORS.find((color) => color === row.feed_color) ?? 'blue' }
 	};
 }
 
@@ -62,9 +72,9 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 		async listOverlapping(userId, from, to, limit) {
 			const { results } = await db
 				.prepare(
-					`SELECT ${COLUMNS} FROM calendar_events
-					 WHERE user_id = ? AND starts_at < ? AND ends_at > ?
-					 ORDER BY starts_at LIMIT ?`
+					`SELECT ${COLUMNS} FROM ${FROM}
+					 WHERE e.user_id = ? AND e.starts_at < ? AND e.ends_at > ?
+					 ORDER BY e.starts_at LIMIT ?`
 				)
 				.bind(userId, to, from, limit)
 				.all<EventRow>();
@@ -73,7 +83,7 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 
 		async get(userId, id) {
 			const row = await db
-				.prepare(`SELECT ${COLUMNS} FROM calendar_events WHERE id = ? AND user_id = ?`)
+				.prepare(`SELECT ${COLUMNS} FROM ${FROM} WHERE e.id = ? AND e.user_id = ?`)
 				.bind(id, userId)
 				.first<EventRow>();
 			return row ? toEvent(row) : null;

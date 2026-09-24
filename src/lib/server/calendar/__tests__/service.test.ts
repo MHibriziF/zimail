@@ -28,7 +28,8 @@ function fakeRepo(seed: Row[] = []) {
 				location: event.location,
 				notes: event.notes,
 				source: event.source,
-				busy: event.busy !== false
+				busy: event.busy !== false,
+				calendar: null
 			});
 		},
 		async updateManual(userId, id, input: ValidEventInput) {
@@ -57,7 +58,8 @@ const feedRow: Row = {
 	location: null,
 	notes: null,
 	source: 'feed',
-	busy: true
+	busy: true,
+	calendar: { name: 'Google', color: 'blue' }
 };
 
 const input = { title: 'Standup', start: '2026-09-24T02:00:00.000Z', end: '2026-09-24T02:15:00.000Z', allDay: false };

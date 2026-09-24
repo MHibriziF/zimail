@@ -9,6 +9,8 @@
 	import StackHeader from '../StackHeader.svelte';
 	import Icon from '../Icon.svelte';
 	import EventEditor from './EventEditor.svelte';
+	import CalendarFeeds from './CalendarFeeds.svelte';
+	import { LABEL_SWATCH } from '$lib/mail/labels';
 	import { addDays, dateKeyToUtc, isReadOnlyEvent, type CalendarEvent } from '$lib/calendar/events';
 	import {
 		dateKeyIn,
@@ -52,8 +54,9 @@
 
 	const grid = $derived(monthGrid(month, weekStart));
 	const byDay = $derived(groupByDay(events, timeZone));
-	const selectedDay = $derived(selected || today);
 	const monthPrefix = $derived(formatMonthParam(month));
+	// Until a day is picked: today in the current month, else the 1st of the one shown.
+	const selectedDay = $derived(selected || (today.startsWith(monthPrefix) ? today : `${monthPrefix}-01`));
 	const agendaDays = $derived(
 		grid.filter((key) => key.startsWith(monthPrefix) && key >= (monthPrefix === today.slice(0, 7) ? today : ''))
 	);
@@ -89,7 +92,7 @@
 
 	function goMonth(delta: number) {
 		month = delta === 0 ? todayMonth() : shiftMonth(month, delta);
-		if (delta === 0) selected = today;
+		selected = '';
 		const url = new URL(window.location.href);
 		url.searchParams.set('month', formatMonthParam(month));
 		history.replaceState(history.state, '', url);
@@ -100,6 +103,11 @@
 		const starts = dateKeyIn(new Date(event.start), timeZone);
 		if (starts !== dayKey) return t('calendar.continues');
 		return `${timeFormat.format(new Date(event.start))} – ${timeFormat.format(new Date(event.end))}`;
+	}
+
+	/** Feed events wear their calendar's color; others the accent. */
+	function eventColor(event: CalendarEvent): string {
+		return event.calendar ? LABEL_SWATCH[event.calendar.color] : 'var(--color-accent)';
 	}
 
 	function openNew(dayKey: string) {
@@ -149,11 +157,20 @@
 
 {#snippet eventRow(event: CalendarEvent, dayKey: string)}
 	<li>
-		<button type="button" class="cal-row" class:readonly={isReadOnlyEvent(event)} onclick={() => openEvent(event)}>
+		<button
+			type="button"
+			class="cal-row"
+			class:free={!event.busy}
+			style="--event-color: {eventColor(event)}"
+			onclick={() => openEvent(event)}
+		>
 			<span class="cal-row-time">{eventTime(event, dayKey)}</span>
 			<span class="cal-row-title">{event.title}</span>
 			{#if event.location}
 				<span class="cal-row-meta"><Icon name="map-pin-line" size={13} />{event.location}</span>
+			{/if}
+			{#if event.calendar}
+				<span class="cal-row-meta"><Icon name="calendar-line" size={13} />{event.calendar.name}</span>
 			{/if}
 		</button>
 	</li>
@@ -221,8 +238,9 @@
 									type="button"
 									class="cal-chip"
 									class:allday={event.allDay}
-									class:readonly={isReadOnlyEvent(event)}
-									title={event.title}
+									class:free={!event.busy}
+									style="--event-color: {eventColor(event)}"
+									title={event.calendar ? `${event.title} · ${event.calendar.name}` : event.title}
 									onclick={() => openEvent(event)}
 								>
 									{#if !event.allDay && dateKeyIn(new Date(event.start), timeZone) === key}
@@ -274,6 +292,13 @@
 			{/each}
 		</section>
 	{/if}
+
+	<CalendarFeeds
+		onchange={() => {
+			load();
+			invalidate('app:calendar');
+		}}
+	/>
 </div>
 
 {#if editing}
@@ -459,15 +484,22 @@
 		background: var(--color-surface-hover);
 	}
 
-	.cal-chip.allday {
-		color: var(--color-accent-text);
-		background: var(--color-accent-soft);
+	.cal-chip,
+	.cal-row {
+		border-left: 3px solid var(--event-color);
 	}
 
-	.cal-chip.readonly {
-		opacity: 0.8;
-		font-style: italic;
+	.cal-chip.free,
+	.cal-row.free {
+		border-left-style: dashed;
+		opacity: 0.7;
 	}
+
+	.cal-chip.allday {
+		color: var(--color-text);
+		background: color-mix(in srgb, var(--event-color) 18%, transparent);
+	}
+
 
 	.cal-chip-time {
 		flex-shrink: 0;
@@ -545,9 +577,6 @@
 		background: var(--color-surface-hover);
 	}
 
-	.cal-row.readonly .cal-row-title {
-		font-style: italic;
-	}
 
 	.cal-row-time {
 		color: var(--color-text-secondary);

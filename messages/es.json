@@ -882,6 +882,23 @@
 		"more": "+{count} más",
 		"nothingThisDay": "Nada programado.",
 		"nothingThisMonth": "Nada programado para el resto del mes.",
-		"comingUp": "Próximamente"
+		"comingUp": "Próximamente",
+		"feeds": {
+			"heading": "Otros calendarios",
+			"hint": "Suscríbete a calendarios de Google, Outlook o iCloud con su dirección iCal privada. Sus eventos aparecen aquí y cuentan como tiempo ocupado. No se les envía nada: la dirección solo se lee.",
+			"add": "Añadir calendario",
+			"name": "Nombre",
+			"namePlaceholder": "Trabajo (Google)",
+			"url": "Dirección iCal",
+			"urlHelp": "Google Calendar: Configuración → tu calendario → Integrar el calendario → Dirección secreta en formato iCal. Outlook: Configuración → Calendarios compartidos → Publicar → ICS. iCloud: comparte el calendario públicamente y copia el enlace webcal://.",
+			"color": "Color",
+			"subscribe": "Suscribirse",
+			"adding": "Sincronizando…",
+			"empty": "Todavía no hay otros calendarios.",
+			"syncNow": "Sincronizar ahora",
+			"remove": "Quitar",
+			"neverSynced": "Aún sin sincronizar",
+			"synced": "Última sincronización {time} · {count} eventos"
+		}
 	}
 }
