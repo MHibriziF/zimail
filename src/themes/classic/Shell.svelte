@@ -68,6 +68,7 @@
 	<Sidebar
 		counts={data.counts}
 		labels={data.labels}
+		upcoming={data.upcoming}
 		domains={data.domains}
 		activeDomainId={data.activeDomainId}
 		isAdmin={data.user.is_admin}

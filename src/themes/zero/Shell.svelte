@@ -6,6 +6,7 @@
 	import { LABEL_SWATCH } from '$lib/mail/labels';
 	import type { ThemeShellProps } from '$lib/ui-theme/types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import UpcomingEvents from '$lib/components/calendar/UpcomingEvents.svelte';
 	import AccountHeader from './AccountHeader.svelte';
 	import Icon from './icons/Icon.svelte';
 	import CommandPalette from './overlays/CommandPalette.svelte';
@@ -326,11 +327,28 @@
 						{/each}
 					</div>
 				{/if}
+				{#if data.upcoming.length > 0 && (!collapsed || mobileOpen)}
+					<div class="z-nav-section">
+						<div class="z-nav-title">{t('calendar.comingUp')}</div>
+						<UpcomingEvents events={data.upcoming} />
+					</div>
+				{/if}
 			{/if}
 		</nav>
 
 		<div class="z-sidebar-foot">
 			{#if !settings}
+				<Tooltip text={t('nav.calendar')} side="right" enabled={collapsed && !mobileOpen} stretch>
+					<a
+						href="/calendar"
+						class="z-nav-link"
+						class:active={isActive('/calendar')}
+						aria-label={collapsed && !mobileOpen ? t('nav.calendar') : undefined}
+					>
+						<Icon name="Calendar" size={16} />
+						{#if !collapsed || mobileOpen}<span>{t('nav.calendar')}</span>{/if}
+					</a>
+				</Tooltip>
 				<Tooltip text={t('nav.meetings')} side="right" enabled={collapsed && !mobileOpen} stretch>
 					<a
 						href="/meetings"

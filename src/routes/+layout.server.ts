@@ -1,12 +1,14 @@
 import type { LayoutServerLoad } from './$types';
 import { getMailStoreService } from '$lib/server/mail-store';
 import { getLabelsService } from '$lib/server/labels';
+import { getCalendarService } from '$lib/server/calendar';
 import { runDueTrashPurge } from '$lib/server/cleanup';
 import { getEmailProvider } from '$lib/server/context';
 import { runDueScheduledSends } from '$lib/server/scheduled-send';
 import { DEFAULT_UI_THEME } from '$lib/ui-theme/ids';
 import { DEFAULT_LOCALE } from '$lib/i18n/locales';
 import type { MailboxCounts } from '$lib/types';
+import type { CalendarEvent } from '$lib/calendar/events';
 
 const EMPTY_COUNTS: MailboxCounts = {
 	inbox: 0,
@@ -27,6 +29,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	// lets those routes refresh the badges without a full invalidateAll().
 	depends('app:counts');
 	depends('app:labels');
+	depends('app:calendar');
 
 	// Emptying old trash rides along with a page load rather than a timer. The
 	// claim inside is throttled to once a day, so this is a single cheap UPDATE
@@ -72,9 +75,24 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	// Sidebar label list — changes only when labels are managed, so it has its own dependency.
 	const labels = db && locals.user ? await getLabelsService(platform).list(locals.user.id) : [];
 
+	// The sidebar's "coming up" list. Two days covers today and tomorrow from any
+	// zone; the component narrows it to the viewer's own days.
+	let upcoming: CalendarEvent[] = [];
+	if (db && locals.user) {
+		const now = new Date();
+		const outcome = await getCalendarService(platform).listBetween(
+			locals.user.id,
+			now,
+			new Date(now.getTime() + 2 * 86_400_000),
+			timezoneRow?.timezone ?? 'UTC'
+		);
+		if (outcome.type === 'ok') upcoming = outcome.events;
+	}
+
 	return {
 		user: locals.user,
 		labels,
+		upcoming,
 		timeZone: timezoneRow?.timezone ?? null,
 		domains: locals.domains,
 		addresses: locals.addresses,
