@@ -3,6 +3,7 @@
  * A REPLY (going, maybe, not going) is recorded as it arrives. A COUNTER — a
  * guest proposing another time — waits for the user to accept or decline it.
  */
+import { eventInterval, type CalendarEvent } from '../../calendar/events';
 import { readInvitation, type Invitation, type InviteParty } from '../../calendar/ics/invite';
 import type { AnswerAction, GuestAnswerView } from '../../calendar/invitations';
 import type { InvitationsRepository, OwnEvent } from './repository';
@@ -15,6 +16,7 @@ export type AnswerActionOutcome =
 	| { type: 'not_found' }
 	| { type: 'unsupported' }
 	| { type: 'slot_taken' }
+	| { type: 'conflict' }
 	| { type: 'not_sent' };
 
 export type AnswersService = {
@@ -33,15 +35,21 @@ export type AnswersServiceDeps = {
 	reschedule: (userId: string, event: OwnEvent, start: Date, end: Date) => Promise<'ok' | 'not_found' | 'slot_taken'>;
 	/** Tells the guest their proposed time was turned down. */
 	declineProposal: (userId: string, event: OwnEvent, proposal: Invitation, guest: InviteParty) => Promise<void>;
+	/** The user's events overlapping `[from, to)` by their stored instants — widen for all-day ones. */
+	eventsBetween: (userId: string, from: Date, to: Date) => Promise<CalendarEvent[]>;
 };
 
-type Loaded = { invitation: Invitation; event: OwnEvent; guest: InviteParty };
+type Loaded = { invitation: Invitation; event: OwnEvent; guest: InviteParty; conflicts?: EventClash[] };
+
+type EventClash = GuestAnswerView['conflicts'][number];
+
+const DAY_MS = 86_400_000;
 
 export function ownEventId(uid: string): string | null {
 	return uid.endsWith(OWN_UID_SUFFIX) ? uid.slice(0, -OWN_UID_SUFFIX.length) || null : null;
 }
 
-function toView({ invitation, event, guest }: Loaded): GuestAnswerView {
+function toView({ invitation, event, guest, conflicts = [] }: Loaded): GuestAnswerView {
 	const proposed =
 		invitation.method === 'COUNTER' ? { start: invitation.start, end: invitation.end, allDay: invitation.allDay } : null;
 	return {
@@ -53,7 +61,8 @@ function toView({ invitation, event, guest }: Loaded): GuestAnswerView {
 		proposed,
 		comment: invitation.comment,
 		outdated: event.sequence > invitation.sequence,
-		applied: proposed !== null && proposed.start === event.start && proposed.end === event.end
+		applied: proposed !== null && proposed.start === event.start && proposed.end === event.end,
+		conflicts
 	};
 }
 
@@ -70,9 +79,27 @@ export function createAnswersService(deps: AnswersServiceDeps): AnswersService {
 		return event ? { invitation, event, guest: { email: guest.email, name: guest.name } } : null;
 	}
 
+	/** Busy events that the proposed time would overlap, other than the event being moved. */
+	async function clashes(userId: string, { invitation, event }: Loaded): Promise<EventClash[]> {
+		const start = new Date(invitation.start);
+		const end = new Date(invitation.end);
+		const zone = await deps.timeZone(userId);
+		// All-day events are stored as UTC dates, so look a day either side and compare exactly.
+		const around = await deps.eventsBetween(userId, new Date(start.getTime() - DAY_MS), new Date(end.getTime() + DAY_MS));
+		return around
+			.filter((other) => other.busy && other.id !== event.id)
+			.filter((other) => {
+				const span = eventInterval(other, zone);
+				return span.start < end && span.end > start;
+			})
+			.map((other) => ({ title: other.title, start: other.start, end: other.end, allDay: other.allDay }));
+	}
+
 	async function load(userId: string, emailId: string): Promise<Loaded | null> {
 		const ics = await deps.loadCalendarPart(userId, emailId);
-		return ics ? read(userId, ics) : null;
+		const loaded = ics ? await read(userId, ics) : null;
+		if (loaded?.invitation.method !== 'COUNTER') return loaded;
+		return { ...loaded, conflicts: await clashes(userId, loaded) };
 	}
 
 	return {
@@ -88,11 +115,13 @@ export function createAnswersService(deps: AnswersServiceDeps): AnswersService {
 			if (view.method !== 'COUNTER' || view.applied || view.outdated) return { type: 'unsupported' };
 
 			if (action === 'accept-proposal') {
+				// Checked again here, not trusted from the card: the calendar may have filled up since.
+				if (view.conflicts.length > 0) return { type: 'conflict' };
 				const { invitation, event } = loaded;
 				const moved = await deps.reschedule(userId, event, new Date(invitation.start), new Date(invitation.end));
 				if (moved !== 'ok') return { type: moved };
 				const after = await repo.findOwnEvent(userId, event.id);
-				return { type: 'ok', answer: toView({ ...loaded, event: after ?? event }) };
+				return { type: 'ok', answer: toView({ ...loaded, event: after ?? event, conflicts: [] }) };
 			}
 
 			// Declining is nothing but telling the guest, so a failed send is the whole outcome.

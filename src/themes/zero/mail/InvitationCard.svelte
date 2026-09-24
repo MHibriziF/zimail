@@ -8,6 +8,7 @@
 	import {
 		SHOWN_GUESTS,
 		answerHeadlineKey,
+		canAcceptProposal,
 		canSettleProposal,
 		formatInvitationWhen,
 		otherGuests
@@ -156,15 +157,27 @@
 			{:else if answer.proposed && answer.outdated}
 				<p class="z-invite-note">{t('answer.outdated')}</p>
 			{:else if canSettleProposal(answer)}
+				{#if answer.conflicts.length > 0}
+					<div class="z-invite-clash" role="note">
+						<p>{t('answer.clashes')}</p>
+						<ul>
+							{#each answer.conflicts as clash, index (index)}
+								<li>{clash.title} · {formatInvitationWhen(clash, locale, timeZone)}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
 				<div class="z-invite-actions">
-					<button
-						type="button"
-						class="z-invite-btn chosen"
-						disabled={card.busy !== null}
-						onclick={() => card.settleProposal('accept-proposal')}
-					>
-						<Icon name="Check" size={13} />{t('answer.accept')}
-					</button>
+					{#if canAcceptProposal(answer)}
+						<button
+							type="button"
+							class="z-invite-btn chosen"
+							disabled={card.busy !== null}
+							onclick={() => card.settleProposal('accept-proposal')}
+						>
+							<Icon name="Check" size={13} />{t('answer.accept')}
+						</button>
+					{/if}
 					<button
 						type="button"
 						class="z-invite-btn"
@@ -294,6 +307,26 @@
 	.z-invite-status {
 		font-weight: 500;
 		color: var(--z-fg);
+	}
+
+	.z-invite-clash {
+		margin-top: 0.375rem;
+		padding: 0.5rem 0.625rem;
+		border-radius: 0.375rem;
+		font-size: 0.8125rem;
+		color: #dc2626;
+		background: color-mix(in srgb, #dc2626 10%, transparent);
+	}
+
+	.z-invite-clash p {
+		margin: 0;
+		font-weight: 500;
+	}
+
+	.z-invite-clash ul {
+		margin: 0.25rem 0 0;
+		padding-left: 1.125rem;
+		color: var(--z-muted);
 	}
 
 	.z-invite-error {

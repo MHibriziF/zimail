@@ -11,6 +11,7 @@ const FAILURES = {
 	outdated: { error: 'A newer version of this invitation has already been applied', status: 409 },
 	unsupported: { error: 'That answer does not apply to this invitation', status: 400 },
 	slot_taken: { error: 'Another booking already has that time', status: 409 },
+	conflict: { error: 'That time clashes with something already on your calendar', status: 409 },
 	not_sent: { error: 'Could not send your answer to the guest. Nothing changed; try again.', status: 502 }
 } as const;
 

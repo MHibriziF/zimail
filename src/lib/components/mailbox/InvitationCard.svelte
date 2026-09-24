@@ -8,6 +8,7 @@
 	import {
 		SHOWN_GUESTS,
 		answerHeadlineKey,
+		canAcceptProposal,
 		canSettleProposal,
 		formatInvitationWhen,
 		otherGuests
@@ -163,15 +164,27 @@
 			{:else if answer.proposed && answer.outdated}
 				<p class="invite-note">{t('answer.outdated')}</p>
 			{:else if canSettleProposal(answer)}
+				{#if answer.conflicts.length > 0}
+					<div class="invite-clash" role="note">
+						<p><Icon name="error-warning-line" size={14} />{t('answer.clashes')}</p>
+						<ul>
+							{#each answer.conflicts as clash, index (index)}
+								<li>{clash.title} · {formatInvitationWhen(clash, locale, timeZone)}</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
 				<div class="invite-actions">
-					<button
-						type="button"
-						class="invite-btn chosen"
-						disabled={card.busy !== null}
-						onclick={() => card.settleProposal('accept-proposal')}
-					>
-						<Icon name="check-line" size={15} />{t('answer.accept')}
-					</button>
+					{#if canAcceptProposal(answer)}
+						<button
+							type="button"
+							class="invite-btn chosen"
+							disabled={card.busy !== null}
+							onclick={() => card.settleProposal('accept-proposal')}
+						>
+							<Icon name="check-line" size={15} />{t('answer.accept')}
+						</button>
+					{/if}
 					<button
 						type="button"
 						class="invite-btn"
@@ -298,6 +311,29 @@
 	.invite-status {
 		font-weight: 500;
 		color: var(--color-accent-text);
+	}
+
+	.invite-clash {
+		margin-top: 0.375rem;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		color: var(--color-danger);
+		background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+	}
+
+	.invite-clash p {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin: 0;
+		font-weight: 500;
+	}
+
+	.invite-clash ul {
+		margin: 0.25rem 0 0;
+		padding-left: 1.25rem;
+		color: var(--color-text-secondary);
 	}
 
 	.invite-error {

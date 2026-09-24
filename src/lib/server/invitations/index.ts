@@ -2,6 +2,7 @@ import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { APP_NAME } from '$lib/constants';
 import { isCalendarAttachment } from '../../utils/attachments';
 import { getAttachmentForUser, listAttachments, readAttachmentBytes } from '../attachments';
+import { createD1CalendarRepository } from '../calendar/repository';
 import { getEmailProvider } from '../context';
 import { listAddressesForUser } from '../domains';
 import type { EmailProvider } from '../email-provider';
@@ -26,6 +27,8 @@ export { createD1InvitationsRepository, type InvitationsRepository } from './rep
 
 /** An invitation is a few KB; anything far bigger isn't worth parsing on a request. */
 const MAX_CALENDAR_BYTES = 512 * 1024;
+/** Events looked at around a proposed time — a few days' worth of anyone's calendar. */
+const MAX_NEARBY_EVENTS = 500;
 
 function utf8Base64(text: string): string {
 	let binary = '';
@@ -133,7 +136,9 @@ export function answersServiceFor(db: D1Database, bucket: R2Bucket | undefined, 
 		loadCalendarPart: (userId, emailId) => loadCalendarPart(db, bucket, userId, emailId),
 		timeZone: (userId) => userTimeZone(db, userId),
 		reschedule: actions?.reschedule ?? (async () => 'not_found'),
-		declineProposal: actions?.declineProposal ?? (async () => undefined)
+		declineProposal: actions?.declineProposal ?? (async () => undefined),
+		eventsBetween: (userId, from, to) =>
+			createD1CalendarRepository(db).listOverlapping(userId, from.toISOString(), to.toISOString(), MAX_NEARBY_EVENTS)
 	});
 }
 

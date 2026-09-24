@@ -1010,6 +1010,7 @@
 		"decline": "Garder l'horaire actuel",
 		"moved": "Le nouvel horaire a été envoyé à {name}.",
 		"kept": "{name} a été prévenu que l'horaire ne change pas.",
-		"outdated": "L'événement a changé depuis l'envoi de cette proposition."
+		"outdated": "L'événement a changé depuis l'envoi de cette proposition.",
+		"clashes": "Cet horaire est en conflit avec votre agenda :"
 	}
 }
