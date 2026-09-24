@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { expandCalendar } from '../../../calendar/ics';
-import { bookingEmailContent, bookingIcs, type BookingDetails } from '../email';
+import { bookingEmailContent, bookingIcs, inviteContentType, type BookingDetails } from '../email';
 
 const details: BookingDetails = {
 	uid: 'abc@zimail',
@@ -16,6 +16,40 @@ const details: BookingDetails = {
 	timeZone: 'Asia/Jakarta'
 };
 
+describe('calendar invitation', () => {
+	const now = new Date('2026-09-24T00:00:00.000Z');
+
+	test('a booking is an iTIP request the guest can accept', () => {
+		const ics = bookingIcs(details, 'request', now);
+		assert.match(ics, /\r\nMETHOD:REQUEST\r\n/);
+		assert.match(ics, /\r\nUID:abc@zimail\r\n/);
+		assert.match(ics, /\r\nSEQUENCE:0\r\n/);
+		assert.match(ics, /\r\nSTATUS:CONFIRMED\r\n/);
+		assert.match(ics, /ORGANIZER;CN="Izi":mailto:me@example.test/);
+		// Quoted, so the comma in the guest's name can't split the parameter.
+		assert.match(ics.replaceAll('\r\n ', ''), /ATTENDEE;CN="Ana, from Acme";ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:ana@example.com/);
+		assert.equal(inviteContentType('request'), 'text/calendar; method=REQUEST; charset=UTF-8');
+	});
+
+	test('a cancellation names the same event with a higher sequence', () => {
+		const ics = bookingIcs(details, 'cancel', now);
+		assert.match(ics, /\r\nMETHOD:CANCEL\r\n/);
+		assert.match(ics, /\r\nUID:abc@zimail\r\n/);
+		assert.match(ics, /\r\nSEQUENCE:1\r\n/);
+		assert.match(ics, /\r\nSTATUS:CANCELLED\r\n/);
+		assert.equal(inviteContentType('cancel'), 'text/calendar; method=CANCEL; charset=UTF-8');
+
+		const content = bookingEmailContent(details, 'cancel');
+		assert.match(content.title, /^Cancelled: /);
+		assert.ok(content.details?.some((detail) => detail.label === 'Was'));
+	});
+
+	test('quotes in a name are dropped rather than breaking the parameter', () => {
+		const ics = bookingIcs({ ...details, guestName: 'Ana "the" Guest' }, 'request', now);
+		assert.match(ics.replaceAll('\r\n ', ''), /ATTENDEE;CN="Ana the Guest";/);
+	});
+});
+
 describe('booking confirmation', () => {
 	test('the email states the time in the page’s zone and includes the note', () => {
 		const content = bookingEmailContent(details);
@@ -27,7 +61,7 @@ describe('booking confirmation', () => {
 	});
 
 	test('the invite escapes text and round-trips through our own parser', () => {
-		const ics = bookingIcs(details, new Date('2026-09-24T00:00:00.000Z'));
+		const ics = bookingIcs(details, 'request', new Date('2026-09-24T00:00:00.000Z'));
 		assert.match(ics, /SUMMARY:Office hours\\; weekly with Izi/);
 		assert.match(ics, /DESCRIPTION:Line one\\nLine two/);
 		assert.ok(ics.split('\r\n').every((line) => line.length <= 75));
