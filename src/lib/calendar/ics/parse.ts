@@ -48,37 +48,50 @@ export function unescapeText(value: string): string {
 	return value.replaceAll(/\\([\\;,nN])/g, (_, char: string) => (char === 'n' || char === 'N' ? '\n' : char));
 }
 
-export function parseIcs(text: string): IcsCalendar {
-	const events: IcsComponent[] = [];
-	let timeZone: string | null = null;
-	let current: IcsComponent | null = null;
-	// Depth inside the current VEVENT, so a nested VALARM's properties are ignored.
-	let nested = 0;
+/** Walks lines into VEVENTs. `depth` counts components opened inside the current event (VALARM). */
+class Collector {
+	events: IcsComponent[] = [];
+	timeZone: string | null = null;
+	private current: IcsComponent | null = null;
+	private depth = 0;
 
+	begin(kind: string) {
+		if (this.current) this.depth++;
+		else if (kind === 'VEVENT') this.current = new Map();
+	}
+
+	end(kind: string) {
+		if (!this.current) return;
+		if (this.depth > 0) this.depth--;
+		else if (kind === 'VEVENT') {
+			this.events.push(this.current);
+			this.current = null;
+		}
+	}
+
+	property(property: IcsProperty) {
+		if (!this.current) {
+			if (property.name === 'X-WR-TIMEZONE') this.timeZone = property.value.trim();
+			return;
+		}
+		if (this.depth > 0) return;
+		const list = this.current.get(property.name);
+		if (list) list.push(property);
+		else this.current.set(property.name, [property]);
+	}
+}
+
+export function parseIcs(text: string): IcsCalendar {
+	const collector = new Collector();
 	for (const line of unfold(text)) {
 		const property = parseProperty(line);
 		if (!property) continue;
-		const { name, value } = property;
-		const kind = value.trim().toUpperCase();
-
-		if (name === 'BEGIN') {
-			if (current) nested++;
-			else if (kind === 'VEVENT') current = new Map();
-		} else if (name === 'END') {
-			if (current && nested > 0) nested--;
-			else if (current && kind === 'VEVENT') {
-				events.push(current);
-				current = null;
-			}
-		} else if (current && nested === 0) {
-			const list = current.get(name);
-			if (list) list.push(property);
-			else current.set(name, [property]);
-		} else if (!current && name === 'X-WR-TIMEZONE') {
-			timeZone = value.trim();
-		}
+		const kind = property.value.trim().toUpperCase();
+		if (property.name === 'BEGIN') collector.begin(kind);
+		else if (property.name === 'END') collector.end(kind);
+		else collector.property(property);
 	}
-	return { events, timeZone };
+	return { events: collector.events, timeZone: collector.timeZone };
 }
 
 export function first(component: IcsComponent, name: string): IcsProperty | undefined {
