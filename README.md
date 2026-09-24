@@ -29,7 +29,8 @@ no servers to maintain.
 
 On top of everything upstream ships:
 
-- **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat. **Compose → New meeting**, or the **Meetings** view.
+- **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat, and [recording](#recording-a-meeting) in the browser. **Compose → New meeting**, or the **Meetings** view.
+- **[Calendar](#calendar)** — month and agenda views next to the mailbox, with today's and tomorrow's events in the sidebar. Pull in [Google, Outlook or iCloud calendars](#other-calendars) by their iCal address, and share [reservation pages](#reservation-pages) where people book a free slot — checked against every calendar you have, sent as a real calendar invitation, and optionally with its own meeting room. **Calendar** in the sidebar.
 - **Two interfaces** — Zero, the two-pane shell with a command palette and keyboard shortcuts, or Classic, the original stacked layout. Per account, in **Settings → Interface**.
 - **Scheduled send** — pick any future date and time, or one of the presets, from the caret beside **Send**. The message waits in your own outbox and a [cron trigger](#scheduled-send) delivers it, so it works on either mail provider and is not capped at a provider's hold-until horizon. Recall it back to a draft any time before it goes.
 - **Two-factor authentication** — TOTP from any authenticator app, with single-use backup codes, asked for at sign-in. **Settings → Two-factor authentication**.
@@ -277,6 +278,97 @@ Skip this and meetings just don't show up — nothing else depends on it. The
 **Deploy this fork** button prompts for these three too, and they're optional
 there as well: leave them blank and add them later the same way.
 
+#### Recording a meeting
+
+The record button in the call bar records **in the browser** and saves a
+`.webm` (or `.mp4`) to your downloads — nothing is uploaded, and there is no
+per-minute LiveKit Egress bill.
+
+- **Record the meeting** (host only) — draws everyone's camera, any shared
+  screen and a name label onto a clean 1280×720 frame, with everyone's voice
+  mixed in. The call's own buttons and panels are not in it. Your tab has to
+  stay open, but it can be in the background.
+- **Record my view** (anyone) — records exactly what your screen shows, for your
+  own notes. The browser asks which screen or tab to capture.
+
+Everyone in the call sees who is recording and which kind. *Record my view*
+needs screen capture, which phone browsers don't offer, so on a phone only the
+host's *Record the meeting* is available — and only where the browser supports
+`MediaRecorder`.
+
+## Calendar
+
+*Added by this fork.*
+
+**Calendar** in the sidebar opens a month grid (or an agenda list) in your
+[time zone](#what-this-fork-adds). Click a day to see it, double-click to add an
+event, and click an event to edit it. The sidebar's **Coming up** list shows
+today's and tomorrow's events so they're in view while you read mail. Both
+interfaces, and all five languages.
+
+### Other calendars
+
+Busy time in another calendar should count here too — so a Google meeting
+blocks a reservation slot. **Calendar → Other calendars → Add calendar** takes a
+calendar's **iCal address**; Zimail reads it (nothing is ever sent to it) and
+re-syncs every 30 minutes from the [cron trigger](#scheduled-send), or right
+away with **Sync now**.
+
+| Calendar | Where the address is |
+| --- | --- |
+| Google | Settings → your calendar → **Integrate calendar** → **Secret address in iCal format** |
+| Outlook | Settings → Calendar → Shared calendars → **Publish a calendar** → ICS |
+| iCloud | Share the calendar as a **Public Calendar** and copy the `webcal://` link |
+
+The secret address works like a password: anyone who has it can read the
+calendar. Zimail stores it but only ever shows its host, and **Reset** on
+Google's side revokes it.
+
+**Google Workspace accounts** often don't show a secret address — the
+organisation's admin has turned off external sharing. Either ask the admin to
+allow it (Admin console → Apps → Google Workspace → Calendar → Sharing
+settings), or make the calendar public with **See only free/busy (hide
+details)** and use its *Public address in iCal format*. That exposes only busy
+blocks — no titles, people or places — which is all reservations need.
+
+Recurring events (weekly, monthly, "last Friday", exceptions and moved
+instances), time zones including Outlook's Windows names, and all-day events
+are handled. Events marked *free* in the source calendar show here but don't
+block anything.
+
+### Reservation pages
+
+**Calendar → Reservation pages → New page** makes a public link
+(`/book/your-link`) where people pick a time and book it — like Calendly, but
+yours and free. You choose:
+
+- the **dates** it's open between, the **days** of the week and the **daily hours**;
+- the **length** of a slot, a **buffer** around your other events, and the **minimum notice**;
+- optionally, **a Zimail meeting room for each booking** (needs [video meetings](#video-meetings-optional)).
+
+A slot is offered only if nothing on your calendar overlaps it — your own
+events, earlier bookings and [other calendars](#other-calendars) alike. Guests
+see only which times are free, never what fills the rest, and see them in their
+own time zone. The server checks the slot again when the booking arrives, so two
+people can't take the same time.
+
+Each booking:
+
+- appears on your calendar as *Guest · Page title*, with their email and note;
+- emails the guest a **calendar invitation** from your address (you're on Bcc) —
+  Gmail, Outlook and Apple Mail show it as an invite to accept, rather than a
+  file to import;
+- carries the **meeting link** in the email, in the invitation's location and on
+  your calendar event, when the page gives rooms.
+
+Cancel a booking from its event on your calendar: the slot opens up again, its
+meeting room is closed, and the guest gets a cancellation that takes the event
+off their calendar.
+
+A page takes at most 30 bookings a day, and one guest address at most three
+upcoming bookings, so the form can't be used to send mail from your domain in
+bulk.
+
 ## Database migrations
 
 *Changed by this fork.*
@@ -415,11 +507,12 @@ Both providers accept every address on a connected domain. The app then routes:
 
 ```
 src/
-  worker.ts          SvelteKit fetch + Cloudflare email() inbound + scheduled() send
+  worker.ts          SvelteKit fetch + Cloudflare email() inbound + scheduled() send and calendar sync
   routes/            inbox, compose, drafts, settings, admin, setup
   lib/
     components/      sidebar, mailbox, composer, thread view
-    server/          providers, inbound, D1, auth
+    server/          providers, inbound, D1, auth, calendar, calendar feeds, reservations
+    calendar/        event rules, month grid, iCal parser, reservation slots
 scripts/
   setup.sh / setup.mjs         first-run wizard
   wrap-cloudflare-worker.mjs   attach email() after the SvelteKit build
@@ -439,6 +532,9 @@ migrations/          D1 schema, applied in order
 | Attachments missing | R2 bucket must exist and match `bucket_name` in `wrangler.jsonc` |
 | `database_id` errors on deploy | Paste the id from `wrangler d1 create` into `wrangler.jsonc` |
 | Setup shows no Cloudflare domains | Set `CLOUDFLARE_MAIL_DOMAINS` and `EMAIL_PROVIDER=cloudflare`, restart the dev server |
+| "The calendar address was refused" | Google answers 404 for a `/public/` address unless the calendar is public — use the **secret** address, or see [Workspace accounts](#other-calendars) |
+| Other calendar stuck at its last sync | Google republishes its iCal feed every few hours; **Sync now** fetches what it currently offers |
+| "Meeting room" option greyed out | Set the three `LIVEKIT_*` secrets from [Video meetings](#video-meetings-optional) |
 
 ## License
 
