@@ -89,6 +89,8 @@ export type ReservationsRepository = {
 	insertBooking(booking: NewBooking): Promise<void>;
 	/** The booking behind a calendar event, with what a cancellation email needs. */
 	getBookingByEvent(userId: string, eventId: string): Promise<StoredBooking | null>;
+	/** Moves a booking and bumps its invitation revision; `false` if there was no such booking. */
+	moveBooking(userId: string, eventId: string, start: string, end: string): Promise<boolean>;
 };
 
 export type StoredBooking = {
@@ -100,6 +102,10 @@ export type StoredBooking = {
 	pageTitle: string;
 	timeZone: string;
 	meetingCode: string | null;
+	/** The join link the guest was given, kept as the event's location. */
+	meetingUrl: string | null;
+	/** The invitation revision the guest last received. */
+	sequence: number;
 };
 
 function settingsValues(page: ReservationPageSettings): unknown[] {
@@ -211,8 +217,10 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 		async getBookingByEvent(userId, eventId) {
 			const row = await db
 				.prepare(
-					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, r.meeting_code, p.title, p.time_zone
+					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, r.meeting_code, p.title, p.time_zone,
+					        e.location, COALESCE(e.sequence, 0) AS sequence
 					 FROM reservations r JOIN reservation_pages p ON p.id = r.page_id
+					 LEFT JOIN calendar_events e ON e.id = r.event_id
 					 WHERE r.event_id = ? AND r.user_id = ?`
 				)
 				.bind(eventId, userId)
@@ -225,6 +233,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					meeting_code: string | null;
 					title: string;
 					time_zone: string;
+					location: string | null;
+					sequence: number;
 				}>();
 			if (!row) return null;
 			return {
@@ -235,7 +245,9 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				end: row.ends_at,
 				pageTitle: row.title,
 				timeZone: row.time_zone,
-				meetingCode: row.meeting_code
+				meetingCode: row.meeting_code,
+				meetingUrl: row.meeting_code ? row.location : null,
+				sequence: row.sequence
 			};
 		},
 
@@ -274,8 +286,27 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 						booking.end,
 						booking.eventLocation,
 						booking.eventNotes
-					)
+					),
+				db
+					.prepare('INSERT INTO event_guests (event_id, user_id, email, name) VALUES (?, ?, lower(?), ?)')
+					.bind(booking.eventId, booking.userId, booking.guestEmail, booking.guestName)
 			]);
+		},
+
+		async moveBooking(userId, eventId, start, end) {
+			const [, moved] = await db.batch([
+				db
+					.prepare('UPDATE reservations SET starts_at = ?, ends_at = ? WHERE event_id = ? AND user_id = ?')
+					.bind(start, end, eventId, userId),
+				db
+					.prepare(
+						`UPDATE calendar_events
+						 SET starts_at = ?, ends_at = ?, sequence = sequence + 1, updated_at = CURRENT_TIMESTAMP
+						 WHERE id = ? AND user_id = ? AND source = 'reservation'`
+					)
+					.bind(start, end, eventId, userId)
+			]);
+			return (moved.meta.changes ?? 0) > 0;
 		}
 	};
 }

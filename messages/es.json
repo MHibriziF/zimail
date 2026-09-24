@@ -995,5 +995,21 @@
 		"moreGuests": "y {count} más",
 		"repeats": "Se repite",
 		"occurrence": "Una instancia de un evento periódico"
+	},
+	"answer": {
+		"reply": "Respuesta a tu invitación",
+		"proposal": "Nuevo horario propuesto",
+		"accepted": "{name} asistirá",
+		"tentative": "{name} quizá asista",
+		"declined": "{name} no puede asistir",
+		"noAnswer": "{name} aún no ha decidido",
+		"proposes": "{name} propone un nuevo horario",
+		"now": "Actual",
+		"proposed": "Propuesto",
+		"accept": "Aceptar el nuevo horario",
+		"decline": "Mantener el horario actual",
+		"moved": "Se envió el nuevo horario a {name}.",
+		"kept": "Se avisó a {name} de que el horario se mantiene.",
+		"outdated": "El evento cambió después de que se enviara esta propuesta."
 	}
 }

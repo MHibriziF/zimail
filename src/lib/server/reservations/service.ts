@@ -51,6 +51,12 @@ export type ReservationsService = {
 	 * calendar then drops it. `false` if there was no such booking to remove.
 	 */
 	cancelBooking(userId: string, eventId: string): Promise<boolean>;
+	/**
+	 * Moves a booking — the host accepting a guest's proposed time — and sends
+	 * the guest the update. The host decides, so page hours aren't enforced;
+	 * another booking already in that slot still is.
+	 */
+	rescheduleBooking(userId: string, eventId: string, start: Date, end: Date): Promise<'ok' | 'not_found' | 'slot_taken'>;
 };
 
 export type ReservationsServiceDeps = {
@@ -299,9 +305,34 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				start: new Date(booking.start),
 				end: new Date(booking.end),
 				timeZone: booking.timeZone,
-				meetingUrl: null
+				meetingUrl: null,
+				sequence: booking.sequence + 1
 			});
 			return true;
+		},
+
+		async rescheduleBooking(userId, eventId, start, end) {
+			const booking = await repo.getBookingByEvent(userId, eventId);
+			if (!booking) return 'not_found';
+			try {
+				if (!(await repo.moveBooking(userId, eventId, start.toISOString(), end.toISOString()))) return 'not_found';
+			} catch (error) {
+				if (isUniqueConstraintError(error)) return 'slot_taken';
+				throw error;
+			}
+			await tellGuest(userId, 'moved', {
+				uid: inviteUid(eventId),
+				pageTitle: booking.pageTitle,
+				guestName: booking.guestName,
+				guestEmail: booking.guestEmail,
+				note: booking.note ?? '',
+				start,
+				end,
+				timeZone: booking.timeZone,
+				meetingUrl: booking.meetingUrl,
+				sequence: booking.sequence + 1
+			});
+			return 'ok';
 		}
 	};
 }

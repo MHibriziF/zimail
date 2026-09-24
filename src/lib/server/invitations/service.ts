@@ -42,7 +42,10 @@ export type InvitationsService = {
 };
 
 export type InvitationsServiceDeps = {
-	repo: InvitationsRepository;
+	repo: Pick<
+		InvitationsRepository,
+		'get' | 'save' | 'hasEvents' | 'replaceEvents' | 'replaceOccurrence' | 'removeEvents'
+	>;
 	/** The calendar part of one of the user's messages, as text. */
 	loadCalendarPart: (userId: string, emailId: string) => Promise<string | null>;
 	ownAddresses: (userId: string) => Promise<string[]>;

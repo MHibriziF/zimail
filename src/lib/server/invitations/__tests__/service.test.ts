@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import type { InvitationsRepository, InviteEventRow, StoredInvite } from '../repository';
-import { createInvitationsService } from '../service';
+import type { InviteEventRow, StoredInvite } from '../repository';
+import { createInvitationsService, type InvitationsServiceDeps } from '../service';
 import { replyIcs } from '../email';
 import { readInvitation } from '../../../calendar/ics/invite';
 
@@ -38,7 +38,7 @@ function setup(messages: Record<string, string>) {
 	const events = new Map<string, InviteEventRow[]>();
 	const replies: string[] = [];
 
-	const repo: InvitationsRepository = {
+	const repo: InvitationsServiceDeps['repo'] = {
 		async get(_userId, uid) {
 			return invites.get(uid) ?? null;
 		},

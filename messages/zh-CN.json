@@ -995,5 +995,21 @@
 		"moreGuests": "以及另外 {count} 人",
 		"repeats": "重复",
 		"occurrence": "重复活动中的一次"
+	},
+	"answer": {
+		"reply": "对你的邀请的回复",
+		"proposal": "建议了新时间",
+		"accepted": "{name} 将参加",
+		"tentative": "{name} 可能参加",
+		"declined": "{name} 无法参加",
+		"noAnswer": "{name} 尚未决定",
+		"proposes": "{name} 建议了新时间",
+		"now": "当前",
+		"proposed": "建议",
+		"accept": "接受新时间",
+		"decline": "保持当前时间",
+		"moved": "已将新时间发送给 {name}。",
+		"kept": "已告知 {name} 时间不变。",
+		"outdated": "此建议发送后，活动已有更改。"
 	}
 }

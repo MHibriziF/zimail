@@ -995,5 +995,21 @@
 		"moreGuests": "and {count} more",
 		"repeats": "Repeats",
 		"occurrence": "One occurrence of a repeating event"
+	},
+	"answer": {
+		"reply": "Reply to your invitation",
+		"proposal": "New time proposed",
+		"accepted": "{name} is going",
+		"tentative": "{name} might go",
+		"declined": "{name} can't go",
+		"noAnswer": "{name} hasn't decided",
+		"proposes": "{name} proposes a new time",
+		"now": "Now",
+		"proposed": "Proposed",
+		"accept": "Accept new time",
+		"decline": "Keep the current time",
+		"moved": "{name} has been sent the new time.",
+		"kept": "{name} has been told the time stays.",
+		"outdated": "The event has changed since this proposal was sent."
 	}
 }

@@ -5,7 +5,13 @@
 	import { DEFAULT_LOCALE, intlLocale } from '$lib/i18n/locales';
 	import { detectTimeZone } from '$lib/timezone';
 	import { InvitationCard } from '$lib/calendar/invitation-card.svelte';
-	import { SHOWN_GUESTS, formatInvitationWhen, otherGuests } from '$lib/calendar/invitations';
+	import {
+		SHOWN_GUESTS,
+		answerHeadlineKey,
+		canSettleProposal,
+		formatInvitationWhen,
+		otherGuests
+	} from '$lib/calendar/invitations';
 	import type { InviteResponse } from '$lib/calendar/ics/invite';
 	import Icon from '../Icon.svelte';
 
@@ -20,6 +26,7 @@
 	const timeZone = $derived<string>($page.data.timeZone ?? (browser ? detectTimeZone() : 'UTC'));
 
 	const view = $derived(card.view);
+	const answer = $derived(card.answer);
 	const cancelled = $derived(view?.method === 'CANCEL');
 	const heading = $derived.by(() => {
 		if (cancelled) return t('invitation.cancelled');
@@ -121,6 +128,59 @@
 			{/if}
 			{#if card.replied !== null}
 				<p class="invite-note">{card.replied ? t('invitation.replied') : t('invitation.replyFailed')}</p>
+			{/if}
+			{#if card.error}<p class="invite-error" role="alert">{card.error}</p>{/if}
+		</div>
+	</section>
+{:else if answer}
+	{@const who = answer.from.name ?? answer.from.email}
+	<section class="invite" aria-label={answer.proposed ? t('answer.proposal') : t('answer.reply')}>
+		<div class="invite-date" aria-hidden="true">
+			<Icon name={answer.proposed ? 'calendar-schedule-line' : 'calendar-check-line'} size={20} />
+		</div>
+		<div class="invite-main">
+			<p class="invite-kind">{answer.proposed ? t('answer.proposal') : t('answer.reply')}</p>
+			<h3 class="invite-title">{answer.title}</h3>
+			<p class="invite-status">{t(answerHeadlineKey(answer), { name: who })}</p>
+			{#if answer.proposed}
+				<p class="invite-meta">
+					<Icon name="time-line" size={14} />{t('answer.now')}: {formatInvitationWhen(answer.current, locale, timeZone)}
+				</p>
+				{#if !answer.applied}
+					<p class="invite-meta">
+						<Icon name="arrow-right-line" size={14} />{t('answer.proposed')}: {formatInvitationWhen(answer.proposed, locale, timeZone)}
+					</p>
+				{/if}
+			{:else}
+				<p class="invite-meta"><Icon name="time-line" size={14} />{formatInvitationWhen(answer.current, locale, timeZone)}</p>
+			{/if}
+			{#if answer.comment}<p class="invite-note">“{answer.comment}”</p>{/if}
+
+			{#if card.proposalDeclined}
+				<p class="invite-note">{t('answer.kept', { name: who })}</p>
+			{:else if answer.applied}
+				<p class="invite-note">{t('answer.moved', { name: who })}</p>
+			{:else if answer.proposed && answer.outdated}
+				<p class="invite-note">{t('answer.outdated')}</p>
+			{:else if canSettleProposal(answer)}
+				<div class="invite-actions">
+					<button
+						type="button"
+						class="invite-btn chosen"
+						disabled={card.busy !== null}
+						onclick={() => card.settleProposal('accept-proposal')}
+					>
+						<Icon name="check-line" size={15} />{t('answer.accept')}
+					</button>
+					<button
+						type="button"
+						class="invite-btn"
+						disabled={card.busy !== null}
+						onclick={() => card.settleProposal('decline-proposal')}
+					>
+						{t('answer.decline')}
+					</button>
+				</div>
 			{/if}
 			{#if card.error}<p class="invite-error" role="alert">{card.error}</p>{/if}
 		</div>

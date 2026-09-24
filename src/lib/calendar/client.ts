@@ -2,7 +2,7 @@ import type { ReservationPage, ReservationPageSettings } from './reservations';
 import type { CalendarFeed } from './feeds';
 import type { LabelColor } from '../mail/labels';
 import type { CalendarEvent, CalendarEventInput } from './events';
-import type { InvitationAction, InvitationView } from './invitations';
+import type { AnswerAction, GuestAnswerView, InvitationAction, InvitationView } from './invitations';
 
 export class CalendarRequestError extends Error {}
 
@@ -56,10 +56,21 @@ export async function removeFeed(id: string): Promise<void> {
 	await readJson(response, 'Could not remove the calendar');
 }
 
-/** The invitation a message carries, or `null` when it has none to act on. */
-export async function fetchInvitation(emailId: string): Promise<InvitationView | null> {
+/** What a message's calendar part is: an invitation to the user, a guest's answer to theirs, or neither. */
+export async function fetchInvitation(
+	emailId: string
+): Promise<{ invitation: InvitationView | null; answer: GuestAnswerView | null }> {
 	const response = await fetch(`/api/mail/${encodeURIComponent(emailId)}/invitation`);
-	return (await readJson<{ invitation: InvitationView | null }>(response, 'Could not read the invitation')).invitation;
+	return readJson(response, 'Could not read the invitation');
+}
+
+export async function actOnAnswer(emailId: string, action: AnswerAction): Promise<GuestAnswerView> {
+	const response = await fetch(`/api/mail/${encodeURIComponent(emailId)}/invitation`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ action })
+	});
+	return (await readJson<{ answer: GuestAnswerView }>(response, 'Could not update the event')).answer;
 }
 
 export async function actOnInvitation(

@@ -5,13 +5,23 @@ import { getAttachmentForUser, listAttachments, readAttachmentBytes } from '../a
 import { getEmailProvider } from '../context';
 import { listAddressesForUser } from '../domains';
 import type { EmailProvider } from '../email-provider';
-import { renderEmailHtml, renderEmailText } from '../outbound/email-template';
+import { renderEmailHtml, renderEmailText, type EmailContent } from '../outbound/email-template';
 import { sendOutboundEmail } from '../outbound/send-mail';
-import { replyEmailContent, replyIcs, replySubject } from './email';
+import { getReservationsService } from '../reservations';
+import type { InviteParty } from '../../calendar/ics/invite';
+import { createAnswersService, type AnswersService } from './answers';
+import {
+	declineCounterEmailContent,
+	declineCounterIcs,
+	replyEmailContent,
+	replyIcs,
+	replySubject
+} from './email';
 import { createD1InvitationsRepository } from './repository';
 import { createInvitationsService, type InvitationsService } from './service';
 
 export { createInvitationsService, type InvitationsService, type InvitationView } from './service';
+export { createAnswersService, type AnswersService } from './answers';
 export { createD1InvitationsRepository, type InvitationsRepository } from './repository';
 
 /** An invitation is a few KB; anything far bigger isn't worth parsing on a request. */
@@ -48,6 +58,46 @@ async function loadCalendarPart(db: D1Database, bucket: R2Bucket | undefined, us
 	return bytes ? new TextDecoder().decode(bytes) : null;
 }
 
+async function userTimeZone(db: D1Database, userId: string): Promise<string> {
+	const row = await db.prepare('SELECT timezone FROM users WHERE id = ?').bind(userId).first<{ timezone: string | null }>();
+	return row?.timezone || 'UTC';
+}
+
+type CalendarMail = {
+	/** Which of the user's addresses to send from; the default one when it isn't theirs or isn't given. */
+	fromEmail: string | null;
+	/** Only this exact address will do — an answer must come from the address that was invited. */
+	strict?: boolean;
+	to: string;
+	subject: string;
+	content: EmailContent;
+	method: string;
+	/** Built once the sending address is known, since the file names it. */
+	ics: (from: InviteParty) => string;
+};
+
+/** A calendar message (a reply, a declined proposal) sent from one of the user's own addresses. */
+async function sendCalendarMail(db: D1Database, provider: EmailProvider, userId: string, mail: CalendarMail) {
+	const addresses = await listAddressesForUser(db, userId);
+	const exact = addresses.find((address) => address.address.toLowerCase() === mail.fromEmail?.toLowerCase());
+	const from = mail.strict ? exact : (exact ?? addresses.find((address) => address.is_default) ?? addresses[0]);
+	if (!from) return;
+	const user = await db.prepare('SELECT name FROM users WHERE id = ?').bind(userId).first<{ name: string }>();
+	const senderName = from.label?.trim() || user?.name || APP_NAME;
+	const ics = mail.ics({ email: from.address.toLowerCase(), name: senderName });
+	await sendOutboundEmail(provider, {
+		from,
+		senderName,
+		to: mail.to,
+		subject: mail.subject,
+		text: renderEmailText(mail.content),
+		html: renderEmailHtml(mail.content),
+		attachments: [
+			{ filename: 'invite.ics', type: `text/calendar; method=${mail.method}; charset=UTF-8`, content: utf8Base64(ics) }
+		]
+	});
+}
+
 /** `provider` is only needed to answer; the inbound paths, which just apply updates, go without. */
 export function invitationsServiceFor(
 	db: D1Database,
@@ -58,33 +108,32 @@ export function invitationsServiceFor(
 		repo: createD1InvitationsRepository(db),
 		loadCalendarPart: (userId, emailId) => loadCalendarPart(db, bucket, userId, emailId),
 		ownAddresses: async (userId) => (await listAddressesForUser(db, userId)).map((address) => address.address),
-		async timeZone(userId) {
-			const row = await db.prepare('SELECT timezone FROM users WHERE id = ?').bind(userId).first<{ timezone: string | null }>();
-			return row?.timezone || 'UTC';
-		},
+		timeZone: (userId) => userTimeZone(db, userId),
 		async sendReply(userId, invitation, attendee, response) {
 			if (!provider || !invitation.organizer) return;
-			const addresses = await listAddressesForUser(db, userId);
-			const from = addresses.find((address) => address.address.toLowerCase() === attendee.email);
-			if (!from) return;
-			const user = await db.prepare('SELECT name FROM users WHERE id = ?').bind(userId).first<{ name: string }>();
-			const content = replyEmailContent(invitation, attendee, response);
-			await sendOutboundEmail(provider(), {
-				from,
-				senderName: from.label?.trim() || user?.name || APP_NAME,
+			await sendCalendarMail(db, provider(), userId, {
+				fromEmail: attendee.email,
+				strict: true,
 				to: invitation.organizer.email,
 				subject: replySubject(invitation, response),
-				text: renderEmailText(content),
-				html: renderEmailHtml(content),
-				attachments: [
-					{
-						filename: 'invite.ics',
-						type: 'text/calendar; method=REPLY; charset=UTF-8',
-						content: utf8Base64(replyIcs(invitation, attendee, response))
-					}
-				]
+				content: replyEmailContent(invitation, attendee, response),
+				method: 'REPLY',
+				ics: () => replyIcs(invitation, attendee, response)
 			});
 		}
+	});
+}
+
+type AnswerActions = Pick<Parameters<typeof createAnswersService>[0], 'reschedule' | 'declineProposal'>;
+
+/** Without `actions`, answers can be read and replies recorded, but proposals not acted on. */
+export function answersServiceFor(db: D1Database, bucket: R2Bucket | undefined, actions?: AnswerActions): AnswersService {
+	return createAnswersService({
+		repo: createD1InvitationsRepository(db),
+		loadCalendarPart: (userId, emailId) => loadCalendarPart(db, bucket, userId, emailId),
+		timeZone: (userId) => userTimeZone(db, userId),
+		reschedule: actions?.reschedule ?? (async () => 'not_found'),
+		declineProposal: actions?.declineProposal ?? (async () => undefined)
 	});
 }
 
@@ -94,8 +143,9 @@ export function hasBytes<T extends { bytes?: Uint8Array }>(attachment: T): attac
 }
 
 /**
- * For the inbound paths: an organizer's update or cancellation is applied as
- * it arrives. Never throws — the message is already stored.
+ * For the inbound paths: an organizer's update or cancellation, or a guest's
+ * answer to the user's own invitation, is applied as it arrives. Never throws
+ * — the message is already stored.
  */
 export async function applyArrivedInvitation(
 	db: D1Database,
@@ -104,8 +154,11 @@ export async function applyArrivedInvitation(
 ): Promise<void> {
 	const part = pickCalendarPart(attachments.map((attachment) => ({ ...attachment, size: attachment.bytes.byteLength })));
 	if (!part) return;
+	const ics = new TextDecoder().decode(part.bytes);
 	try {
-		await invitationsServiceFor(db, undefined).applyArrival(userId, new TextDecoder().decode(part.bytes));
+		if ((await answersServiceFor(db, undefined).applyArrival(userId, ics)) === 'ignored') {
+			await invitationsServiceFor(db, undefined).applyArrival(userId, ics);
+		}
 	} catch (error) {
 		console.error('Could not apply an arriving invitation', error);
 	}
@@ -116,4 +169,30 @@ export function getInvitationsService(platform: App.Platform | undefined | null)
 	const db = platform?.env.DB;
 	if (!db) throw new Error('Database unavailable');
 	return invitationsServiceFor(db, platform?.env.ATTACHMENTS, () => getEmailProvider(platform));
+}
+
+/** Composition root for routes: answers to the user's own invitations, and acting on proposed times. */
+export function getAnswersService(platform: App.Platform | undefined | null): AnswersService {
+	const db = platform?.env.DB;
+	if (!db) throw new Error('Database unavailable');
+	return answersServiceFor(db, platform?.env.ATTACHMENTS, {
+		async reschedule(userId, event, start, end) {
+			if (event.source !== 'reservation') return 'not_found';
+			return getReservationsService(platform).rescheduleBooking(userId, event.id, start, end);
+		},
+		async declineProposal(userId, event, proposal, guest) {
+			await sendCalendarMail(db, getEmailProvider(platform), userId, {
+				fromEmail: proposal.organizer?.email ?? null,
+				to: guest.email,
+				subject: `New time declined: ${event.title}`.slice(0, 200),
+				content: declineCounterEmailContent(event.title, proposal.organizer?.name ?? 'The organizer'),
+				method: 'DECLINECOUNTER',
+				ics: (from) => declineCounterIcs(proposal, from, guest, {
+					start: new Date(event.start),
+					end: new Date(event.end),
+					sequence: event.sequence
+				})
+			});
+		}
+	});
 }
