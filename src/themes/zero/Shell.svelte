@@ -25,6 +25,8 @@
 
 	const pathname = $derived($page.url.pathname);
 	const settings = $derived(pathname.startsWith('/settings') || pathname.startsWith('/admin'));
+	/** Mailbox routes bring their own panes, each scrolling on its own, so they fill the stage directly. */
+	const mailbox = $derived(Boolean($page.data.mailbox));
 	const composeOpen = $derived(
 		$page.url.searchParams.get('compose') === '1' || pathname === '/compose'
 	);
@@ -389,6 +391,8 @@
 					{@render children()}
 				</div>
 			</div>
+		{:else if mailbox}
+			{@render children()}
 		{:else}
 			<!--
 				Any route Zero has no pane for — /compose reached by recalling a
