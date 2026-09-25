@@ -12,7 +12,7 @@
 	import CalendarFeeds from './CalendarFeeds.svelte';
 	import ReservationPages from './ReservationPages.svelte';
 	import { LABEL_SWATCH } from '$lib/mail/labels';
-	import { addDays, dateKeyToUtc, isDeletableEvent, isReadOnlyEvent, type CalendarEvent } from '$lib/calendar/events';
+	import { addDays, dateKeyToUtc, isDeletableEvent, isReadOnlyEvent, type CalendarEvent, type EventGuest } from '$lib/calendar/events';
 	import {
 		dateKeyIn,
 		firstDayOfWeek,
@@ -25,9 +25,10 @@
 		type YearMonth
 	} from '$lib/calendar/grid';
 	import { draftForNew, draftFromEvent, draftToInput, type EventDraft } from '$lib/calendar/editor';
-	import { deleteEvent, fetchEvents, saveEvent } from '$lib/calendar/client';
+	import { deleteEvent, fetchEventGuests, fetchEvents, saveEvent } from '$lib/calendar/client';
 
-	type Editing = { event: CalendarEvent | null; draft: EventDraft };
+	/** `guests` carries each guest's answer, which the draft (just addresses) doesn't. */
+	type Editing = { event: CalendarEvent | null; draft: EventDraft; guests: EventGuest[] };
 
 	const MAX_CHIPS = 3;
 
@@ -47,6 +48,7 @@
 	let view = $state<'month' | 'agenda'>('month');
 	let selected = $state('');
 	let events = $state<CalendarEvent[]>([]);
+	let meetingsAvailable = $state(false);
 	let loading = $state(false);
 	let loadError = $state('');
 	let editing = $state<Editing | null>(null);
@@ -78,7 +80,7 @@
 			const from = startOfDayIn(grid[0], timeZone);
 			const to = startOfDayIn(addDays(grid[grid.length - 1], 1), timeZone);
 			const loaded = await fetchEvents(from, to, timeZone);
-			if (current === request) events = loaded;
+			if (current === request) ({ events, meetingsAvailable } = loaded);
 		} catch (failure) {
 			if (current === request) loadError = failure instanceof Error ? failure.message : t('common.networkError');
 		} finally {
@@ -113,12 +115,18 @@
 
 	function openNew(dayKey: string) {
 		saveError = '';
-		editing = { event: null, draft: draftForNew(dayKey, timeZone) };
+		editing = { event: null, draft: draftForNew(dayKey, timeZone), guests: [] };
 	}
 
-	function openEvent(event: CalendarEvent) {
+	/** A manual event opens once its guests are in, so saving can't drop a list it never saw. */
+	async function openEvent(event: CalendarEvent) {
 		saveError = '';
-		editing = { event, draft: draftFromEvent(event, timeZone) };
+		if (event.source !== 'manual') {
+			editing = { event, draft: draftFromEvent(event, timeZone), guests: [] };
+			return;
+		}
+		const guests = await fetchEventGuests(event.id).catch(() => null);
+		editing = { event, draft: draftFromEvent(event, timeZone, guests), guests: guests ?? [] };
 	}
 
 	async function afterWrite() {
@@ -311,6 +319,9 @@
 		source={editing.event?.source}
 		readOnly={editing.event ? isReadOnlyEvent(editing.event) : false}
 		deletable={editing.event ? isDeletableEvent(editing.event) : false}
+		guests={editing.guests}
+		meetingCode={editing.event?.meetingCode ?? null}
+		{meetingsAvailable}
 		busy={saving}
 		error={saveError}
 		onsave={save}
