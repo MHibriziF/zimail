@@ -68,7 +68,7 @@ function setup(messages: Record<string, string>, event: Partial<OwnEvent> | null
 		async declineProposal(_userId, target, _proposal, guest) {
 			declines.push(`${target.id}:${guest.email}`);
 		},
-		eventsBetween: async () => [...others, ...(own ? [{ ...own, location: null, notes: null, busy: true, calendar: null }] : [])]
+		eventsBetween: async () => [...others, ...(own ? [{ ...own, location: null, notes: null, busy: true, calendar: null, meetingCode: null }] : [])]
 	});
 	return { service, statuses, moves, declines };
 }
@@ -115,7 +115,8 @@ describe('answers service', () => {
 			notes: null,
 			source: 'manual',
 			busy: true,
-			calendar: null
+			calendar: null,
+			meetingCode: null
 		};
 		const { service, moves } = setup({ m1: message() }, {}, [standup]);
 		const answer = await service.inspect('u1', 'm1');
@@ -128,7 +129,7 @@ describe('answers service', () => {
 	});
 
 	test('free time, the event being moved, and events that merely touch the slot do not clash', async () => {
-		const base = { location: null, notes: null, source: 'feed' as const, calendar: null, allDay: false };
+		const base = { location: null, notes: null, source: 'feed' as const, calendar: null, meetingCode: null, allDay: false };
 		const free: CalendarEvent = { ...base, id: 'free', title: 'Focus', start: '2026-09-25T03:30:00.000Z', end: '2026-09-25T04:00:00.000Z', busy: false };
 		const before: CalendarEvent = { ...base, id: 'before', title: 'Earlier', start: '2026-09-25T03:00:00.000Z', end: '2026-09-25T03:30:00.000Z', busy: true };
 		const after: CalendarEvent = { ...base, id: 'after', title: 'Later', start: '2026-09-25T04:00:00.000Z', end: '2026-09-25T04:30:00.000Z', busy: true };
@@ -148,7 +149,8 @@ describe('answers service', () => {
 			notes: null,
 			source: 'manual',
 			busy: true,
-			calendar: null
+			calendar: null,
+			meetingCode: null
 		};
 		const { service } = setup({ m1: message() }, {}, [offsite]);
 		assert.equal((await service.inspect('u1', 'm1'))?.conflicts.length, 1);

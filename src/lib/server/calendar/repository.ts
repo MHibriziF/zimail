@@ -21,10 +21,11 @@ type EventRow = {
 	busy: number;
 	feed_name: string | null;
 	feed_color: string | null;
+	meeting_code: string | null;
 };
 
 const COLUMNS = `e.id, e.title, e.starts_at, e.ends_at, e.all_day, e.location, e.notes, e.source, e.busy,
-	f.name AS feed_name, f.color AS feed_color`;
+	e.meeting_code, f.name AS feed_name, f.color AS feed_color`;
 /** Feed events carry their calendar's name and color; the join finds nothing for other sources. */
 const FROM = `calendar_events e LEFT JOIN calendar_feeds f ON e.source = 'feed' AND f.id = e.source_id`;
 
@@ -42,7 +43,8 @@ function toEvent(row: EventRow): CalendarEvent {
 		calendar:
 			row.feed_name === null
 				? null
-				: { name: row.feed_name, color: LABEL_COLORS.find((color) => color === row.feed_color) ?? 'blue' }
+				: { name: row.feed_name, color: LABEL_COLORS.find((color) => color === row.feed_color) ?? 'blue' },
+		meetingCode: row.meeting_code ?? null
 	};
 }
 
@@ -53,6 +55,7 @@ export type NewCalendarEvent = ValidEventInput & {
 	sourceId?: string | null;
 	externalUid?: string | null;
 	busy?: boolean;
+	meetingCode?: string | null;
 };
 
 /**
@@ -75,6 +78,8 @@ export type CalendarRepository = {
 	 * and the rest keep their answer unless `resetAnswers`.
 	 */
 	setGuests(userId: string, eventId: string, emails: string[], resetAnswers: boolean): Promise<void>;
+	/** Gives a manual event its meeting room, or takes it away with `null`. */
+	setMeetingCode(userId: string, id: string, code: string | null): Promise<void>;
 	/** Cancels a booking: its reservation row and the event that blocks the slot. */
 	deleteReservation(userId: string, id: string): Promise<boolean>;
 	/** Takes a received invitation off the calendar: every occurrence of the series `id` belongs to. */
@@ -107,8 +112,9 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 			await db
 				.prepare(
 					`INSERT INTO calendar_events
-					 (id, user_id, source, source_id, external_uid, title, starts_at, ends_at, all_day, location, notes, busy)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					 (id, user_id, source, source_id, external_uid, title, starts_at, ends_at, all_day, location, notes, busy,
+					  meeting_code)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(
 					event.id,
@@ -122,7 +128,8 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 					event.allDay ? 1 : 0,
 					event.location,
 					event.notes,
-					event.busy === false ? 0 : 1
+					event.busy === false ? 0 : 1,
+					event.meetingCode ?? null
 				)
 				.run();
 		},
@@ -173,6 +180,13 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 				name: row.name,
 				status: PART_STATS.find((status) => status === row.status) ?? 'needs-action'
 			}));
+		},
+
+		async setMeetingCode(userId, id, code) {
+			await db
+				.prepare(`UPDATE calendar_events SET meeting_code = ? WHERE id = ? AND user_id = ? AND source = 'manual'`)
+				.bind(code, id, userId)
+				.run();
 		},
 
 		async setGuests(userId, eventId, emails, resetAnswers) {

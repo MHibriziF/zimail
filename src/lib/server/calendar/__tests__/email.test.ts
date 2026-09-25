@@ -12,6 +12,7 @@ const invite: EventInvite = {
 	allDay: false,
 	location: 'Room 4',
 	notes: 'Bring numbers\nand ideas',
+	meetingUrl: null,
 	organizer: { email: 'me@example.test', name: 'Izi' },
 	guests: [
 		{ email: 'ada@example.com', name: 'Ada', status: 'accepted' },
@@ -105,5 +106,19 @@ describe('event invitation', () => {
 			'new'
 		);
 		assert.equal(oneDay.details?.[0].value, 'Thursday, October 1, 2026');
+	});
+
+	test('a meeting room is linked from the email and the calendar entry', () => {
+		const withRoom = { ...invite, meetingUrl: 'https://mail.example.test/meet/abc-defg-hij' };
+		const content = inviteEmailContent(withRoom, 'new');
+		assert.deepEqual(content.action, { label: 'Join the meeting', href: withRoom.meetingUrl });
+		assert.ok(content.details?.some((detail) => detail.label === 'Meeting'));
+		const read = readInvitation(inviteIcs(withRoom, 'new', now), 'UTC');
+		assert.equal(read?.location, 'Room 4', 'a place the user gave is kept');
+		assert.match(read?.description ?? '', /^Join the Zimail meeting: https:\/\/mail\.example\.test\/meet\/abc-defg-hij\n\nBring numbers/);
+		assert.match(inviteIcs(withRoom, 'new', now), /\r\nURL:https:\/\/mail\.example\.test\/meet\/abc-defg-hij\r\n/);
+		const roomOnly = readInvitation(inviteIcs({ ...withRoom, location: null, notes: null }, 'new', now), 'UTC');
+		assert.equal(roomOnly?.location, withRoom.meetingUrl);
+		assert.equal(inviteEmailContent(withRoom, 'cancelled').action, undefined);
 	});
 });
