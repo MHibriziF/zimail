@@ -32,6 +32,11 @@ jobs:
     name: SonarQube scan
     runs-on: ubuntu-latest
     needs: check-and-test
+    # One scan at a time: the server behind Cloudflare drops out under parallel scans.
+    # A queued run is only cancelled when a newer one takes its place in the queue.
+    concurrency:
+      group: sonarqube
+      cancel-in-progress: false
     permissions:
       pull-requests: write
     steps:
@@ -74,7 +79,8 @@ jobs:
           done
           echo "::warning::SonarQube did not answer for two minutes; scanning anyway"
 
-      # A second try covers a blip mid-scan. A genuinely red gate just fails twice.
+      # Retries cover the server's dropouts, which can last a minute; the gaps grow so two
+      # tries don't land in the same one. A genuinely red gate just fails three times.
       - id: scan
         uses: SonarSource/sonarqube-scan-action@v6
         continue-on-error: true
@@ -86,7 +92,19 @@ jobs:
         if: steps.scan.outcome == 'failure'
         run: sleep 30
 
-      - if: steps.scan.outcome == 'failure'
+      - id: scan-retry
+        if: steps.scan.outcome == 'failure'
+        uses: SonarSource/sonarqube-scan-action@v6
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Wait before the last scan attempt
+        if: steps.scan-retry.outcome == 'failure'
+        run: sleep 90
+
+      - if: steps.scan-retry.outcome == 'failure'
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
