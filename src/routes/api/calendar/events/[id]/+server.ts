@@ -3,6 +3,14 @@ import type { RequestHandler } from './$types';
 import { getCalendarService } from '$lib/server/calendar';
 import { calendarWriteResponse, readEventInput } from '$lib/server/calendar/responses';
 
+/** One event with its guest list, which the range listing leaves out. */
+export const GET: RequestHandler = async ({ params, locals, platform }) => {
+	if (!platform?.env.DB || !locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
+
+	const found = await getCalendarService(platform).get(locals.user.id, params.id);
+	return found ? json(found) : calendarWriteResponse({ type: 'not_found' });
+};
+
 /** Replaces every editable field — the editor always sends the whole event. */
 export const PATCH: RequestHandler = async ({ params, request, locals, platform }) => {
 	if (!platform?.env.DB || !locals.user) return json({ error: 'Unauthorized' }, { status: 401 });

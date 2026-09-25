@@ -4,6 +4,7 @@
  */
 import { instantFromWall } from '../timezone';
 import type { LabelColor } from '../mail/labels';
+import type { PartStat } from './ics/invite';
 
 export const CALENDAR_EVENT_SOURCES = ['manual', 'feed', 'reservation', 'invite'] as const;
 export type CalendarEventSource = (typeof CALENDAR_EVENT_SOURCES)[number];
@@ -11,6 +12,8 @@ export type CalendarEventSource = (typeof CALENDAR_EVENT_SOURCES)[number];
 export const MAX_EVENT_TITLE_LENGTH = 200;
 export const MAX_EVENT_LOCATION_LENGTH = 200;
 export const MAX_EVENT_NOTES_LENGTH = 4000;
+/** Each guest is one email per change, so the list stays small. */
+export const MAX_EVENT_GUESTS = 30;
 const MAX_EVENT_DAYS = 366;
 const DAY_MS = 86_400_000;
 
@@ -40,6 +43,8 @@ export type CalendarEventInput = {
 	allDay: boolean;
 	location?: string | null;
 	notes?: string | null;
+	/** Email addresses to invite; left out, the guest list stays as it is. */
+	guests?: string[];
 };
 
 export type ValidEventInput = {
@@ -52,6 +57,9 @@ export type ValidEventInput = {
 };
 
 export type EventInputError = 'invalid_title' | 'invalid_time';
+
+/** Someone invited to one of the user's events, and what their calendar last answered. */
+export type EventGuest = { email: string; name: string | null; status: PartStat };
 
 const DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -76,6 +84,29 @@ export function addDays(key: string, days: number): string {
 function cleanText(value: string | null | undefined, max: number): string | null {
 	const text = (value ?? '').trim().slice(0, max).trim();
 	return text || null;
+}
+
+const FORBIDDEN_IN_EMAIL = new Set([' ', '\t', '\r', '\n', '<', '>', ',', ';', '"']);
+
+/**
+ * Deliberately loose — the provider is the real judge — but it keeps out junk
+ * and anything that could smuggle a second recipient or header. Hand-rolled
+ * rather than a regex, which Sonar scores as backtracking-prone.
+ */
+export function isPlausibleEmail(email: string): boolean {
+	if (email.length > 254 || [...email].some((char) => FORBIDDEN_IN_EMAIL.has(char))) return false;
+	const at = email.indexOf('@');
+	if (at < 1 || at !== email.lastIndexOf('@')) return false;
+	const domain = email.slice(at + 1);
+	const dot = domain.lastIndexOf('.');
+	return dot > 0 && dot < domain.length - 1;
+}
+
+/** Lowercased and deduplicated; `null` if any address is unusable or there are too many. */
+export function validateGuests(emails: readonly string[]): string[] | null {
+	const unique = [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))];
+	if (unique.length > MAX_EVENT_GUESTS || !unique.every(isPlausibleEmail)) return null;
+	return unique;
 }
 
 function parseBound(value: string, allDay: boolean): Date | null {

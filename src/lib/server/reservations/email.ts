@@ -72,9 +72,8 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 	return content;
 }
 
-/** The attachment's MIME type — mail clients read the method from here as well as from the file. */
-export function inviteContentType(kind: InviteKind): string {
-	return `text/calendar; method=${METHOD[kind]}; charset=UTF-8`;
+export function bookingMethod(kind: InviteKind): string {
+	return METHOD[kind];
 }
 
 function description(details: BookingDetails): string {
