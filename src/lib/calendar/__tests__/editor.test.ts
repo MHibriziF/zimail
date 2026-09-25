@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { draftForNew, draftFromEvent, draftToInput } from '../editor';
+import { addGuests, draftForNew, draftFromEvent, draftToInput, guestStatusKey, splitGuestInput } from '../editor';
 import type { CalendarEvent } from '../events';
 
 const zone = 'Asia/Jakarta';
@@ -74,5 +74,66 @@ describe('event drafts', () => {
 	test('an unreadable time becomes an empty string for the server to reject', () => {
 		const draft = { ...draftForNew('2026-09-24', zone), startTime: '' };
 		assert.equal(draftToInput(draft, zone).start, '');
+	});
+
+	const manual: CalendarEvent = {
+		id: 'e',
+		title: 'Planning',
+		start: '2026-09-24T05:00:00.000Z',
+		end: '2026-09-24T06:00:00.000Z',
+		allDay: false,
+		location: null,
+		notes: null,
+		source: 'manual',
+		busy: true,
+		calendar: null,
+		meetingCode: 'abc-defg-hij'
+	};
+
+	test('guests and the meeting room go from the event to the draft and back', () => {
+		const draft = draftFromEvent(manual, zone, [{ email: 'ada@example.com', name: null, status: 'accepted' }]);
+		assert.deepEqual(draft.guests, ['ada@example.com']);
+		assert.equal(draft.withMeeting, true);
+		const input = draftToInput(draft, zone);
+		assert.deepEqual(input.guests, ['ada@example.com']);
+		assert.equal(input.withMeeting, true);
+		const fresh = draftToInput(draftForNew('2026-09-24', zone), zone);
+		assert.deepEqual([fresh.guests, fresh.withMeeting], [[], false]);
+	});
+
+	test('a guest list that could not be loaded is left out, so saving keeps it', () => {
+		const draft = draftFromEvent(manual, zone, null);
+		assert.equal(draft.guests, null);
+		assert.equal(draftToInput(draft, zone).guests, undefined);
+	});
+
+	test('typed or pasted guests are split on commas, semicolons and spaces', () => {
+		assert.deepEqual(splitGuestInput(' Ada@Example.com, bo@example.com;cy@example.com\n  '), [
+			'ada@example.com',
+			'bo@example.com',
+			'cy@example.com'
+		]);
+		assert.deepEqual(splitGuestInput(''), []);
+	});
+
+	test('adding guests dedupes, and refuses a bad address or too many', () => {
+		assert.deepEqual(addGuests(['ada@example.com'], 'ADA@example.com bo@example.com'), {
+			guests: ['ada@example.com', 'bo@example.com'],
+			error: null
+		});
+		assert.deepEqual(addGuests(['ada@example.com'], 'bo@example.com nope'), {
+			guests: ['ada@example.com'],
+			error: { key: 'calendar.invalidGuest', values: { email: 'nope' } }
+		});
+		const thirty = Array.from({ length: 30 }, (_, index) => `g${index}@example.com`);
+		assert.equal(addGuests(thirty, 'one@example.com').error?.key, 'calendar.tooManyGuests');
+	});
+
+	test('each answer has a label; someone just added has none', () => {
+		assert.equal(guestStatusKey('accepted'), 'calendar.guestAccepted');
+		assert.equal(guestStatusKey('tentative'), 'calendar.guestTentative');
+		assert.equal(guestStatusKey('declined'), 'calendar.guestDeclined');
+		assert.equal(guestStatusKey('needs-action'), 'calendar.guestInvited');
+		assert.equal(guestStatusKey(undefined), null);
 	});
 });

@@ -1,7 +1,7 @@
 import type { ReservationPage, ReservationPageSettings } from './reservations';
 import type { CalendarFeed } from './feeds';
 import type { LabelColor } from '../mail/labels';
-import type { CalendarEvent, CalendarEventInput } from './events';
+import type { CalendarEvent, CalendarEventInput, EventGuest } from './events';
 import type { AnswerAction, GuestAnswerView, InvitationAction, InvitationView } from './invitations';
 
 export class CalendarRequestError extends Error {}
@@ -12,10 +12,21 @@ async function readJson<T>(response: Response, fallback: string): Promise<T> {
 	return body;
 }
 
-export async function fetchEvents(from: Date, to: Date, timeZone: string): Promise<CalendarEvent[]> {
+/** `meetingsAvailable`: whether events can get a meeting room on this deployment. */
+export async function fetchEvents(
+	from: Date,
+	to: Date,
+	timeZone: string
+): Promise<{ events: CalendarEvent[]; meetingsAvailable: boolean }> {
 	const query = new URLSearchParams({ from: from.toISOString(), to: to.toISOString(), tz: timeZone });
 	const response = await fetch(`/api/calendar/events?${query}`);
-	return (await readJson<{ events: CalendarEvent[] }>(response, 'Could not load events')).events;
+	return readJson(response, 'Could not load events');
+}
+
+/** One event with its guests and their answers. */
+export async function fetchEventGuests(id: string): Promise<EventGuest[]> {
+	const response = await fetch(`/api/calendar/events/${encodeURIComponent(id)}`);
+	return (await readJson<{ guests: EventGuest[] }>(response, 'Could not load the guests')).guests;
 }
 
 /** Creates when `id` is missing, otherwise replaces that event. */

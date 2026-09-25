@@ -2,12 +2,13 @@
 	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n';
 	import Icon from '../Icon.svelte';
-	import type { EventDraft } from '$lib/calendar/editor';
+	import { addGuests, guestStatusKey, type EventDraft } from '$lib/calendar/editor';
 	import {
 		MAX_EVENT_LOCATION_LENGTH,
 		MAX_EVENT_NOTES_LENGTH,
 		MAX_EVENT_TITLE_LENGTH,
-		type CalendarEventSource
+		type CalendarEventSource,
+		type EventGuest
 	} from '$lib/calendar/events';
 
 	let {
@@ -18,6 +19,9 @@
 		deletable = true,
 		busy = false,
 		error = '',
+		guests = [],
+		meetingCode = null,
+		meetingsAvailable = false,
 		onsave,
 		ondelete,
 		oncancel
@@ -31,6 +35,10 @@
 		deletable?: boolean;
 		busy?: boolean;
 		error?: string;
+		/** The saved guest list with each guest's answer. */
+		guests?: EventGuest[];
+		meetingCode?: string | null;
+		meetingsAvailable?: boolean;
 		onsave: (draft: EventDraft) => void;
 		ondelete: () => void;
 		oncancel: () => void;
@@ -38,6 +46,34 @@
 
 	let draft = $state(untrack(() => ({ ...initial })));
 	let confirmingDelete = $state(false);
+	let guestText = $state('');
+	let guestError = $state('');
+
+	const answers = $derived(new Map(guests.map((guest) => [guest.email, guest.status])));
+
+	/** Takes what's typed as guests; `false` if it had to stay in the field. */
+	function commitGuests(): boolean {
+		if (!draft.guests || !guestText.trim()) return true;
+		const entry = addGuests(draft.guests, guestText);
+		guestError = entry.error ? t(entry.error.key, entry.error.values) : '';
+		if (entry.error) return false;
+		draft.guests = entry.guests;
+		guestText = '';
+		return true;
+	}
+
+	function onGuestKey(event: KeyboardEvent) {
+		if (event.key === 'Enter' || event.key === ',') {
+			event.preventDefault();
+			commitGuests();
+		} else if (event.key === 'Backspace' && !guestText && draft.guests?.length) {
+			draft.guests = draft.guests.slice(0, -1);
+		}
+	}
+
+	function removeGuest(email: string) {
+		draft.guests = draft.guests?.filter((guest) => guest !== email) ?? null;
+	}
 
 	/** A booking is cancelled (the guest is told), an invitation just taken off, anything else deleted. */
 	const removal = $derived.by(() => {
@@ -57,7 +93,7 @@
 
 	function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (!readOnly) onsave({ ...draft });
+		if (!readOnly && commitGuests()) onsave({ ...draft, guests: draft.guests && [...draft.guests] });
 	}
 
 	function onKey(event: KeyboardEvent) {
@@ -143,6 +179,66 @@
 			<textarea class="cal-input" rows="3" bind:value={draft.notes} maxlength={MAX_EVENT_NOTES_LENGTH} disabled={readOnly}
 			></textarea>
 		</label>
+
+		{#if !readOnly}
+			<div class="cal-field">
+				<label for="cal-guest-input">{t('calendar.guests')}</label>
+				{#if draft.guests}
+					<div class="cal-guests">
+						{#each draft.guests as email (email)}
+							{@const status = guestStatusKey(answers.get(email))}
+							<span class="cal-guest">
+								<span class="cal-guest-email">{email}</span>
+								{#if status}<span class="cal-guest-status" data-status={answers.get(email)}>{t(status)}</span>{/if}
+								<button
+									type="button"
+									class="cal-guest-remove"
+									aria-label={t('calendar.removeGuest', { email })}
+									onclick={() => removeGuest(email)}
+								>
+									<Icon name="close-line" size={14} />
+								</button>
+							</span>
+						{/each}
+						<input
+							id="cal-guest-input"
+							class="cal-guest-input"
+							type="text"
+							inputmode="email"
+							autocomplete="off"
+							bind:value={guestText}
+							placeholder={t('calendar.guestsPlaceholder')}
+							onkeydown={onGuestKey}
+							onblur={commitGuests}
+						/>
+					</div>
+					{#if guestError}
+						<small class="cal-help cal-help-error" role="alert">{guestError}</small>
+					{:else}
+						<small class="cal-help">{t('calendar.guestsHint')}</small>
+					{/if}
+				{:else}
+					<small class="cal-help">{t('calendar.guestsUnavailable')}</small>
+				{/if}
+			</div>
+
+			<label class="cal-check cal-meeting">
+				<input type="checkbox" bind:checked={draft.withMeeting} disabled={!meetingsAvailable && !meetingCode} />
+				<span>
+					{t('calendar.withMeeting')}
+					<small class="cal-help">
+						{meetingsAvailable || meetingCode ? t('calendar.withMeetingHint') : t('calendar.reservations.withMeetingUnavailable')}
+					</small>
+				</span>
+			</label>
+		{/if}
+
+		{#if meetingCode && draft.withMeeting}
+			<a class="cal-join" href="/meet/{meetingCode}" target="_blank" rel="noopener">
+				<Icon name="video-on-line" size={16} />
+				{t('calendar.joinMeeting')}
+			</a>
+		{/if}
 
 		{#if error}<p class="cal-error" role="alert">{error}</p>{/if}
 
@@ -270,6 +366,110 @@
 		align-items: center;
 		gap: 0.5rem;
 		font-size: 0.875rem;
+	}
+
+	.cal-help {
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+	}
+
+	.cal-help-error {
+		color: var(--color-danger);
+	}
+
+	.cal-guests {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.375rem;
+		padding: 0.375rem;
+		border-radius: 0.625rem;
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+	}
+
+	.cal-guests:focus-within {
+		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
+	}
+
+	.cal-guest {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		max-width: 100%;
+		padding: 0.1875rem 0.25rem 0.1875rem 0.5rem;
+		border-radius: 999px;
+		font-size: 0.8125rem;
+		color: var(--color-text);
+		background: var(--color-surface);
+		box-shadow: inset 0 0 0 1px var(--color-line);
+	}
+
+	.cal-guest-email {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.cal-guest-status {
+		font-size: 0.6875rem;
+		color: var(--color-text-secondary);
+	}
+
+	.cal-guest-status[data-status='accepted'] {
+		color: var(--color-accent);
+	}
+
+	.cal-guest-status[data-status='declined'] {
+		color: var(--color-danger);
+	}
+
+	.cal-guest-remove {
+		display: inline-flex;
+		padding: 0.125rem;
+		border-radius: 999px;
+		color: var(--color-text-secondary);
+	}
+
+	.cal-guest-remove:hover {
+		color: var(--color-text);
+		background: var(--color-surface-muted);
+	}
+
+	.cal-guest-input {
+		flex: 1;
+		min-width: 10rem;
+		padding: 0.25rem 0.375rem;
+		border: 0;
+		font: inherit;
+		font-size: 0.875rem;
+		color: var(--color-text);
+		background: transparent;
+	}
+
+	.cal-guest-input:focus {
+		outline: none;
+	}
+
+	.cal-meeting {
+		align-items: flex-start;
+	}
+
+	.cal-meeting input {
+		margin-top: 0.2rem;
+	}
+
+	.cal-meeting small {
+		display: block;
+	}
+
+	.cal-join {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		align-self: flex-start;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--color-accent);
 	}
 
 	.cal-error {
