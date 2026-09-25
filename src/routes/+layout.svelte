@@ -18,12 +18,19 @@
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
 
+	/** Signed-out pages, which a client-side redirect can reach while `data.user` still holds the old account. */
+	const SIGNED_OUT_PATHS = ['/login', '/forgot', '/reset', '/setup', '/account/recovery'];
+	const signedOutPage = $derived(
+		SIGNED_OUT_PATHS.some((path) => $page.url.pathname === path || $page.url.pathname.startsWith(`${path}/`))
+	);
+
 	// Onboarding runs before the user has an address, so the shell would be empty.
 	// /meet is a call — even a signed-in host should see it full-screen, the way
 	// a Gmeet link opens on its own rather than inside Gmail's chrome.
 	// /book is a public booking page, the same for the host as for a guest.
 	const showShell = $derived(
 		Boolean(data.user) &&
+			!signedOutPage &&
 			$page.url.pathname !== '/onboarding' &&
 			$page.url.pathname !== '/account/setup' &&
 			!$page.url.pathname.startsWith('/meet/') &&
