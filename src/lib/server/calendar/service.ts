@@ -8,6 +8,7 @@ import {
 	type CalendarEventInput,
 	type EventGuest
 } from '../../calendar/events';
+import type { MeetingRooms } from '../reservations/service';
 import type { InviteNotice } from './email';
 import type { CalendarRepository } from './repository';
 
@@ -41,7 +42,7 @@ export type CalendarService = {
 	reschedule(userId: string, id: string, start: Date, end: Date): Promise<'ok' | 'not_found'>;
 };
 
-type EventFields = Pick<CalendarEvent, 'title' | 'start' | 'end' | 'allDay' | 'location' | 'notes'>;
+type EventFields = Pick<CalendarEvent, 'title' | 'start' | 'end' | 'allDay' | 'location' | 'notes' | 'meetingCode'>;
 
 /** One notice to some of an event's guests, about the event as it now stands. */
 export type GuestMail = {
@@ -58,9 +59,11 @@ export type CalendarServiceDeps = {
 	cancelReservation?: (userId: string, id: string) => Promise<boolean>;
 	/** Emails the invitations; without it, the guest list is kept but nobody is told. */
 	notifyGuests?: (userId: string, mail: GuestMail) => Promise<void>;
+	/** Meeting rooms for events; without it, an event asking for one goes without. */
+	meetings?: MeetingRooms | null;
 };
 
-const FIELDS = ['title', 'start', 'end', 'allDay', 'location', 'notes'] as const;
+const FIELDS = ['title', 'start', 'end', 'allDay', 'location', 'notes', 'meetingCode'] as const;
 
 function changedFields(before: EventFields, after: EventFields) {
 	const differs = (field: (typeof FIELDS)[number]) => before[field] !== after[field];
@@ -71,7 +74,37 @@ function newGuest(email: string): EventGuest {
 	return { email, name: null, status: 'needs-action' };
 }
 
-export function createCalendarService({ repo, cancelReservation, notifyGuests }: CalendarServiceDeps): CalendarService {
+export function createCalendarService({
+	repo,
+	cancelReservation,
+	notifyGuests,
+	meetings
+}: CalendarServiceDeps): CalendarService {
+	/** A failure saves the event without a room rather than not at all. */
+	async function openRoom(userId: string, title: string): Promise<string | null> {
+		if (!meetings) return null;
+		try {
+			return await meetings.open(userId, title);
+		} catch (error_) {
+			console.error('Could not open a meeting room for an event', error_);
+			return null;
+		}
+	}
+
+	async function closeRoom(userId: string, code: string | null): Promise<void> {
+		if (code) await meetings?.close(userId, code).catch(() => undefined);
+	}
+
+	/** Opens or closes the event's room as asked; `undefined` leaves it as it is. */
+	async function syncRoom(userId: string, event: CalendarEvent, wanted: boolean | undefined): Promise<string | null> {
+		if (wanted === undefined || wanted === (event.meetingCode !== null)) return event.meetingCode;
+		const code = wanted ? await openRoom(userId, event.title) : null;
+		if (code === event.meetingCode) return code;
+		await repo.setMeetingCode(userId, event.id, code);
+		await closeRoom(userId, event.meetingCode);
+		return code;
+	}
+
 	/** Best effort: the calendar has already changed whether or not the emails go out. */
 	async function tell(userId: string, mail: GuestMail): Promise<void> {
 		if (!notifyGuests || mail.to.length === 0) return;
@@ -111,6 +144,7 @@ export function createCalendarService({ repo, cancelReservation, notifyGuests }:
 		const guests = await repo.listGuests(userId, event.id);
 		const sequence = await repo.deleteManual(userId, event.id);
 		if (sequence === null) return false;
+		await closeRoom(userId, event.meetingCode);
 		await tell(userId, {
 			event: { ...event, sequence: sequence + 1 },
 			notice: 'cancelled',
@@ -140,13 +174,14 @@ export function createCalendarService({ repo, cancelReservation, notifyGuests }:
 		const sequence = await repo.updateManual(userId, id, valid.value);
 		if (sequence === null) return { type: 'not_found' };
 
-		const changed = changedFields(existing, valid.value);
+		const meetingCode = await syncRoom(userId, { ...existing, ...valid.value }, input.withMeeting);
+		const changed = changedFields(existing, { ...valid.value, meetingCode });
 		// A new time needs everyone to answer again, as Google and Outlook ask.
 		if (emails || (changed.moved && before.length > 0)) {
 			await repo.setGuests(userId, id, emails ?? before.map((guest) => guest.email), changed.moved);
 		}
 		const guests = await repo.listGuests(userId, id);
-		const event = { ...existing, ...valid.value };
+		const event = { ...existing, ...valid.value, meetingCode };
 		await announce(userId, { ...event, sequence }, before, guests, changed.any);
 		return { type: 'ok', event, guests };
 	}
@@ -186,9 +221,10 @@ export function createCalendarService({ repo, cancelReservation, notifyGuests }:
 				...valid.value,
 				source: 'manual',
 				busy: true,
-				calendar: null
+				calendar: null,
+				meetingCode: input.withMeeting ? await openRoom(userId, valid.value.title) : null
 			};
-			await repo.insert({ ...valid.value, id: event.id, userId, source: 'manual' });
+			await repo.insert({ ...valid.value, id: event.id, userId, source: 'manual', meetingCode: event.meetingCode });
 			if (emails.length > 0) await repo.setGuests(userId, event.id, emails, false);
 			const guests = emails.map(newGuest);
 			await announce(userId, { ...event, sequence: 0 }, [], guests, false);

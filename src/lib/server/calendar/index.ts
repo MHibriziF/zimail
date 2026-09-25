@@ -5,7 +5,8 @@ import { renderEmailHtml, renderEmailText } from '../outbound/email-template';
 import { calendarAttachment, defaultSender, userTimeZone } from '../outbound/calendar-mail';
 import { sendOutboundEmail } from '../outbound/send-mail';
 import { ownEventUid } from '../invitations/answers';
-import { getReservationsService } from '../reservations';
+import { getReservationsService, meetingRooms, publicBaseUrl } from '../reservations';
+import type { MeetingRooms } from '../reservations/service';
 import { inviteEmailContent, inviteIcs, inviteMethod, type EventInvite } from './email';
 import { createD1CalendarRepository } from './repository';
 import { createCalendarService, type CalendarService, type GuestMail } from './service';
@@ -16,8 +17,27 @@ export { createCalendarService, type CalendarService, type CalendarWriteOutcome 
 
 type PlatformLike = App.Platform | undefined | null;
 
+export type CalendarServiceOptions = {
+	/** Without it, guest lists are kept but nobody is emailed. */
+	provider?: () => EmailProvider;
+	cancelReservation?: (userId: string, id: string) => Promise<boolean>;
+	meetings?: MeetingRooms | null;
+	/** This deployment's origin, for meeting links; without it, invitations carry none. */
+	baseUrl?: string;
+};
+
+function meetingUrl(code: string | null, baseUrl: string | undefined): string | null {
+	return code && baseUrl ? new URL(`/meet/${code}`, baseUrl).href : null;
+}
+
 /** One email per guest, from the user's default address, so one failed delivery doesn't stop the rest. */
-async function emailGuests(db: D1Database, provider: EmailProvider, userId: string, mail: GuestMail) {
+async function emailGuests(
+	db: D1Database,
+	provider: EmailProvider,
+	baseUrl: string | undefined,
+	userId: string,
+	mail: GuestMail
+) {
 	const sender = await defaultSender(db, userId);
 	if (!sender) return;
 	const { event } = mail;
@@ -30,6 +50,7 @@ async function emailGuests(db: D1Database, provider: EmailProvider, userId: stri
 		allDay: event.allDay,
 		location: event.location,
 		notes: event.notes,
+		meetingUrl: meetingUrl(event.meetingCode, baseUrl),
 		organizer: { email: sender.address.address.toLowerCase(), name: sender.name },
 		guests: mail.attendees,
 		timeZone: await userTimeZone(db, userId)
@@ -53,26 +74,24 @@ async function emailGuests(db: D1Database, provider: EmailProvider, userId: stri
 	if (failed.length > 0) console.error(`Could not email ${failed.length} event guest(s)`, failed[0].reason);
 }
 
-/** Without `provider`, guest lists are kept but nobody is emailed. */
-export function calendarServiceFor(
-	db: D1Database,
-	provider?: () => EmailProvider,
-	cancelReservation?: (userId: string, id: string) => Promise<boolean>
-): CalendarService {
+export function calendarServiceFor(db: D1Database, options: CalendarServiceOptions = {}): CalendarService {
+	const { provider, baseUrl } = options;
 	return createCalendarService({
 		repo: createD1CalendarRepository(db),
-		cancelReservation,
-		notifyGuests: provider ? (userId, mail) => emailGuests(db, provider(), userId, mail) : undefined
+		cancelReservation: options.cancelReservation,
+		meetings: options.meetings,
+		notifyGuests: provider ? (userId, mail) => emailGuests(db, provider(), baseUrl, userId, mail) : undefined
 	});
 }
 
-/** Composition root for routes — mirrors `getLabelsService`. */
-export function getCalendarService(platform: PlatformLike): CalendarService {
+/** Composition root for routes — mirrors `getLabelsService`. `requestOrigin` is for meeting links. */
+export function getCalendarService(platform: PlatformLike, requestOrigin = ''): CalendarService {
 	const db = platform?.env.DB;
 	if (!db) throw new Error('Database unavailable');
-	return calendarServiceFor(
-		db,
-		() => getEmailProvider(platform),
-		(userId, id) => getReservationsService(platform).cancelBooking(userId, id)
-	);
+	return calendarServiceFor(db, {
+		provider: () => getEmailProvider(platform),
+		cancelReservation: (userId, id) => getReservationsService(platform).cancelBooking(userId, id),
+		meetings: meetingRooms(platform),
+		baseUrl: publicBaseUrl(platform, requestOrigin) || undefined
+	});
 }

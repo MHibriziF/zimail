@@ -31,6 +31,7 @@ export async function readEventInput(request: Request): Promise<CalendarEventInp
 		allDay: body.allDay === true,
 		location: text(body.location),
 		notes: text(body.notes),
-		guests: Array.isArray(body.guests) ? body.guests.map(text) : undefined
+		guests: Array.isArray(body.guests) ? body.guests.map(text) : undefined,
+		withMeeting: typeof body.withMeeting === 'boolean' ? body.withMeeting : undefined
 	};
 }

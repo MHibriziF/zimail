@@ -17,6 +17,8 @@ export type EventInvite = {
 	allDay: boolean;
 	location: string | null;
 	notes: string | null;
+	/** The event's Zimail meeting room, if it has one. */
+	meetingUrl: string | null;
 	organizer: InviteParty;
 	/** Everyone invited, so each guest's calendar shows who else is coming. */
 	guests: (InviteParty & { status: PartStat })[];
@@ -67,30 +69,42 @@ function lead(invite: EventInvite, notice: InviteNotice): string {
 	return `${who} invited you. Accept the invitation to put it on your calendar.`;
 }
 
+const FOOTER = 'Reply to this email to reach the organizer.';
+
 export function inviteEmailContent(invite: EventInvite, notice: InviteNotice): EmailContent {
+	const base = { title: inviteSubject(invite, notice), lead: lead(invite, notice), footer: FOOTER };
 	const details = [
 		{ label: notice === 'cancelled' ? 'Was' : 'When', value: formatWhen(invite) },
 		{ label: 'Organizer', value: organizerLabel(invite.organizer) }
 	];
-	if (notice !== 'cancelled') {
-		if (invite.location) details.push({ label: 'Where', value: invite.location });
-		if (invite.guests.length > 0) {
-			details.push({ label: 'Guests', value: invite.guests.map((guest) => guest.email).join(', ') });
-		}
-		if (invite.notes) details.push({ label: 'Notes', value: invite.notes });
+	if (notice === 'cancelled') return { ...base, details };
+	if (invite.location) details.push({ label: 'Where', value: invite.location });
+	if (invite.meetingUrl) details.push({ label: 'Meeting', value: invite.meetingUrl });
+	if (invite.guests.length > 0) {
+		details.push({ label: 'Guests', value: invite.guests.map((guest) => guest.email).join(', ') });
 	}
-	return {
-		title: inviteSubject(invite, notice),
-		lead: lead(invite, notice),
-		details,
-		footer: 'Reply to this email to reach the organizer.'
-	};
+	if (invite.notes) details.push({ label: 'Notes', value: invite.notes });
+	if (!invite.meetingUrl) return { ...base, details };
+	return { ...base, details, action: { label: 'Join the meeting', href: invite.meetingUrl } };
 }
 
 function timeLines(invite: EventInvite): string[] {
 	return invite.allDay
 		? [`DTSTART;VALUE=DATE:${icsDate(invite.start)}`, `DTEND;VALUE=DATE:${icsDate(invite.end)}`]
 		: [`DTSTART:${icsTime(invite.start)}`, `DTEND:${icsTime(invite.end)}`];
+}
+
+/** Where calendars show and link the room: LOCATION when there's no other place, URL always, and in the notes. */
+function meetingLines(invite: EventInvite): string[] {
+	const description = [invite.meetingUrl ? `Join the Zimail meeting: ${invite.meetingUrl}` : '', invite.notes ?? '']
+		.filter(Boolean)
+		.join('\n\n');
+	const location = invite.location ?? invite.meetingUrl;
+	return [
+		...(location ? [`LOCATION:${icsText(location)}`] : []),
+		...(invite.meetingUrl ? [`URL:${invite.meetingUrl}`] : []),
+		...(description ? [`DESCRIPTION:${icsText(description)}`] : [])
+	];
 }
 
 function attendeeLine(guest: InviteParty & { status: PartStat }): string {
@@ -119,8 +133,7 @@ export function inviteIcs(invite: EventInvite, notice: InviteNotice, now = new D
 		'TRANSP:OPAQUE',
 		icsPerson('ORGANIZER', invite.organizer.email, invite.organizer.name),
 		...invite.guests.map(attendeeLine),
-		...(invite.location ? [`LOCATION:${icsText(invite.location)}`] : []),
-		...(invite.notes ? [`DESCRIPTION:${icsText(invite.notes)}`] : []),
+		...meetingLines(invite),
 		'END:VEVENT',
 		'END:VCALENDAR'
 	]);

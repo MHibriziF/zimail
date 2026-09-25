@@ -32,6 +32,8 @@ export type CalendarEvent = {
 	busy: boolean;
 	/** The subscribed calendar a feed event came from, for its color and label. */
 	calendar: { name: string; color: LabelColor } | null;
+	/** The join code of the event's own Zimail meeting room, if it has one. */
+	meetingCode: string | null;
 };
 
 export type CalendarEventInput = {
@@ -45,6 +47,8 @@ export type CalendarEventInput = {
 	notes?: string | null;
 	/** Email addresses to invite; left out, the guest list stays as it is. */
 	guests?: string[];
+	/** Whether the event has its own meeting room; left out, it stays as it is. */
+	withMeeting?: boolean;
 };
 
 export type ValidEventInput = {

@@ -16,7 +16,7 @@ export function meetingsConfigured(platform: App.Platform | undefined | null): b
 	return Boolean(env?.LIVEKIT_API_KEY && env.LIVEKIT_API_SECRET && env.LIVEKIT_URL);
 }
 
-function meetingRooms(platform: App.Platform | undefined | null): MeetingRooms | null {
+export function meetingRooms(platform: App.Platform | undefined | null): MeetingRooms | null {
 	if (!meetingsConfigured(platform)) return null;
 	const meetings = getMeetingsService(platform);
 	return {

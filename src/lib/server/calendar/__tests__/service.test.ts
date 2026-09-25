@@ -30,7 +30,8 @@ function fakeRepo(seed: Row[] = [], seedGuests: Record<string, EventGuest[]> = {
 				notes: event.notes,
 				source: event.source,
 				busy: event.busy !== false,
-				calendar: null
+				calendar: null,
+				meetingCode: event.meetingCode ?? null
 			});
 		},
 		async updateManual(userId, id, input: ValidEventInput) {
@@ -55,6 +56,10 @@ function fakeRepo(seed: Row[] = [], seedGuests: Record<string, EventGuest[]> = {
 			delete guests[id];
 			return row.sequence ?? 0;
 		},
+		async setMeetingCode(userId, id, code) {
+			const row = rows.find((entry) => entry.userId === userId && entry.id === id && entry.source === 'manual');
+			if (row) row.meetingCode = code;
+		},
 		async listGuests(_userId, eventId) {
 			return structuredClone(guests[eventId] ?? []);
 		},
@@ -74,6 +79,23 @@ function fakeRepo(seed: Row[] = [], seedGuests: Record<string, EventGuest[]> = {
 		}
 	};
 	return { repo, rows, guests };
+}
+
+function rooms(failOpen = false) {
+	const open: string[] = [];
+	const closed: string[] = [];
+	let next = 0;
+	const meetings = {
+		async open(_userId: string, title: string) {
+			if (failOpen) throw new Error('LiveKit down');
+			open.push(title);
+			return `room-${++next}`;
+		},
+		async close(_userId: string, code: string) {
+			closed.push(code);
+		}
+	};
+	return { meetings, open, closed };
 }
 
 function mailbox() {
@@ -96,7 +118,8 @@ const feedRow: Row = {
 	notes: null,
 	source: 'feed',
 	busy: true,
-	calendar: { name: 'Google', color: 'blue' }
+	calendar: { name: 'Google', color: 'blue' },
+	meetingCode: null
 };
 
 const input = { title: 'Standup', start: '2026-09-24T02:00:00.000Z', end: '2026-09-24T02:15:00.000Z', allDay: false };
@@ -319,5 +342,57 @@ describe('CalendarService', () => {
 		assert.equal((await service.get('u1', 'm1'))?.guests.length, 2);
 		assert.deepEqual((await service.get('u1', 'feed-1'))?.guests, []);
 		assert.equal(await service.get('u1', 'missing'), null);
+	});
+
+	test('an event asking for a room gets one, and guests hear about it', async () => {
+		const { repo, rows } = fakeRepo();
+		const { meetings, open } = rooms();
+		const { notifyGuests, sent } = mailbox();
+		const service = createCalendarService({ repo, meetings, notifyGuests });
+		const outcome = await service.create('u1', { ...input, withMeeting: true, guests: ['ada@example.com'] });
+		assert.equal(outcome.type === 'ok' && outcome.event.meetingCode, 'room-1');
+		assert.equal(rows[0].meetingCode, 'room-1');
+		assert.deepEqual(open, ['Standup']);
+		assert.equal(sent[0].event.meetingCode, 'room-1');
+	});
+
+	test('a room that cannot be opened leaves the event without one', async () => {
+		const { repo, rows } = fakeRepo();
+		const service = createCalendarService({ repo, meetings: rooms(true).meetings });
+		const quiet = console.error;
+		console.error = () => undefined;
+		try {
+			assert.equal((await service.create('u1', { ...input, withMeeting: true })).type, 'ok');
+		} finally {
+			console.error = quiet;
+		}
+		assert.equal(rows[0].meetingCode, null);
+		const without = createCalendarService({ repo: fakeRepo().repo });
+		const outcome = await without.create('u1', { ...input, withMeeting: true });
+		assert.equal(outcome.type === 'ok' && outcome.event.meetingCode, null);
+	});
+
+	test('a room is added, kept, and removed with the edits that ask', async () => {
+		const { repo, rows } = fakeRepo([{ ...manual, meetingCode: null }], invited());
+		const { meetings, closed } = rooms();
+		const { notifyGuests, summary } = mailbox();
+		const service = createCalendarService({ repo, meetings, notifyGuests });
+		await service.update('u1', 'm1', { ...same, withMeeting: true });
+		assert.equal(rows[0].meetingCode, 'room-1');
+		assert.deepEqual(summary(), ['updated:ada@example.com,bo@example.com@3'], 'a new room is news to the guests');
+		await service.update('u1', 'm1', same);
+		await service.update('u1', 'm1', { ...same, withMeeting: true });
+		assert.equal(rows[0].meetingCode, 'room-1', 'left out or already there, the room stays');
+		await service.update('u1', 'm1', { ...same, withMeeting: false });
+		assert.equal(rows[0].meetingCode, null);
+		assert.deepEqual(closed, ['room-1']);
+	});
+
+	test('deleting an event closes its room', async () => {
+		const { repo } = fakeRepo([{ ...manual, meetingCode: 'room-9' }]);
+		const { meetings, closed } = rooms();
+		const service = createCalendarService({ repo, meetings });
+		assert.equal(await service.remove('u1', 'm1'), 'ok');
+		assert.deepEqual(closed, ['room-9']);
 	});
 });
