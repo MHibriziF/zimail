@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { expandCalendar } from '../../../calendar/ics';
-import { bookingEmailContent, bookingIcs, inviteContentType, type BookingDetails } from '../email';
+import { calendarAttachment } from '../../outbound/calendar-mail';
+import { bookingEmailContent, bookingIcs, bookingMethod, type BookingDetails } from '../email';
+
+const inviteContentType = (kind: Parameters<typeof bookingMethod>[0]) => calendarAttachment('', bookingMethod(kind)).type;
 
 const details: BookingDetails = {
 	uid: 'abc@zimail',

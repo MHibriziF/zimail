@@ -3,8 +3,10 @@ import {
 	CALENDAR_EVENT_SOURCES,
 	type CalendarEvent,
 	type CalendarEventSource,
+	type EventGuest,
 	type ValidEventInput
 } from '../../calendar/events';
+import { PART_STATS } from '../../calendar/ics/invite';
 import { LABEL_COLORS } from '../../mail/labels';
 
 type EventRow = {
@@ -63,8 +65,16 @@ export type CalendarRepository = {
 	listOverlapping(userId: string, from: string, to: string, limit: number): Promise<CalendarEvent[]>;
 	get(userId: string, id: string): Promise<CalendarEvent | null>;
 	insert(event: NewCalendarEvent): Promise<void>;
-	updateManual(userId: string, id: string, input: ValidEventInput): Promise<boolean>;
-	deleteManual(userId: string, id: string): Promise<boolean>;
+	/** The revision the event is at after the change, or `null` if there was no such event. */
+	updateManual(userId: string, id: string, input: ValidEventInput): Promise<number | null>;
+	/** The revision the event was at, or `null` if there was no such event. */
+	deleteManual(userId: string, id: string): Promise<number | null>;
+	listGuests(userId: string, eventId: string): Promise<EventGuest[]>;
+	/**
+	 * Makes `emails` the guest list: new guests are added, missing ones dropped,
+	 * and the rest keep their answer unless `resetAnswers`.
+	 */
+	setGuests(userId: string, eventId: string, emails: string[], resetAnswers: boolean): Promise<void>;
 	/** Cancels a booking: its reservation row and the event that blocks the slot. */
 	deleteReservation(userId: string, id: string): Promise<boolean>;
 	/** Takes a received invitation off the calendar: every occurrence of the series `id` belongs to. */
@@ -118,12 +128,13 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 		},
 
 		async updateManual(userId, id, input) {
-			const result = await db
+			const row = await db
 				.prepare(
 					`UPDATE calendar_events
 					 SET title = ?, starts_at = ?, ends_at = ?, all_day = ?, location = ?, notes = ?,
-					     updated_at = CURRENT_TIMESTAMP
-					 WHERE id = ? AND user_id = ? AND source = 'manual'`
+					     sequence = sequence + 1, updated_at = CURRENT_TIMESTAMP
+					 WHERE id = ? AND user_id = ? AND source = 'manual'
+					 RETURNING sequence`
 				)
 				.bind(
 					input.title,
@@ -135,16 +146,60 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 					id,
 					userId
 				)
-				.run();
-			return (result.meta.changes ?? 0) > 0;
+				.first<{ sequence: number }>();
+			return row?.sequence ?? null;
 		},
 
 		async deleteManual(userId, id) {
-			const result = await db
-				.prepare(`DELETE FROM calendar_events WHERE id = ? AND user_id = ? AND source = 'manual'`)
+			const row = await db
+				.prepare(
+					`DELETE FROM calendar_events WHERE id = ? AND user_id = ? AND source = 'manual' RETURNING sequence`
+				)
 				.bind(id, userId)
-				.run();
-			return (result.meta.changes ?? 0) > 0;
+				.first<{ sequence: number }>();
+			return row?.sequence ?? null;
+		},
+
+		async listGuests(userId, eventId) {
+			const { results } = await db
+				.prepare(
+					`SELECT email, name, status FROM event_guests
+					 WHERE event_id = ? AND user_id = ? ORDER BY rowid`
+				)
+				.bind(eventId, userId)
+				.all<{ email: string; name: string | null; status: string }>();
+			return results.map((row) => ({
+				email: row.email,
+				name: row.name,
+				status: PART_STATS.find((status) => status === row.status) ?? 'needs-action'
+			}));
+		},
+
+		async setGuests(userId, eventId, emails, resetAnswers) {
+			const list = JSON.stringify(emails);
+			await db.batch([
+				db
+					.prepare(
+						`DELETE FROM event_guests
+						 WHERE event_id = ? AND user_id = ? AND email NOT IN (SELECT value FROM json_each(?))`
+					)
+					.bind(eventId, userId, list),
+				...(resetAnswers
+					? [
+							db
+								.prepare(
+									`UPDATE event_guests SET status = 'needs-action', updated_at = CURRENT_TIMESTAMP
+									 WHERE event_id = ? AND user_id = ?`
+								)
+								.bind(eventId, userId)
+						]
+					: []),
+				...emails.map((email) =>
+					db
+						.prepare('INSERT OR IGNORE INTO event_guests (event_id, user_id, email) VALUES (?, ?, ?)')
+						.bind(eventId, userId, email)
+				)
+			]);
 		},
 
 		async deleteReservation(userId, id) {

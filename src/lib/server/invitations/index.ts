@@ -1,12 +1,13 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
-import { APP_NAME } from '$lib/constants';
 import { isCalendarAttachment } from '../../utils/attachments';
 import { getAttachmentForUser, listAttachments, readAttachmentBytes } from '../attachments';
+import { getCalendarService } from '../calendar';
 import { createD1CalendarRepository } from '../calendar/repository';
 import { getEmailProvider } from '../context';
 import { listAddressesForUser } from '../domains';
 import type { EmailProvider } from '../email-provider';
 import { renderEmailHtml, renderEmailText, type EmailContent } from '../outbound/email-template';
+import { calendarAttachment, senderFor, userTimeZone } from '../outbound/calendar-mail';
 import { sendOutboundEmail } from '../outbound/send-mail';
 import { getReservationsService } from '../reservations';
 import type { InviteParty } from '../../calendar/ics/invite';
@@ -29,12 +30,6 @@ export { createD1InvitationsRepository, type InvitationsRepository } from './rep
 const MAX_CALENDAR_BYTES = 512 * 1024;
 /** Events looked at around a proposed time — a few days' worth of anyone's calendar. */
 const MAX_NEARBY_EVENTS = 500;
-
-function utf8Base64(text: string): string {
-	let binary = '';
-	for (const byte of new TextEncoder().encode(text)) binary += String.fromCodePoint(byte);
-	return btoa(binary);
-}
 
 type Part = { contentType: string; filename: string; size: number };
 
@@ -61,11 +56,6 @@ async function loadCalendarPart(db: D1Database, bucket: R2Bucket | undefined, us
 	return bytes ? new TextDecoder().decode(bytes) : null;
 }
 
-async function userTimeZone(db: D1Database, userId: string): Promise<string> {
-	const row = await db.prepare('SELECT timezone FROM users WHERE id = ?').bind(userId).first<{ timezone: string | null }>();
-	return row?.timezone || 'UTC';
-}
-
 type CalendarMail = {
 	/** Which of the user's addresses to send from; the default one when it isn't theirs or isn't given. */
 	fromEmail: string | null;
@@ -85,19 +75,16 @@ async function sendCalendarMail(db: D1Database, provider: EmailProvider, userId:
 	const exact = addresses.find((address) => address.address.toLowerCase() === mail.fromEmail?.toLowerCase());
 	const from = mail.strict ? exact : (exact ?? addresses.find((address) => address.is_default) ?? addresses[0]);
 	if (!from) return;
-	const user = await db.prepare('SELECT name FROM users WHERE id = ?').bind(userId).first<{ name: string }>();
-	const senderName = from.label?.trim() || user?.name || APP_NAME;
-	const ics = mail.ics({ email: from.address.toLowerCase(), name: senderName });
+	const sender = await senderFor(db, userId, from);
+	const ics = mail.ics({ email: from.address.toLowerCase(), name: sender.name });
 	await sendOutboundEmail(provider, {
 		from,
-		senderName,
+		senderName: sender.name,
 		to: mail.to,
 		subject: mail.subject,
 		text: renderEmailText(mail.content),
 		html: renderEmailHtml(mail.content),
-		attachments: [
-			{ filename: 'invite.ics', type: `text/calendar; method=${mail.method}; charset=UTF-8`, content: utf8Base64(ics) }
-		]
+		attachments: [calendarAttachment(ics, mail.method)]
 	});
 }
 
@@ -182,7 +169,7 @@ export function getAnswersService(platform: App.Platform | undefined | null): An
 	if (!db) throw new Error('Database unavailable');
 	return answersServiceFor(db, platform?.env.ATTACHMENTS, {
 		async reschedule(userId, event, start, end) {
-			if (event.source !== 'reservation') return 'not_found';
+			if (event.source === 'manual') return getCalendarService(platform).reschedule(userId, event.id, start, end);
 			return getReservationsService(platform).rescheduleBooking(userId, event.id, start, end);
 		},
 		async declineProposal(userId, event, proposal, guest) {

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
+import { isPlausibleEmail } from '../events';
 import {
-	isPlausibleEmail,
 	isValidSlug,
 	minutesToTime,
 	slugify,

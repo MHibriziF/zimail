@@ -3,7 +3,7 @@
  * owner's form and the public booking page (which check them first).
  */
 import { isValidTimeZone } from '../timezone';
-import { dateKeyToUtc } from './events';
+import { dateKeyToUtc, isPlausibleEmail } from './events';
 
 export const SLOT_LENGTHS = [15, 20, 30, 45, 60, 90, 120] as const;
 export const MAX_WINDOW_DAYS = 180;
@@ -147,22 +147,6 @@ export function validatePageSettings(
 			withMeeting: input.withMeeting === true
 		}
 	};
-}
-
-const FORBIDDEN_IN_EMAIL = new Set([' ', '\t', '\r', '\n', '<', '>', ',', ';', '"']);
-
-/**
- * Deliberately loose — the provider is the real judge — but it keeps out junk
- * and anything that could smuggle a second recipient or header. Hand-rolled
- * rather than a regex, which Sonar scores as backtracking-prone.
- */
-export function isPlausibleEmail(email: string): boolean {
-	if (email.length > 254 || [...email].some((char) => FORBIDDEN_IN_EMAIL.has(char))) return false;
-	const at = email.indexOf('@');
-	if (at < 1 || at !== email.lastIndexOf('@')) return false;
-	const domain = email.slice(at + 1);
-	const dot = domain.lastIndexOf('.');
-	return dot > 0 && dot < domain.length - 1;
 }
 
 export function validateGuest(

@@ -45,6 +45,11 @@ type EventClash = GuestAnswerView['conflicts'][number];
 
 const DAY_MS = 86_400_000;
 
+/** The UID guests' calendars know one of the user's events by, so their answers find it again. */
+export function ownEventUid(eventId: string): string {
+	return `${eventId}${OWN_UID_SUFFIX}`;
+}
+
 export function ownEventId(uid: string): string | null {
 	return uid.endsWith(OWN_UID_SUFFIX) ? uid.slice(0, -OWN_UID_SUFFIX.length) || null : null;
 }
