@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Puts the SonarScanner's big downloads — the analysis engine, the JRE and the
-# plugins this repo's languages need — into its cache before it runs.
+# Puts the SonarScanner's big downloads — the analysis engine and the plugins
+# this repo's languages need — into its cache before it runs. The JRE isn't
+# one of them: sonar.scanner.skipJreProvisioning uses the one the CLI ships.
 #
 # Our SonarQube sits behind a proxy that intermittently stalls or resets large
 # downloads, and the scanner gives up on the first one; a scan then hangs for
@@ -61,9 +62,6 @@ fetch() {
 
 engine=$(api /api/v2/analysis/engine) &&
 	fetch /api/v2/analysis/engine "$(jq -r .sha256 <<<"$engine")" sha256 "$(jq -r .filename <<<"$engine")"
-
-jre=$(api '/api/v2/analysis/jres?os=linux&arch=x64' | jq -c 'first(.[])') &&
-	fetch "/api/v2/analysis/jres/$(jq -r .id <<<"$jre")" "$(jq -r .sha256 <<<"$jre")" sha256 "$(jq -r .filename <<<"$jre")"
 
 installed=$(api /api/plugins/installed) || installed='{"plugins":[]}'
 for key in $plugins; do
