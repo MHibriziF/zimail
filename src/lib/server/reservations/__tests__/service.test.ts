@@ -124,7 +124,8 @@ function setup(options: SetupOptions = {}) {
 					notes: null,
 					source: 'reservation',
 					busy: true,
-					calendar: null
+					calendar: null,
+					meetingCode: null
 				}));
 			return [...(options.busy ?? []), ...booked];
 		}
@@ -214,7 +215,8 @@ describe('ReservationsService slots and booking', () => {
 			notes: null,
 			source: 'feed',
 			busy: true,
-			calendar: null
+			calendar: null,
+			meetingCode: null
 		};
 		const free: CalendarEvent = { ...busy, id: 'f', start: '2026-09-28T03:00:00.000Z', end: '2026-09-28T04:00:00.000Z', busy: false };
 		const { service } = await withPage({ busy: [busy, free] });

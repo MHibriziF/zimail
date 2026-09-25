@@ -84,7 +84,8 @@ describe('CalendarRepository', () => {
 			notes: 'n',
 			source: 'manual',
 			busy: false,
-			calendar: null
+			calendar: null,
+			meetingCode: null
 		});
 	});
 
@@ -148,5 +149,12 @@ describe('CalendarRepository', () => {
 		await reset.repo.setGuests('user-1', 'e1', [], true);
 		assert.equal(reset.queries.length, 2);
 		assert.match(reset.queries[1].sql, /SET status = 'needs-action'/);
+	});
+
+	test('a meeting room is set on manual events only', async () => {
+		const { repo, queries } = setup();
+		await repo.setMeetingCode('user-1', 'e1', 'abc');
+		assert.match(queries[0].sql, /SET meeting_code = \? WHERE id = \? AND user_id = \? AND source = 'manual'/);
+		assert.deepEqual(queries[0].args, ['abc', 'e1', 'user-1']);
 	});
 });

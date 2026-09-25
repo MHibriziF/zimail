@@ -34,7 +34,7 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 };
 
 /** Answers or adds/removes an invitation, or accepts/declines a guest's proposed time. */
-export const POST: RequestHandler = async ({ params, locals, platform, request }) => {
+export const POST: RequestHandler = async ({ params, locals, platform, request, url }) => {
 	if (!platform?.env.DB || !locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 	if (!(await getMailStoreService(platform).getEmailForUser(locals.user.id, params.id!))) {
 		return json({ error: 'Not found' }, { status: 404 });
@@ -43,7 +43,7 @@ export const POST: RequestHandler = async ({ params, locals, platform, request }
 	const body = (await request.json().catch(() => ({}))) as { action?: unknown };
 	const answerAction = ANSWER_ACTIONS.find((entry) => entry === body.action);
 	if (answerAction) {
-		const outcome = await getAnswersService(platform).act(locals.user.id, params.id!, answerAction);
+		const outcome = await getAnswersService(platform, url.origin).act(locals.user.id, params.id!, answerAction);
 		return outcome.type === 'ok' ? json({ answer: outcome.answer }) : failure(outcome.type);
 	}
 

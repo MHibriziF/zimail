@@ -163,13 +163,13 @@ export function getInvitationsService(platform: App.Platform | undefined | null)
 	return invitationsServiceFor(db, platform?.env.ATTACHMENTS, () => getEmailProvider(platform));
 }
 
-/** Composition root for routes: answers to the user's own invitations, and acting on proposed times. */
-export function getAnswersService(platform: App.Platform | undefined | null): AnswersService {
+/** Composition root for routes: answers to the user's own invitations, and acting on proposed times. `requestOrigin` is for meeting links. */
+export function getAnswersService(platform: App.Platform | undefined | null, requestOrigin = ''): AnswersService {
 	const db = platform?.env.DB;
 	if (!db) throw new Error('Database unavailable');
 	return answersServiceFor(db, platform?.env.ATTACHMENTS, {
 		async reschedule(userId, event, start, end) {
-			if (event.source === 'manual') return getCalendarService(platform).reschedule(userId, event.id, start, end);
+			if (event.source === 'manual') return getCalendarService(platform, requestOrigin).reschedule(userId, event.id, start, end);
 			return getReservationsService(platform).rescheduleBooking(userId, event.id, start, end);
 		},
 		async declineProposal(userId, event, proposal, guest) {

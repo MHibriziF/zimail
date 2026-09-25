@@ -51,7 +51,7 @@ const decode = (base64: string) => new TextDecoder().decode(Uint8Array.from(atob
 describe('calendarServiceFor', () => {
 	test('each guest gets their own invitation from the default address', async () => {
 		const { db, sent, provider } = setup();
-		const outcome = await calendarServiceFor(db, provider).create('u1', {
+		const outcome = await calendarServiceFor(db, { provider }).create('u1', {
 			...input,
 			guests: ['ada@example.com', 'bo@example.com']
 		});
@@ -77,7 +77,7 @@ describe('calendarServiceFor', () => {
 		const logged: unknown[] = [];
 		console.error = (...args: unknown[]) => logged.push(args);
 		try {
-			const outcome = await calendarServiceFor(db, provider).create('u1', {
+			const outcome = await calendarServiceFor(db, { provider }).create('u1', {
 				...input,
 				guests: ['bounce@example.com', 'ada@example.com']
 			});
@@ -104,7 +104,24 @@ describe('calendarServiceFor', () => {
 		});
 		let sends = 0;
 		const provider = { send: async () => ({ providerId: String(++sends) }) } as unknown as EmailProvider;
-		await calendarServiceFor(db, () => provider).create('u1', { ...input, guests: ['ada@example.com'] });
+		await calendarServiceFor(db, { provider: () => provider }).create('u1', { ...input, guests: ['ada@example.com'] });
 		assert.equal(sends, 0);
+	});
+
+	test('the room is linked from this deployment, and only when its address is known', async () => {
+		const { db, sent, provider } = setup();
+		const meetings = { open: async () => 'abc-defg-hij', close: async () => undefined };
+		await calendarServiceFor(db, { provider, meetings, baseUrl: 'https://mail.example.test' }).create('u1', {
+			...input,
+			withMeeting: true,
+			guests: ['ada@example.com']
+		});
+		assert.match(sent[0].text, /https:\/\/mail\.example\.test\/meet\/abc-defg-hij/);
+		await calendarServiceFor(db, { provider, meetings }).create('u1', {
+			...input,
+			withMeeting: true,
+			guests: ['ada@example.com']
+		});
+		assert.doesNotMatch(sent[1].text, /\/meet\//);
 	});
 });

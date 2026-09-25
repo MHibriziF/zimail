@@ -172,5 +172,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0042_invitation_answers.sql",
 		sql: "-- Invitations the user sends (bookings now, events with guests later) and\n-- what their guests answer.\n--\n-- `sequence` is the revision the guests were last sent: an update or a\n-- cancellation must carry a higher one or their calendars ignore it.\nALTER TABLE calendar_events ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0;\n\n-- One row per guest of one of the user's events, with their latest answer\n-- ('needs-action', 'accepted', 'tentative', 'declined'), as their calendar\n-- replied. Goes when the event does.\nCREATE TABLE event_guests (\n\tevent_id TEXT NOT NULL REFERENCES calendar_events(id) ON DELETE CASCADE,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\temail TEXT NOT NULL,\n\tname TEXT,\n\tstatus TEXT NOT NULL DEFAULT 'needs-action',\n\tupdated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n\tPRIMARY KEY (event_id, email)\n);\n\nCREATE INDEX event_guests_user_idx ON event_guests(user_id);\n\n-- Bookings made before this already have their guest, in reservations.\nINSERT OR IGNORE INTO event_guests (event_id, user_id, email, name)\nSELECT r.event_id, r.user_id, lower(r.guest_email), r.guest_name\nFROM reservations r JOIN calendar_events e ON e.id = r.event_id;\n"
+	},
+	{
+		name: "0043_event_meetings.sql",
+		sql: "-- An event the user organizes can have its own Zimail meeting room, like a\n-- booking. The room is an ordinary row in `meetings`, owned by the user; the\n-- event keeps its join code so the room can be closed with it.\nALTER TABLE calendar_events ADD COLUMN meeting_code TEXT;\n"
 	}
 ];
