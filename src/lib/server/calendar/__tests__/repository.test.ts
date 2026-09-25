@@ -106,4 +106,47 @@ describe('CalendarRepository', () => {
 		]);
 		assert.deepEqual((await repo.get('user-1', 'e1'))?.calendar, { name: 'Work', color: 'blue' });
 	});
+
+	test('an edit or a delete reports the revision, or null when nothing matched', async () => {
+		const { repo, queries } = setup(() => [{ sequence: 4 }]);
+		assert.equal(await repo.updateManual('user-1', 'e1', valid), 4);
+		assert.match(queries[0].sql, /sequence = sequence \+ 1/);
+		assert.match(queries[0].sql, /RETURNING sequence/);
+		assert.equal(await repo.deleteManual('user-1', 'e1'), 4);
+		assert.match(queries[1].sql, /RETURNING sequence/);
+		assert.equal(await setup().repo.updateManual('user-1', 'e1', valid), null);
+		assert.equal(await setup().repo.deleteManual('user-1', 'e1'), null);
+	});
+
+	test('guests are listed for the user, with an unknown answer read as needs-action', async () => {
+		const { repo, queries } = setup(() => [
+			{ email: 'ada@example.com', name: 'Ada', status: 'accepted' },
+			{ email: 'bo@example.com', name: null, status: 'shrug' }
+		]);
+		assert.deepEqual(await repo.listGuests('user-1', 'e1'), [
+			{ email: 'ada@example.com', name: 'Ada', status: 'accepted' },
+			{ email: 'bo@example.com', name: null, status: 'needs-action' }
+		]);
+		assert.deepEqual(queries[0].args, ['e1', 'user-1']);
+	});
+
+	test('setting guests drops the missing, adds the new, and resets answers only when asked', async () => {
+		const { repo, queries } = setup();
+		await repo.setGuests('user-1', 'e1', ['ada@example.com', 'bo@example.com'], false);
+		assert.match(queries[0].sql, /DELETE FROM event_guests[\s\S]*NOT IN \(SELECT value FROM json_each\(\?\)\)/);
+		assert.deepEqual(queries[0].args, ['e1', 'user-1', '["ada@example.com","bo@example.com"]']);
+		assert.deepEqual(
+			queries.slice(1).map((query) => query.args),
+			[
+				['e1', 'user-1', 'ada@example.com'],
+				['e1', 'user-1', 'bo@example.com']
+			]
+		);
+		assert.ok(queries.slice(1).every((query) => query.sql.startsWith('INSERT OR IGNORE')));
+
+		const reset = setup();
+		await reset.repo.setGuests('user-1', 'e1', [], true);
+		assert.equal(reset.queries.length, 2);
+		assert.match(reset.queries[1].sql, /SET status = 'needs-action'/);
+	});
 });
