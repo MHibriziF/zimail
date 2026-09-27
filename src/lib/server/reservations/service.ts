@@ -271,7 +271,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const start = new Date(typeof body.start === 'string' ? body.start : '');
 			if (Number.isNaN(start.getTime())) return { type: 'slot_taken' };
 			const refresh = refreshHost(page.userId);
-			if (refresh) await settleWithin(refresh, BOOKING_REFRESH_WAIT_MS);
+			if (refresh !== null) await settleWithin(refresh, BOOKING_REFRESH_WAIT_MS);
 			const at = now();
 			const refusal = await refuseBooking(page, start, at, guest.value.email);
 			if (refusal) return { type: refusal };
