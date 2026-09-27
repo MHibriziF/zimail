@@ -82,6 +82,30 @@ function unchanged(row: StoredFeedEvent, values: EventValues): boolean {
 	);
 }
 
+/** Stored rows by uid; rows with no uid, or a uid already taken, are marked for removal. */
+function indexStored(stored: StoredFeedEvent[]) {
+	const byUid = new Map<string, StoredFeedEvent>();
+	const remove: string[] = [];
+	for (const row of stored) {
+		if (row.external_uid === null || byUid.has(row.external_uid)) remove.push(row.id);
+		else byUid.set(row.external_uid, row);
+	}
+	return { byUid, remove };
+}
+
+function toValues(event: FeedEvent, id: string): EventValues {
+	return {
+		id,
+		uid: event.uid,
+		title: event.title,
+		start: event.start,
+		end: event.end,
+		allDay: event.allDay ? 1 : 0,
+		location: event.location,
+		busy: event.busy ? 1 : 0
+	};
+}
+
 /**
  * What it takes to turn the stored events into `incoming`, matched on the
  * occurrence uid. D1 bills every row a statement touches, index entries
@@ -92,12 +116,7 @@ export function diffFeedEvents(
 	incoming: FeedEvent[],
 	newId: () => string = () => crypto.randomUUID()
 ): FeedEventDiff {
-	const byUid = new Map<string, StoredFeedEvent>();
-	const remove: string[] = [];
-	for (const row of stored) {
-		if (row.external_uid === null || byUid.has(row.external_uid)) remove.push(row.id);
-		else byUid.set(row.external_uid, row);
-	}
+	const { byUid, remove } = indexStored(stored);
 
 	const insert: EventValues[] = [];
 	const update: EventValues[] = [];
@@ -107,16 +126,7 @@ export function diffFeedEvents(
 		seen.add(event.uid);
 
 		const row = byUid.get(event.uid);
-		const values: EventValues = {
-			id: row?.id ?? newId(),
-			uid: event.uid,
-			title: event.title,
-			start: event.start,
-			end: event.end,
-			allDay: event.allDay ? 1 : 0,
-			location: event.location,
-			busy: event.busy ? 1 : 0
-		};
+		const values = toValues(event, row?.id ?? newId());
 		if (!row) insert.push(values);
 		else if (!unchanged(row, values)) update.push(values);
 	}
