@@ -36,7 +36,7 @@ describe('text helpers match the regexes they replace', () => {
 
 	test('stripTags', () => {
 		for (const value of samples('ab<> ')) {
-			assert.equal(stripTags(value), value.replace(/<[^>]+>/g, ''), value);
+			assert.equal(stripTags(value), value.split(/<[^>]+>/).join(''), value);
 		}
 		assertFast(() => stripTags('<'.repeat(HOSTILE)));
 	});
