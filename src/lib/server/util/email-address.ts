@@ -1,3 +1,4 @@
+import { splitAddressList } from '../../mail/address-list';
 import { firstAngled, firstEmailLike, splitTrailingAngled } from '../../utils/text';
 
 export type EmailIdentity = {
@@ -44,30 +45,7 @@ export function parseEmailAddress(value: string): string {
 export function parseEmailIdentities(value: string | null | undefined): EmailIdentity[] {
 	if (!value) return [];
 
-	const parts: string[] = [];
-	let start = 0;
-	let inQuotes = false;
-	let bracketDepth = 0;
-
-	for (let index = 0; index < value.length; index += 1) {
-		const character = value[index];
-		if (character === '"') {
-			let backslashes = 0;
-			for (let previous = index - 1; previous >= 0 && value[previous] === '\\'; previous -= 1) {
-				backslashes += 1;
-			}
-			if (backslashes % 2 === 0) inQuotes = !inQuotes;
-		}
-		if (!inQuotes && character === '<') bracketDepth += 1;
-		if (!inQuotes && character === '>' && bracketDepth > 0) bracketDepth -= 1;
-		if (!inQuotes && bracketDepth === 0 && character === ',') {
-			parts.push(value.slice(start, index));
-			start = index + 1;
-		}
-	}
-	parts.push(value.slice(start));
-
-	return parts
+	return splitAddressList(value)
 		.map(parseEmailIdentity)
 		.filter((identity) => identity.address.includes('@'));
 }

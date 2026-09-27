@@ -115,90 +115,100 @@ export async function resolveThreadId(
 	userId: string,
 	input: ThreadLookup
 ): Promise<string> {
-	const domainClause = input.domainId ? ' AND domain_id = ?' : '';
-	const domainBindings = input.domainId ? [input.domainId] : [];
+	const scope: LookupScope = {
+		db,
+		userId,
+		domainClause: input.domainId ? ' AND domain_id = ?' : '',
+		domainBindings: input.domainId ? [input.domainId] : []
+	};
 
-	if (input.replyToEmailId) {
-		const parent = await db
-			.prepare(`SELECT thread_id, id FROM emails WHERE id = ? AND user_id = ?${domainClause}`)
-			.bind(input.replyToEmailId, userId, ...domainBindings)
-			.first<{ thread_id: string | null; id: string }>();
+	return (
+		(await threadOfParent(scope, input)) ??
+		(await threadOfReferences(scope, input)) ??
+		(await threadOfSubject(scope, input)) ??
+		input.emailId
+	);
+}
 
-		if (parent) return parent.thread_id ?? parent.id;
-	}
+type LookupScope = { db: D1Database; userId: string; domainClause: string; domainBindings: string[] };
+type ThreadRow = { thread_id: string | null; id: string };
 
+const threadOf = (row: ThreadRow | null) => (row ? (row.thread_id ?? row.id) : null);
+
+async function threadOfParent(scope: LookupScope, input: ThreadLookup): Promise<string | null> {
+	if (!input.replyToEmailId) return null;
+	const parent = await scope.db
+		.prepare(`SELECT thread_id, id FROM emails WHERE id = ? AND user_id = ?${scope.domainClause}`)
+		.bind(input.replyToEmailId, scope.userId, ...scope.domainBindings)
+		.first<ThreadRow>();
+	return threadOf(parent);
+}
+
+async function threadOfReferences(scope: LookupScope, input: ThreadLookup): Promise<string | null> {
 	// In-Reply-To first: it is the direct parent. References covers the rest of
 	// the chain, which matters when the only message we stored is further back.
 	const referenced = parseMessageIds(input.inReplyTo, input.references).slice(0, MAX_REFERENCE_IDS);
-	if (referenced.length > 0) {
-		const placeholders = referenced.map(() => '?').join(', ');
-		const match = await db
-			.prepare(
-				`SELECT thread_id, id FROM emails
-				 WHERE user_id = ?
-				 ${domainClause}
-				 AND message_id IS NOT NULL
-				 AND replace(replace(message_id, '<', ''), '>', '') IN (${placeholders})
-				 ORDER BY datetime(created_at) DESC LIMIT 1`
-			)
-			.bind(userId, ...domainBindings, ...referenced)
-			.first<{ thread_id: string | null; id: string }>();
+	if (referenced.length === 0) return null;
 
-		if (match) return match.thread_id ?? match.id;
-	}
+	const placeholders = referenced.map(() => '?').join(', ');
+	const match = await scope.db
+		.prepare(
+			`SELECT thread_id, id FROM emails
+			 WHERE user_id = ?
+			 ${scope.domainClause}
+			 AND message_id IS NOT NULL
+			 AND replace(replace(message_id, '<', ''), '>', '') IN (${placeholders})
+			 ORDER BY datetime(created_at) DESC LIMIT 1`
+		)
+		.bind(scope.userId, ...scope.domainBindings, ...referenced)
+		.first<ThreadRow>();
+	return threadOf(match);
+}
 
-	if (input.subjectMatch !== false) {
-		const threadKey = normalizeSubject(input.subject);
-		// Only the correspondent side identifies a conversation. Including both
-		// sides lets every message overlap through the user's own mailbox.
-		const correspondentAddresses =
-			input.direction === 'inbound'
-				? addressesIn(input.from)
-				: [...addressesIn(input.to), ...addressesIn(input.cc)];
-		const participants = [
-			...new Set(correspondentAddresses)
-		].slice(0, MAX_PARTICIPANTS);
+async function threadOfSubject(scope: LookupScope, input: ThreadLookup): Promise<string | null> {
+	if (input.subjectMatch === false) return null;
 
-		if (threadKey && threadKey !== '(no subject)' && participants.length > 0) {
-			const overlap = participants
-				.map(
-					() =>
-						`instr(lower(from_addr || ' ' || to_addr || ' ' || COALESCE(cc_addr, '')), ?) > 0`
-				)
-				.join(' OR ');
+	const threadKey = normalizeSubject(input.subject);
+	// Only the correspondent side identifies a conversation. Including both
+	// sides lets every message overlap through the user's own mailbox.
+	const correspondentAddresses =
+		input.direction === 'inbound'
+			? addressesIn(input.from)
+			: [...addressesIn(input.to), ...addressesIn(input.cc)];
+	const participants = [...new Set(correspondentAddresses)].slice(0, MAX_PARTICIPANTS);
+	if (!threadKey || threadKey === '(no subject)' || participants.length === 0) return null;
 
-			// The candidate must be the *other* side of a conversation — this rule
-			// exists to reunite a reply with the message it answers, not to lump
-			// together every same-subject message from one address. Without this,
-			// a sender that reuses one subject for unrelated notices (a "noreply@"
-			// receipt or alert, say) merges them all into a single conversation,
-			// and reading one marks every other notice read with it.
-			const match = await db
-				.prepare(
-					`SELECT thread_id, id FROM emails
-					 WHERE user_id = ?
-					 AND thread_key = ?
-					 ${domainClause}
-					 AND (status IS NULL OR status <> 'draft')
-					 AND datetime(created_at) > datetime('now', ?)
-					 AND direction <> ?
-					 AND (${overlap})
-					 ORDER BY datetime(created_at) DESC LIMIT 1`
-				)
-				.bind(
-					userId,
-					threadKey,
-					...domainBindings,
-					`-${SUBJECT_MATCH_DAYS} day`,
-					input.direction,
-					...participants
-				)
-				.first<{ thread_id: string | null; id: string }>();
+	const overlap = participants
+		.map(() => `instr(lower(from_addr || ' ' || to_addr || ' ' || COALESCE(cc_addr, '')), ?) > 0`)
+		.join(' OR ');
 
-			if (match) return match.thread_id ?? match.id;
-		}
-	}
-
-	return input.emailId;
+	// The candidate must be the *other* side of a conversation — this rule
+	// exists to reunite a reply with the message it answers, not to lump
+	// together every same-subject message from one address. Without this,
+	// a sender that reuses one subject for unrelated notices (a "noreply@"
+	// receipt or alert, say) merges them all into a single conversation,
+	// and reading one marks every other notice read with it.
+	const match = await scope.db
+		.prepare(
+			`SELECT thread_id, id FROM emails
+			 WHERE user_id = ?
+			 AND thread_key = ?
+			 ${scope.domainClause}
+			 AND (status IS NULL OR status <> 'draft')
+			 AND datetime(created_at) > datetime('now', ?)
+			 AND direction <> ?
+			 AND (${overlap})
+			 ORDER BY datetime(created_at) DESC LIMIT 1`
+		)
+		.bind(
+			scope.userId,
+			threadKey,
+			...scope.domainBindings,
+			`-${SUBJECT_MATCH_DAYS} day`,
+			input.direction,
+			...participants
+		)
+		.first<ThreadRow>();
+	return threadOf(match);
 }
 

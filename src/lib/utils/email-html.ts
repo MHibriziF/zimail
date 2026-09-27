@@ -96,31 +96,43 @@ const NAMED_COLOUR_VALUES: Record<string, [number, number, number, number]> = {
 function rgba(literal: string): [number, number, number, number] | null {
 	const value = literal.trim().toLowerCase();
 
-	if (value.startsWith('#')) {
-		const hex = value.slice(1);
-		const expanded =
-			hex.length === 3 || hex.length === 4
-				? [...hex].map((digit) => digit + digit).join('') + (hex.length === 3 ? 'ff' : '')
-				: hex.length === 6
-					? `${hex}ff`
-					: hex.length === 8
-						? hex
-						: null;
-		if (!expanded) return null;
+	if (value.startsWith('#')) return hexRgba(value.slice(1));
+	if (Object.hasOwn(NAMED_COLOUR_VALUES, value)) return NAMED_COLOUR_VALUES[value];
+	return functionRgba(value);
+}
 
-		const packed = Number.parseInt(expanded, 16);
-		if (Number.isNaN(packed)) return null;
-		return [
-			((packed >>> 24) & 0xff) / 255,
-			((packed >>> 16) & 0xff) / 255,
-			((packed >>> 8) & 0xff) / 255,
-			(packed & 0xff) / 255
-		];
+/** `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`, without the `#`, as eight hex digits. */
+function expandHex(hex: string): string | null {
+	switch (hex.length) {
+		case 3:
+			return `${[...hex].map((digit) => digit + digit).join('')}ff`;
+		case 4:
+			return [...hex].map((digit) => digit + digit).join('');
+		case 6:
+			return `${hex}ff`;
+		case 8:
+			return hex;
+		default:
+			return null;
 	}
+}
 
-	const named = NAMED_COLOUR_VALUES[value];
-	if (named) return named;
+function hexRgba(hex: string): [number, number, number, number] | null {
+	const expanded = expandHex(hex);
+	if (!expanded) return null;
 
+	const packed = Number.parseInt(expanded, 16);
+	if (Number.isNaN(packed)) return null;
+	return [
+		((packed >>> 24) & 0xff) / 255,
+		((packed >>> 16) & 0xff) / 255,
+		((packed >>> 8) & 0xff) / 255,
+		(packed & 0xff) / 255
+	];
+}
+
+/** `rgb(…)` / `rgba(…)`, with channels as numbers or percentages. */
+function functionRgba(value: string): [number, number, number, number] | null {
 	const parts = value
 		.replace(/rgba?|\(|\)/g, '')
 		.split(/[,/\s]+/)
