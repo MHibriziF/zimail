@@ -11,6 +11,7 @@ export type FeedRow = {
 	event_count: number;
 	last_synced_at: string | null;
 	last_error: string | null;
+	sync_key: string | null;
 };
 
 export type StoredFeed = {
@@ -22,6 +23,8 @@ export type StoredFeed = {
 	eventCount: number;
 	lastSyncedAt: string | null;
 	lastError: string | null;
+	/** What the last full sync was computed from; see migration 0044. */
+	syncKey: string | null;
 };
 
 function toFeed(row: FeedRow): StoredFeed {
@@ -33,11 +36,12 @@ function toFeed(row: FeedRow): StoredFeed {
 		color: LABEL_COLORS.find((color) => color === row.color) ?? 'blue',
 		eventCount: row.event_count,
 		lastSyncedAt: row.last_synced_at,
-		lastError: row.last_error
+		lastError: row.last_error,
+		syncKey: row.sync_key
 	};
 }
 
-const COLUMNS = 'id, user_id, name, url, color, event_count, last_synced_at, last_error';
+const COLUMNS = 'id, user_id, name, url, color, event_count, last_synced_at, last_error, sync_key';
 
 /**
  * Rows per statement. Each is one JSON element bound as a single parameter and
@@ -143,12 +147,14 @@ function chunks<T>(list: T[]): T[][] {
 	return result;
 }
 
+/** The outcome of a claimed sync; the attempt time was already written by `claim`. */
 export type SyncRecord = {
-	attemptedAt: string;
 	/** Set on success; the previous value is kept on failure. */
 	syncedAt: string | null;
 	error: string | null;
 	eventCount: number | null;
+	/** Kept when null, so a failed fetch doesn't force the next sync to redo everything. */
+	syncKey: string | null;
 };
 
 /** Raw D1 access for feeds, scoped by `user_id` except the cron's `listDue`. */
@@ -162,6 +168,13 @@ export type CalendarFeedsRepository = {
 	delete(userId: string, id: string): Promise<boolean>;
 	/** Feeds not attempted since `before`, oldest attempt first. */
 	listDue(before: string, limit: number): Promise<StoredFeed[]>;
+	/** The same, for one user's feeds — the booking page refreshes its host's calendars. */
+	listDueForUser(userId: string, before: string, limit: number): Promise<StoredFeed[]>;
+	/**
+	 * Marks a sync as started. With `staleBefore`, only if nobody has attempted
+	 * one since then — so concurrent requests can't sync the same feed twice.
+	 */
+	claim(id: string, attemptedAt: string, staleBefore: string | null): Promise<boolean>;
 	recordSync(id: string, record: SyncRecord): Promise<void>;
 	/**
 	 * Brings the feed's stored events in line with `events`, writing only what
@@ -244,16 +257,40 @@ export function createD1CalendarFeedsRepository(db: D1Database): CalendarFeedsRe
 			return results.map(toFeed);
 		},
 
+		async listDueForUser(userId, before, limit) {
+			const { results } = await db
+				.prepare(
+					`SELECT ${COLUMNS} FROM calendar_feeds
+					 WHERE user_id = ? AND (last_attempt_at IS NULL OR last_attempt_at < ?)
+					 ORDER BY last_attempt_at IS NOT NULL, last_attempt_at LIMIT ?`
+				)
+				.bind(userId, before, limit)
+				.all<FeedRow>();
+			return results.map(toFeed);
+		},
+
+		async claim(id, attemptedAt, staleBefore) {
+			const result = await db
+				.prepare(
+					`UPDATE calendar_feeds SET last_attempt_at = ?
+					 WHERE id = ? AND (? IS NULL OR last_attempt_at IS NULL OR last_attempt_at < ?)`
+				)
+				.bind(attemptedAt, id, staleBefore, staleBefore)
+				.run();
+			return (result.meta.changes ?? 0) === 1;
+		},
+
 		async recordSync(id, record) {
 			await db
 				.prepare(
 					`UPDATE calendar_feeds
-					 SET last_attempt_at = ?, last_error = ?,
+					 SET last_error = ?,
 					     last_synced_at = COALESCE(?, last_synced_at),
-					     event_count = COALESCE(?, event_count)
+					     event_count = COALESCE(?, event_count),
+					     sync_key = COALESCE(?, sync_key)
 					 WHERE id = ?`
 				)
-				.bind(record.attemptedAt, record.error, record.syncedAt, record.eventCount, id)
+				.bind(record.error, record.syncedAt, record.eventCount, record.syncKey, id)
 				.run();
 		},
 

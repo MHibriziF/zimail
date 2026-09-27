@@ -23,13 +23,21 @@ const body = {
 	noticeMinutes: 0
 };
 
-type SetupOptions = { busy?: CalendarEvent[]; notifyFails?: boolean; meetings?: boolean; roomFails?: boolean; insertConflict?: boolean };
+type SetupOptions = {
+	busy?: CalendarEvent[];
+	notifyFails?: boolean;
+	meetings?: boolean;
+	roomFails?: boolean;
+	insertConflict?: boolean;
+	refresh?: (userId: string) => Promise<void>;
+};
 
 function setup(options: SetupOptions = {}) {
 	const pages: StoredPage[] = [];
 	const bookings: NewBooking[] = [];
 	const notified: { hostUserId: string; booking: BookingDetails; kind: string }[] = [];
 	const deletedEvents: string[] = [];
+	const deferred: Promise<unknown>[] = [];
 	const sequences = new Map<string, number>();
 
 	const repo: ReservationsRepository = {
@@ -154,9 +162,11 @@ function setup(options: SetupOptions = {}) {
 			if (options.notifyFails) throw new Error('provider down');
 			notified.push({ hostUserId, booking, kind });
 		},
+		refreshCalendars: options.refresh,
+		defer: (work) => deferred.push(work),
 		now: () => NOW
 	});
-	return { service, pages, bookings, notified, deletedEvents, rooms };
+	return { service, pages, bookings, notified, deletedEvents, rooms, deferred };
 }
 
 async function withPage(options: SetupOptions = {}) {
@@ -200,6 +210,59 @@ describe('ReservationsService pages', () => {
 		await service.update('owner', pages[0].id, { ...body, active: false });
 		assert.equal(await service.publicPage('office-hours'), null);
 		assert.equal(await service.slots('office-hours', null), null);
+	});
+});
+
+describe('ReservationsService calendar freshness', () => {
+	const meeting: CalendarEvent = {
+		id: 'new',
+		title: 'Just added in Google',
+		start: guest.start,
+		end: '2026-09-28T03:00:00.000Z',
+		allDay: false,
+		location: null,
+		notes: null,
+		source: 'feed',
+		busy: true,
+		calendar: null,
+		meetingCode: null
+	};
+
+	test('loading slots refreshes the host’s calendars in the background', async () => {
+		const refreshed: string[] = [];
+		const { service, deferred } = await withPage({
+			refresh: (userId) => {
+				refreshed.push(userId);
+				return new Promise(() => {});
+			}
+		});
+		const days = await service.slots('office-hours', null);
+		assert.ok(days, 'slots come back without waiting on the refresh');
+		assert.deepEqual(refreshed, ['owner']);
+		assert.equal(deferred.length, 1, 'kept alive past the response');
+	});
+
+	test('a booking waits for the refresh, so a meeting it brings in takes the slot', async () => {
+		const busy: CalendarEvent[] = [];
+		const { service, bookings } = await withPage({
+			busy,
+			refresh: async () => {
+				busy.push(meeting);
+			}
+		});
+		assert.deepEqual(await service.book('office-hours', guest, 'https://mail.example'), { type: 'slot_taken' });
+		assert.equal(bookings.length, 0);
+	});
+
+	test('a calendar that cannot be refreshed does not block the booking', async () => {
+		const { service, bookings } = await withPage({
+			refresh: async () => {
+				throw new Error('calendar server down');
+			}
+		});
+		const outcome = await service.book('office-hours', guest, 'https://mail.example');
+		assert.equal(outcome.type, 'ok');
+		assert.equal(bookings.length, 1);
 	});
 });
 

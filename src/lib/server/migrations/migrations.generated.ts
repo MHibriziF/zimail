@@ -176,5 +176,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0043_event_meetings.sql",
 		sql: "-- An event the user organizes can have its own Zimail meeting room, like a\n-- booking. The room is an ordinary row in `meetings`, owned by the user; the\n-- event keeps its join code so the room can be closed with it.\nALTER TABLE calendar_events ADD COLUMN meeting_code TEXT;\n"
+	},
+	{
+		name: "0044_calendar_feed_sync_key.sql",
+		sql: "-- What the last full sync was computed from: a hash of the feed text, the day\n-- and the owner's time zone. A refresh that produces the same key skips parsing\n-- and the event diff, so an unchanged feed costs one row instead of a read of\n-- every stored event.\nALTER TABLE calendar_feeds ADD COLUMN sync_key TEXT;\n"
 	}
 ];

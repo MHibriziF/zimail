@@ -21,6 +21,8 @@ function fakeRepo() {
 	const feeds: StoredFeed[] = [];
 	const events = new Map<string, FeedEvent[]>();
 	const records: { id: string; record: SyncRecord }[] = [];
+	const attempts = new Map<string, string>();
+	const syncCalls: string[] = [];
 	const repo: CalendarFeedsRepository = {
 		async listForUser(userId) {
 			return feeds.filter((feed) => feed.userId === userId);
@@ -32,7 +34,7 @@ function fakeRepo() {
 			return feeds.find((feed) => feed.userId === userId && feed.id === id) ?? null;
 		},
 		async insert(feed) {
-			feeds.push({ ...feed, eventCount: 0, lastSyncedAt: null, lastError: null });
+			feeds.push({ ...feed, eventCount: 0, lastSyncedAt: null, lastError: null, syncKey: null });
 		},
 		async update(userId, id, patch) {
 			const feed = feeds.find((entry) => entry.userId === userId && entry.id === id);
@@ -50,34 +52,52 @@ function fakeRepo() {
 		async listDue(_before, limit) {
 			return feeds.slice(0, limit);
 		},
+		async listDueForUser(userId, before, limit) {
+			return feeds
+				.filter((feed) => feed.userId === userId && (attempts.get(feed.id) ?? '') < before)
+				.slice(0, limit);
+		},
+		async claim(id, attemptedAt, staleBefore) {
+			const last = attempts.get(id);
+			if (staleBefore !== null && last !== undefined && last >= staleBefore) return false;
+			attempts.set(id, attemptedAt);
+			return true;
+		},
 		async recordSync(id, record) {
 			records.push({ id, record });
 			const feed = feeds.find((entry) => entry.id === id)!;
 			feed.lastError = record.error;
 			if (record.syncedAt) feed.lastSyncedAt = record.syncedAt;
 			if (record.eventCount !== null) feed.eventCount = record.eventCount;
+			if (record.syncKey !== null) feed.syncKey = record.syncKey;
 		},
 		async syncEvents(_userId, feedId, list) {
+			syncCalls.push(feedId);
 			events.set(feedId, list);
 		}
 	};
-	return { repo, feeds, events, records };
+	return { repo, feeds, events, records, attempts, syncCalls };
 }
 
 function setup(fetchFeed: (url: string) => Promise<string> = async () => ICS) {
 	const state = fakeRepo();
 	const fetched: string[] = [];
+	const clock = { now: new Date('2026-09-24T00:00:00.000Z'), timeZone: 'UTC' };
 	const service = createCalendarFeedsService({
 		repo: state.repo,
 		fetchFeed: async (url) => {
 			fetched.push(url);
 			return fetchFeed(url);
 		},
-		timeZoneOf: async () => 'UTC',
-		now: () => new Date('2026-09-24T00:00:00.000Z')
+		timeZoneOf: async () => clock.timeZone,
+		now: () => clock.now
 	});
-	return { service, fetched, ...state };
+	return { service, fetched, clock, ...state };
 }
+
+const later = (clock: { now: Date }, minutes: number) => {
+	clock.now = new Date(clock.now.getTime() + minutes * 60_000);
+};
 
 const input = { name: ' Work  calendar ', url: 'webcal://calendar.google.com/calendar/ical/x/private-abc/basic.ics', color: 'green' as const };
 
@@ -102,7 +122,7 @@ describe('CalendarFeedsService', () => {
 		assert.deepEqual(await service.add('u1', { ...input, url: 'http://example.com/cal.ics' }), { type: 'invalid_url' });
 		assert.deepEqual(await service.add('u1', { ...input, url: 'not a url' }), { type: 'invalid_url' });
 		for (let index = 0; index < MAX_FEEDS_PER_USER; index++) {
-			feeds.push({ id: `f${index}`, userId: 'u1', name: 'x', url: 'https://x', color: 'blue', eventCount: 0, lastSyncedAt: null, lastError: null });
+			feeds.push({ id: `f${index}`, userId: 'u1', name: 'x', url: 'https://x', color: 'blue', eventCount: 0, lastSyncedAt: null, lastError: null, syncKey: null });
 		}
 		assert.deepEqual(await service.add('u1', input), { type: 'limit_reached' });
 	});
@@ -158,9 +178,62 @@ describe('CalendarFeedsService', () => {
 			return ICS;
 		});
 		feeds.push(
-			{ id: 'a', userId: 'u1', name: 'A', url: 'https://good.example/a.ics', color: 'blue', eventCount: 0, lastSyncedAt: null, lastError: null },
-			{ id: 'b', userId: 'u1', name: 'B', url: 'https://bad.example/b.ics', color: 'blue', eventCount: 0, lastSyncedAt: null, lastError: null }
+			{ id: 'a', userId: 'u1', name: 'A', url: 'https://good.example/a.ics', color: 'blue', eventCount: 0, lastSyncedAt: null, lastError: null, syncKey: null },
+			{ id: 'b', userId: 'u1', name: 'B', url: 'https://bad.example/b.ics', color: 'blue', eventCount: 0, lastSyncedAt: null, lastError: null, syncKey: null }
 		);
 		assert.deepEqual(await service.syncDue(5), { synced: 1, failed: 1 });
+	});
+
+	test('an unchanged feed skips the event diff; a new day, zone or text does not', async () => {
+		let body = ICS;
+		const { service, clock, syncCalls, records } = setup(async () => body);
+		const added = await service.add('u1', input);
+		assert.equal(added.type, 'ok');
+		if (added.type !== 'ok') return;
+		assert.equal(syncCalls.length, 1);
+
+		later(clock, 60);
+		await service.sync('u1', added.feed.id);
+		assert.equal(syncCalls.length, 1, 'same text, day and zone: no diff');
+		assert.equal(records.at(-1)?.record.syncedAt, clock.now.toISOString(), 'still recorded as synced');
+
+		body = ICS.replace('UID:one', 'UID:one\r\nDTSTAMP:20260924T010000Z');
+		await service.sync('u1', added.feed.id);
+		body = ICS.replace('UID:one', 'UID:one\r\nDTSTAMP:20260924T010500Z');
+		await service.sync('u1', added.feed.id);
+		assert.equal(syncCalls.length, 1, 'Google’s per-fetch DTSTAMP is not a change');
+		body = ICS;
+
+		later(clock, 24 * 60);
+		await service.sync('u1', added.feed.id);
+		assert.equal(syncCalls.length, 2, 'a new day moves the window forward');
+
+		clock.timeZone = 'Asia/Jakarta';
+		await service.sync('u1', added.feed.id);
+		assert.equal(syncCalls.length, 3, 'a new zone re-reads floating times');
+
+		body = ICS.replace('Dentist', 'Doctor');
+		await service.sync('u1', added.feed.id);
+		assert.equal(syncCalls.length, 4, 'changed text');
+	});
+
+	test('refreshStale fetches a stale feed once per window, however often it is asked', async () => {
+		const { service, fetched, clock } = setup();
+		const added = await service.add('u1', input);
+		assert.equal(added.type, 'ok');
+		fetched.length = 0;
+
+		await service.refreshStale('u1');
+		assert.equal(fetched.length, 0, 'just synced');
+
+		later(clock, 16);
+		await Promise.all([service.refreshStale('u1'), service.refreshStale('u1'), service.refreshStale('u1')]);
+		assert.equal(fetched.length, 1, 'concurrent visitors share one fetch');
+
+		later(clock, 5);
+		await service.refreshStale('u1');
+		assert.equal(fetched.length, 1, 'still fresh');
+		await service.refreshStale('u2');
+		assert.equal(fetched.length, 1, 'another host has no feeds');
 	});
 });
