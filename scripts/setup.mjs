@@ -1051,27 +1051,16 @@ function printNextSteps(state) {
 	if (state.publicUrl) log(`\n  ${c.green(state.publicUrl)}`);
 }
 
-async function main() {
+function checkArgs() {
 	if (!stdinStream.isTTY && !args.yes) {
 		throw new Error('Non-interactive shells need --yes and --domain. See --help.');
 	}
 	if (args.yes && !args.domain) {
 		throw new Error('--yes requires --domain.');
 	}
+}
 
-	log(`\n${c.bold('Quickinbox setup')}`);
-	log(c.dim('  A mailbox on your domain, on Cloudflare.\n'));
-
-	const total = 8;
-
-	section(1, total, 'Tools');
-	await ensureRuntime();
-	installDeps();
-
-	section(2, total, 'Cloudflare login');
-	await ensureLogin();
-
-	section(3, total, 'Domain and provider');
+async function chooseTarget() {
 	const domain = await askDomain();
 	ok(domain);
 	const provider = await askProvider();
@@ -1079,12 +1068,16 @@ async function main() {
 
 	const wranglerVer = await ensureWrangler(provider === 'cloudflare');
 
-	let source = readWrangler();
+	const source = readWrangler();
 	const workerName = await askWorkerName(jsoncString(source, 'name') || 'quickmail');
 	const hostname = await askHostname(domain);
 	if (hostname) ok(`UI hostname ${hostname}`);
 
-	section(4, total, 'D1 and R2');
+	return { domain, provider, wranglerVer, workerName, hostname };
+}
+
+async function setupStorage() {
+	const source = readWrangler();
 	const databaseName = await askResourceName(
 		'D1 database name (e.g. quickmail)',
 		jsoncString(source, 'database_name') || 'quickmail',
@@ -1103,89 +1096,123 @@ async function main() {
 	ok(`R2 ${bucketName}`);
 	const databaseId = await ensureD1(databaseName);
 	ensureR2(bucketName);
+	return { databaseName, bucketName, databaseId };
+}
 
-	section(5, total, 'Config');
-	source = readWrangler();
+function writeConfig(target, storage) {
+	const { domain, provider, wranglerVer, workerName, hostname } = target;
+	const { databaseName, bucketName, databaseId } = storage;
+	const cloudflare = provider === 'cloudflare';
+
+	let source = readWrangler();
 	source = setFirstString(source, 'name', workerName);
 	source = setFirstString(source, 'database_name', databaseName);
 	source = setFirstString(source, 'database_id', databaseId);
 	source = setFirstString(source, 'bucket_name', bucketName);
-	source = setVars(source, {
-		provider,
-		domains: provider === 'cloudflare' ? domain : ''
-	});
+	source = setVars(source, { provider, domains: cloudflare ? domain : '' });
 	if (hostname) source = setRoutes(source, hostname);
-	if (provider === 'cloudflare' && versionGte(wranglerVer, ADDRESSES_WRANGLER)) {
-		source = setAddresses(source, [`*@${domain}`]);
-	} else {
-		source = removeAddresses(source);
-	}
+	source =
+		cloudflare && versionGte(wranglerVer, ADDRESSES_WRANGLER)
+			? setAddresses(source, [`*@${domain}`])
+			: removeAddresses(source);
 	writeWrangler(source);
 	ok('updated wrangler.jsonc');
 	setPackageMigrateScripts(databaseName);
 	if (databaseName !== 'quickmail') ok(`updated package.json migrate scripts for ${databaseName}`);
 
-	const devVars = {
-		EMAIL_PROVIDER: provider
-	};
-	if (provider === 'cloudflare') {
-		devVars.CLOUDFLARE_MAIL_DOMAINS = domain;
-	}
+	const devVars = { EMAIL_PROVIDER: provider };
+	if (cloudflare) devVars.CLOUDFLARE_MAIL_DOMAINS = domain;
 	upsertEnvFile(devVarsFile, devVars, { fromExample: true });
 	ok('updated .dev.vars');
+}
 
-	section(6, total, 'Provider');
-	let useAddresses = false;
-	let resend = { apiKey: '', webhookSecret: '', domainOk: false };
+async function setupProvider({ domain, provider, workerName, wranglerVer }) {
 	if (provider === 'cloudflare') {
 		const cf = await setupCloudflare(domain, workerName, wranglerVer);
-		useAddresses = cf.useAddresses;
-	} else {
-		resend = await setupResend(domain);
-		if (resend.apiKey) {
-			upsertEnvFile(devVarsFile, { RESEND_API_KEY: resend.apiKey });
-			ok('wrote RESEND_API_KEY to .dev.vars');
-		}
+		return { useAddresses: cf.useAddresses, resend: { apiKey: '', webhookSecret: '', domainOk: false } };
 	}
+
+	const resend = await setupResend(domain);
+	if (resend.apiKey) {
+		upsertEnvFile(devVarsFile, { RESEND_API_KEY: resend.apiKey });
+		ok('wrote RESEND_API_KEY to .dev.vars');
+	}
+	return { useAddresses: false, resend };
+}
+
+/** Resend needs a webhook pointed at the deployed Worker, and a redeploy so it has the secret. */
+async function connectResendWebhook(resend, publicUrl) {
+	try {
+		const secret = await maybeCreateWebhook(resend.apiKey, publicUrl);
+		if (!secret) return;
+		resend.webhookSecret = secret;
+		upsertEnvFile(devVarsFile, { RESEND_WEBHOOK_SECRET: secret });
+		log(`  ${c.dim('Redeploying so the Worker has RESEND_WEBHOOK_SECRET…')}`);
+		const again = deploy();
+		if (!again.ok) warn('Second deploy failed. Run bun run deploy after checking the secret.');
+	} catch (error) {
+		warn(`Webhook setup failed: ${error.message}`);
+	}
+}
+
+async function deployWorker(target, resend) {
+	let publicUrl = target.hostname ? `https://${target.hostname}` : null;
+	const shouldDeploy = args.skipDeploy ? false : await confirm('Deploy now?', true);
+	if (!shouldDeploy) {
+		log(`  ${c.dim('Skipped deploy. bun run db:migrate:remote && bun run deploy when you are ready.')}`);
+		return { deployed: false, publicUrl };
+	}
+
+	migrate(false, true);
+	const result = deployCaptured();
+	const deployed = result.ok;
+	publicUrl = parseDeployUrl(result.text) ?? publicUrl;
+	if (deployed) ok('deployed');
+	else warn('Deploy failed. Fix the error above, then bun run deploy.');
+
+	if (deployed && target.provider === 'resend' && resend.apiKey && publicUrl) {
+		await connectResendWebhook(resend, publicUrl);
+	}
+	return { deployed, publicUrl };
+}
+
+async function main() {
+	checkArgs();
+
+	log(`\n${c.bold('Quickinbox setup')}`);
+	log(c.dim('  A mailbox on your domain, on Cloudflare.\n'));
+
+	const total = 8;
+
+	section(1, total, 'Tools');
+	await ensureRuntime();
+	installDeps();
+
+	section(2, total, 'Cloudflare login');
+	await ensureLogin();
+
+	section(3, total, 'Domain and provider');
+	const target = await chooseTarget();
+
+	section(4, total, 'D1 and R2');
+	const storage = await setupStorage();
+
+	section(5, total, 'Config');
+	writeConfig(target, storage);
+
+	section(6, total, 'Provider');
+	const { useAddresses, resend } = await setupProvider(target);
 
 	section(7, total, 'Database');
 	migrate(true, false);
 
 	section(8, total, 'Deploy');
-	let deployed = false;
-	let publicUrl = hostname ? `https://${hostname}` : null;
-	const shouldDeploy = args.skipDeploy ? false : await confirm('Deploy now?', true);
-	if (shouldDeploy) {
-		migrate(false, true);
-		const result = deployCaptured();
-		deployed = result.ok;
-		const parsed = parseDeployUrl(result.text);
-		if (parsed) publicUrl = parsed;
-		if (deployed) ok('deployed');
-		else warn('Deploy failed. Fix the error above, then bun run deploy.');
-
-		if (deployed && provider === 'resend' && resend.apiKey && publicUrl) {
-			try {
-				const secret = await maybeCreateWebhook(resend.apiKey, publicUrl);
-				if (secret) {
-					resend.webhookSecret = secret;
-					upsertEnvFile(devVarsFile, { RESEND_WEBHOOK_SECRET: secret });
-					log(`  ${c.dim('Redeploying so the Worker has RESEND_WEBHOOK_SECRET…')}`);
-					const again = deploy();
-					if (!again.ok) warn('Second deploy failed. Run bun run deploy after checking the secret.');
-				}
-			} catch (error) {
-				warn(`Webhook setup failed: ${error.message}`);
-			}
-		}
-	} else {
-		log(`  ${c.dim('Skipped deploy. bun run db:migrate:remote && bun run deploy when you are ready.')}`);
-	}
+	const { deployed, publicUrl } = await deployWorker(target, resend);
 
 	printNextSteps({
-		provider,
-		domain,
-		workerName,
+		provider: target.provider,
+		domain: target.domain,
+		workerName: target.workerName,
 		useAddresses,
 		deployed,
 		publicUrl,

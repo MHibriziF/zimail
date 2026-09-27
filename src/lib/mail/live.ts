@@ -67,6 +67,27 @@ function waitUntilVisible(signal: AbortSignal): Promise<void> {
 	});
 }
 
+/** False if `signal` aborted while waiting. */
+async function waitWhileHidden(signal: AbortSignal): Promise<boolean> {
+	try {
+		await waitUntilVisible(signal);
+		return true;
+	} catch (error) {
+		if (isAbortError(error)) return false;
+		throw error;
+	}
+}
+
+function untilAborted(signal: AbortSignal): Promise<void> {
+	return new Promise((resolve) => {
+		if (signal.aborted) {
+			resolve();
+			return;
+		}
+		signal.addEventListener('abort', () => resolve(), { once: true });
+	});
+}
+
 /**
  * Keep the open mailbox in sync with inbound delivery. Long-polls a cursor,
  * pauses in background tabs, and wakes immediately on a push message.
@@ -82,62 +103,59 @@ export function startMailboxLiveSync(invalidate: () => Promise<void>): () => voi
 		poll = null;
 	};
 
+	let cursor: string | null = null;
+
+	/** Acts on one poll's answer; false once the server says to stop for good. */
+	const handle = async (result: CursorFetch, signal: AbortSignal): Promise<boolean> => {
+		switch (result.kind) {
+			case 'ok': {
+				const changed = shouldRefreshMailbox(cursor, result.cursor);
+				cursor = result.cursor;
+				if (changed) {
+					await invalidate();
+					window.dispatchEvent(new Event(MAIL_CHANGED_MESSAGE));
+				}
+				return true;
+			}
+			case 'retry':
+				await waitForAbortable(MAILBOX_SYNC_RETRY_MS, signal);
+				return true;
+			case 'stop':
+				await untilAborted(lifecycle.signal);
+				return false;
+			default: {
+				const _never: never = result;
+				return _never;
+			}
+		}
+	};
+
+	/** One long-poll; false when the loop should end. */
+	const pollOnce = async (): Promise<boolean> => {
+		const current = new AbortController();
+		poll = current;
+		const onLifecycleAbort = () => poll?.abort();
+		lifecycle.signal.addEventListener('abort', onLifecycleAbort);
+
+		try {
+			return await handle(await fetchMailboxCursor(cursor, current.signal), current.signal);
+		} catch (error) {
+			if (lifecycle.signal.aborted) return false;
+			if (!isAbortError(error)) {
+				await waitForAbortable(MAILBOX_SYNC_RETRY_MS, lifecycle.signal);
+			}
+			return true;
+		} finally {
+			lifecycle.signal.removeEventListener('abort', onLifecycleAbort);
+			poll = null;
+		}
+	};
+
 	const run = async () => {
-		let cursor: string | null = null;
-
 		while (!lifecycle.signal.aborted) {
-			if (document.visibilityState !== 'visible') {
-				try {
-					await waitUntilVisible(lifecycle.signal);
-				} catch (error) {
-					if (isAbortError(error)) return;
-					throw error;
-				}
-				continue;
-			}
-
-			poll = new AbortController();
-			const onLifecycleAbort = () => poll?.abort();
-			lifecycle.signal.addEventListener('abort', onLifecycleAbort);
-
-			try {
-				const result = await fetchMailboxCursor(cursor, poll.signal);
-				switch (result.kind) {
-					case 'ok':
-						if (shouldRefreshMailbox(cursor, result.cursor)) {
-							cursor = result.cursor;
-							await invalidate();
-							window.dispatchEvent(new Event(MAIL_CHANGED_MESSAGE));
-						} else {
-							cursor = result.cursor;
-						}
-						break;
-					case 'retry':
-						await waitForAbortable(MAILBOX_SYNC_RETRY_MS, poll.signal);
-						break;
-					case 'stop':
-						await new Promise<void>((resolve) => {
-							if (lifecycle.signal.aborted) {
-								resolve();
-								return;
-							}
-							lifecycle.signal.addEventListener('abort', () => resolve(), { once: true });
-						});
-						return;
-					default: {
-						const _never: never = result;
-						return _never;
-					}
-				}
-			} catch (error) {
-				if (lifecycle.signal.aborted) return;
-				if (!isAbortError(error)) {
-					await waitForAbortable(MAILBOX_SYNC_RETRY_MS, lifecycle.signal);
-				}
-			} finally {
-				lifecycle.signal.removeEventListener('abort', onLifecycleAbort);
-				poll = null;
-			}
+			const keepGoing =
+				document.visibilityState === 'visible' ? await pollOnce() : await waitWhileHidden(lifecycle.signal);
+			if (!keepGoing) return;
 		}
 	};
 

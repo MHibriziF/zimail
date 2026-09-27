@@ -80,37 +80,59 @@ function paeth(a, b, c) {
 	return c;
 }
 
-function decodePng(buffer) {
+function readChunks(buffer) {
 	if (buffer.subarray(0, 8).toString('binary') !== '\x89PNG\r\n\x1a\n') {
 		throw new Error('logo.png is not a PNG');
 	}
 
-	let offset = 8;
-	let width = 0;
-	let height = 0;
-	let bitDepth = 0;
-	let colorType = 0;
-	let interlace = 0;
+	const header = { width: 0, height: 0, bitDepth: 0, colorType: 0, interlace: 0 };
 	const idat = [];
+	let offset = 8;
 
 	while (offset < buffer.length) {
 		const length = buffer.readUInt32BE(offset);
 		const type = buffer.toString('ascii', offset + 4, offset + 8);
 		const data = buffer.subarray(offset + 8, offset + 8 + length);
+		if (type === 'IEND') break;
 		if (type === 'IHDR') {
-			width = data.readUInt32BE(0);
-			height = data.readUInt32BE(4);
-			bitDepth = data[8];
-			colorType = data[9];
-			interlace = data[12];
+			header.width = data.readUInt32BE(0);
+			header.height = data.readUInt32BE(4);
+			header.bitDepth = data[8];
+			header.colorType = data[9];
+			header.interlace = data[12];
 		} else if (type === 'IDAT') {
 			idat.push(data);
-		} else if (type === 'IEND') {
-			break;
 		}
 		offset += 12 + length;
 	}
 
+	return { header, idat };
+}
+
+const FILTERS = [
+	(x) => x,
+	(x, left) => x + left,
+	(x, _left, up) => x + up,
+	(x, left, up) => x + ((left + up) >> 1),
+	(x, left, up, upLeft) => x + paeth(left, up, upLeft)
+];
+
+function unfilterRow(filter, row, prev, channels) {
+	const predict = FILTERS[filter];
+	if (!predict) throw new Error(`Unsupported PNG filter ${filter}`);
+
+	const recon = Buffer.alloc(row.length);
+	for (let i = 0; i < row.length; i += 1) {
+		const left = i >= channels ? recon[i - channels] : 0;
+		const upLeft = i >= channels ? prev[i - channels] : 0;
+		recon[i] = predict(row[i], left, prev[i], upLeft) & 255;
+	}
+	return recon;
+}
+
+function decodePng(buffer) {
+	const { header, idat } = readChunks(buffer);
+	const { width, height, bitDepth, colorType, interlace } = header;
 	if (bitDepth !== 8 || interlace !== 0 || (colorType !== 2 && colorType !== 6)) {
 		throw new Error(`Unsupported PNG: depth=${bitDepth} color=${colorType} interlace=${interlace}`);
 	}
@@ -119,41 +141,11 @@ function decodePng(buffer) {
 	const stride = width * channels;
 	const inflated = inflateSync(Buffer.concat(idat));
 	const pixels = new Uint8ClampedArray(width * height * 4);
-	const prev = Buffer.alloc(stride);
+	let prev = Buffer.alloc(stride);
 
-	let src = 0;
 	for (let y = 0; y < height; y += 1) {
-		const filter = inflated[src];
-		src += 1;
-		const row = inflated.subarray(src, src + stride);
-		src += stride;
-		const recon = Buffer.alloc(stride);
-
-		for (let i = 0; i < stride; i += 1) {
-			const left = i >= channels ? recon[i - channels] : 0;
-			const up = prev[i];
-			const upLeft = i >= channels ? prev[i - channels] : 0;
-			const x = row[i];
-			switch (filter) {
-				case 0:
-					recon[i] = x;
-					break;
-				case 1:
-					recon[i] = (x + left) & 255;
-					break;
-				case 2:
-					recon[i] = (x + up) & 255;
-					break;
-				case 3:
-					recon[i] = (x + ((left + up) >> 1)) & 255;
-					break;
-				case 4:
-					recon[i] = (x + paeth(left, up, upLeft)) & 255;
-					break;
-				default:
-					throw new Error(`Unsupported PNG filter ${filter}`);
-			}
-		}
+		const start = y * (stride + 1);
+		const recon = unfilterRow(inflated[start], inflated.subarray(start + 1, start + 1 + stride), prev, channels);
 
 		for (let x = 0; x < width; x += 1) {
 			const si = x * channels;
@@ -164,7 +156,7 @@ function decodePng(buffer) {
 			pixels[di + 3] = channels === 4 ? recon[si + 3] : 255;
 		}
 
-		recon.copy(prev);
+		prev = recon;
 	}
 
 	return { width, height, pixels };

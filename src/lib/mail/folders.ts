@@ -2,6 +2,7 @@ import type { MailboxView } from '$lib/types';
 import { DEFAULT_LOCALE } from '$lib/i18n/locales';
 import { translate } from '$lib/i18n/translate';
 import { splitTrailingAngled } from '$lib/utils/text';
+import { splitAddressList } from './address-list';
 
 export const FOLDER_PATH: Record<MailboxView, string> = {
 	inbox: '/inbox',
@@ -111,25 +112,10 @@ export type AddressPart = {
 /** Split a To/Cc field into display name + address pairs for the Zero thread chrome. */
 export function parseAddressList(value: string | null | undefined): AddressPart[] {
 	if (!value?.trim()) return [];
-	const parts: string[] = [];
-	let start = 0;
-	let inQuotes = false;
-	let brackets = 0;
-	for (let index = 0; index < value.length; index += 1) {
-		const character = value[index];
-		if (character === '"') inQuotes = !inQuotes;
-		if (!inQuotes && character === '<') brackets += 1;
-		if (!inQuotes && character === '>' && brackets > 0) brackets -= 1;
-		if (!inQuotes && brackets === 0 && character === ',') {
-			parts.push(value.slice(start, index));
-			start = index + 1;
-		}
-	}
-	parts.push(value.slice(start));
 
 	const seen = new Set<string>();
 	const people: AddressPart[] = [];
-	for (const part of parts) {
+	for (const part of splitAddressList(value)) {
 		const trimmed = part.trim();
 		if (!trimmed) continue;
 		const angled = splitTrailingAngled(trimmed);

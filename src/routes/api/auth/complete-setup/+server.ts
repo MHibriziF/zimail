@@ -14,9 +14,37 @@ type SetupErrorCode =
 	| 'password_reused'
 	| 'unknown';
 
+type SetupInput = { name: string; password: string };
+
 function setupError(code: SetupErrorCode, status: number) {
 	return json({ code }, { status });
 }
+
+async function readBody(request: Request): Promise<Record<string, unknown> | null> {
+	try {
+		const parsed: unknown = await request.json();
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+			? (parsed as Record<string, unknown>)
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+function validate(body: Record<string, unknown>): SetupInput | SetupErrorCode {
+	const { name, password, confirmPassword } = body;
+	if (typeof name !== 'string' || !name.trim()) return 'name_required';
+	if (name.trim().length > 128) return 'name_too_long';
+	if (typeof password !== 'string' || password.length < 8) return 'password_too_short';
+	if (password.length > 1024) return 'password_too_long';
+	if (password !== confirmPassword) return 'password_mismatch';
+	return { name, password };
+}
+
+const SERVICE_ERRORS = new Map<string, SetupErrorCode>([
+	['Account setup is already complete', 'already_complete'],
+	['Choose a password different from the temporary password', 'password_reused']
+]);
 
 export const POST: RequestHandler = async ({ request, locals, cookies, platform }) => {
 	if (!locals.user || locals.authMethod !== 'session') {
@@ -28,57 +56,18 @@ export const POST: RequestHandler = async ({ request, locals, cookies, platform 
 
 	if (!platform?.env.DB) return setupError('database_unavailable', 503);
 
-	let parsed: unknown;
-	try {
-		parsed = await request.json();
-	} catch {
-		return setupError('invalid_request', 400);
-	}
-	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-		return setupError('invalid_request', 400);
-	}
+	const body = await readBody(request);
+	if (!body) return setupError('invalid_request', 400);
 
-	const body = parsed as {
-		name?: unknown;
-		password?: unknown;
-		confirmPassword?: unknown;
-	};
-	if (typeof body.name !== 'string' || !body.name.trim()) {
-		return setupError('name_required', 400);
-	}
-	if (body.name.trim().length > 128) {
-		return setupError('name_too_long', 400);
-	}
-	if (
-		typeof body.password !== 'string' ||
-		body.password.length < 8 ||
-		body.password.length > 1024
-	) {
-		if (typeof body.password === 'string' && body.password.length > 1024) {
-			return setupError('password_too_long', 400);
-		}
-		return setupError('password_too_short', 400);
-	}
-	if (body.password !== body.confirmPassword) {
-		return setupError('password_mismatch', 400);
-	}
+	const input = validate(body);
+	if (typeof input === 'string') return setupError(input, 400);
 
 	try {
-		await getAuthService(platform).completeFirstLogin(locals.user.id, {
-			name: body.name,
-			password: body.password
-		});
+		await getAuthService(platform).completeFirstLogin(locals.user.id, input);
 		cookies.delete(SESSION_COOKIE, { path: '/' });
 		return json({ ok: true });
 	} catch (error) {
-		if (error instanceof Error) {
-			if (error.message === 'Account setup is already complete') {
-				return setupError('already_complete', 400);
-			}
-			if (error.message === 'Choose a password different from the temporary password') {
-				return setupError('password_reused', 400);
-			}
-		}
-		return setupError('unknown', 500);
+		const code = error instanceof Error ? SERVICE_ERRORS.get(error.message) : undefined;
+		return code ? setupError(code, 400) : setupError('unknown', 500);
 	}
 };
