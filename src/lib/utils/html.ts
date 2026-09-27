@@ -1,5 +1,3 @@
-import { stripTags } from './text';
-
 export function htmlToPlainText(html: string): string {
 	const doc = new DOMParser().parseFromString(html, 'text/html');
 	return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
@@ -7,7 +5,7 @@ export function htmlToPlainText(html: string): string {
 
 /** Decode tags and whitespace entities when DOMParser is unavailable (SSR). */
 function stripMarkup(html: string): string {
-	return stripTags(html).replace(/&nbsp;/gi, ' ').replace(
+	return html.replace(/<[^<>]*>/g, '').replace(/&nbsp;/gi, ' ').replace(
 		/&#(x)?([0-9a-f]+);/gi,
 		(_match, hex: string | undefined, value: string) => {
 			const code = Number.parseInt(value, hex ? 16 : 10);

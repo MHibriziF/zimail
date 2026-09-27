@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { firstAngled, firstEmailLike, splitTrailingAngled, stripTags, trimTrailing } from '../text';
+import { stripHtml } from '../../server/util/html';
+import { firstAngled, firstEmailLike, splitTrailingAngled, trimTrailing } from '../text';
 
 /** Short strings over the characters these parsers care about, so every edge case comes up. */
 function samples(alphabet: string, count = 5000, maxLength = 12): string[] {
@@ -33,11 +34,9 @@ describe('text helpers match the regexes they replace', () => {
 		assertFast(() => trimTrailing('='.repeat(HOSTILE) + 'x', '='));
 	});
 
-	test('stripTags', () => {
-		for (const value of samples('ab<> ')) {
-			assert.equal(stripTags(value), value.replace(/<[^>]+>/g, ''), value);
-		}
-		assertFast(() => stripTags('<'.repeat(HOSTILE)));
+	test('stripHtml stays linear on unclosed tags and decodes &amp; last', () => {
+		assert.equal(stripHtml('<p>a &amp;lt; b</p><br>c'), 'a &lt; b\n\nc');
+		assertFast(() => stripHtml('<'.repeat(HOSTILE)));
 	});
 
 	test('firstAngled', () => {

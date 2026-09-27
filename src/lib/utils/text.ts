@@ -11,26 +11,6 @@ export function trimTrailing(value: string, chars: string): string {
 	return value.slice(0, end);
 }
 
-/** Removes every `<…>` tag, leaving a `<` that never closes as text — `/<[^>]+>/g`. */
-export function stripTags(html: string): string {
-	let result = '';
-	let index = 0;
-	while (index < html.length) {
-		const open = html.indexOf('<', index);
-		if (open === -1) break;
-		const close = html.indexOf('>', open + 1);
-		if (close === -1) break;
-		if (close === open + 1) {
-			result += html.slice(index, close);
-			index = close;
-			continue;
-		}
-		result += html.slice(index, open);
-		index = close + 1;
-	}
-	return result + html.slice(index);
-}
-
 /** The contents of the first non-empty `<…>` — `/<([^>]+)>/`. */
 export function firstAngled(value: string): string | null {
 	let open = value.indexOf('<');
