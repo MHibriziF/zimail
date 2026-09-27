@@ -1,6 +1,7 @@
 import type { MailboxView } from '$lib/types';
 import { DEFAULT_LOCALE } from '$lib/i18n/locales';
 import { translate } from '$lib/i18n/translate';
+import { splitTrailingAngled } from '$lib/utils/text';
 
 export const FOLDER_PATH: Record<MailboxView, string> = {
 	inbox: '/inbox',
@@ -131,11 +132,11 @@ export function parseAddressList(value: string | null | undefined): AddressPart[
 	for (const part of parts) {
 		const trimmed = part.trim();
 		if (!trimmed) continue;
-		const angled = trimmed.match(/^(.*?)\s*<([^>]+)>$/);
-		const email = (angled?.[2] ?? trimmed).trim().toLowerCase();
+		const angled = splitTrailingAngled(trimmed);
+		const email = (angled?.inside ?? trimmed).trim().toLowerCase();
 		if (!email.includes('@') || seen.has(email)) continue;
 		seen.add(email);
-		const rawName = angled?.[1]?.trim().replace(/^"|"$/g, '') ?? '';
+		const rawName = angled?.before.trim().replace(/^"|"$/g, '') ?? '';
 		people.push({ name: rawName || email, email });
 	}
 	return people;

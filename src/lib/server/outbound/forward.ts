@@ -11,7 +11,7 @@ import { escapeHtml } from './send-mail';
  */
 
 /** Already a forward? Senders write "Fwd:", "FW:" and "Fwd[2]:" for the same thing. */
-const FORWARD_PREFIX = /^\s*(fw|fwd)\s*(\[\d+\])?\s*:/i;
+const FORWARD_PREFIX = /^\s*fwd?\s*(?:\[\d+\]\s*)?:/i;
 
 export type ForwardedOriginal = {
 	from_addr: string;

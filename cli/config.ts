@@ -60,7 +60,9 @@ export function normalizeUrl(url: string): string {
 		throw new Error('HTTP is only allowed for localhost.');
 	}
 
-	return parsed.href.replace(/\/+$/, '');
+	let href = parsed.href;
+	while (href.endsWith('/')) href = href.slice(0, -1);
+	return href;
 }
 
 export async function loadConfig(): Promise<CliConfig> {
