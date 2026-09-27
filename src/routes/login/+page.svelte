@@ -1,4 +1,8 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
+	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
 	import Logo from '$lib/components/Logo.svelte';
 	import { t } from '$lib/i18n';
 	import { APP_NAME } from '$lib/constants';
@@ -10,6 +14,11 @@
 	let needsCode = $state(false);
 	let code = $state('');
 	let loading = $state(false);
+
+	// After a client-side redirect from an ended session, the root layout still holds the old account.
+	onMount(() => {
+		if (get(page).data.user) invalidateAll();
+	});
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
