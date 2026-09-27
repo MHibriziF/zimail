@@ -73,7 +73,7 @@ export function createCalendarFeedsService(deps: CalendarFeedsServiceDeps): Cale
 				to: new Date(at.getTime() + SYNC_FUTURE_DAYS * DAY_MS),
 				fallbackTimeZone: await deps.timeZoneOf(feed.userId)
 			});
-			await repo.replaceEvents(feed.userId, feed.id, events);
+			await repo.syncEvents(feed.userId, feed.id, events);
 			await repo.recordSync(feed.id, {
 				attemptedAt: at.toISOString(),
 				syncedAt: at.toISOString(),

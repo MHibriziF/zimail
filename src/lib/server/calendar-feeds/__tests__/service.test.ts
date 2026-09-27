@@ -57,7 +57,7 @@ function fakeRepo() {
 			if (record.syncedAt) feed.lastSyncedAt = record.syncedAt;
 			if (record.eventCount !== null) feed.eventCount = record.eventCount;
 		},
-		async replaceEvents(_userId, feedId, list) {
+		async syncEvents(_userId, feedId, list) {
 			events.set(feedId, list);
 		}
 	};
