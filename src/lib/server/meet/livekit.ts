@@ -1,3 +1,5 @@
+import { trimTrailing } from '../../utils/text';
+
 /**
  * Minimal LiveKit access-token minting, implemented with Web Crypto so it
  * runs on Workers without the `livekit-server-sdk` dependency.
@@ -194,5 +196,5 @@ function base64url(input: string | ArrayBuffer): string {
 	const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
 	let binary = '';
 	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	return trimTrailing(btoa(binary), '=').replaceAll('+', '-').replaceAll('/', '_');
 }

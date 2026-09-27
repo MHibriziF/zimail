@@ -14,47 +14,40 @@
 export function splitStatements(sql: string): string[] {
 	const statements: string[] = [];
 	let current = '';
-	let inString = false;
+	let index = 0;
 
-	for (let index = 0; index < sql.length; index += 1) {
+	while (index < sql.length) {
 		const character = sql[index];
 
-		if (inString) {
-			current += character;
-			// '' is an escaped quote inside a string, not the end of one.
-			if (character === "'") {
-				if (sql[index + 1] === "'") {
-					current += sql[index + 1];
-					index += 1;
-				} else {
-					inString = false;
-				}
-			}
-			continue;
-		}
-
 		if (character === "'") {
-			inString = true;
-			current += character;
-			continue;
-		}
-
-		if (character === '-' && sql[index + 1] === '-') {
+			const end = stringLiteralEnd(sql, index);
+			current += sql.slice(index, end);
+			index = end;
+		} else if (character === '-' && sql[index + 1] === '-') {
 			const newline = sql.indexOf('\n', index);
-			index = newline === -1 ? sql.length : newline;
 			current += '\n';
-			continue;
-		}
-
-		if (character === ';') {
+			index = newline === -1 ? sql.length : newline + 1;
+		} else if (character === ';') {
 			statements.push(current);
 			current = '';
-			continue;
+			index += 1;
+		} else {
+			current += character;
+			index += 1;
 		}
-
-		current += character;
 	}
 
 	statements.push(current);
 	return statements.map((statement) => statement.trim()).filter(Boolean);
+}
+
+/** Index just past the string literal opening at `start`; '' inside it is an escaped quote. */
+function stringLiteralEnd(sql: string, start: number): number {
+	let index = start + 1;
+	while (index < sql.length) {
+		if (sql[index] !== "'") index += 1;
+		else if (sql[index + 1] === "'") index += 2;
+		else return index + 1;
+	}
+	return sql.length;
 }

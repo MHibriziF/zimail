@@ -21,7 +21,7 @@ const LAYOUT_MARKERS = [
 	/<table[\s>]/i,
 	/<style[\s>]/i,
 	/\sbgcolor\s*=/i,
-	/background(-color)?\s*:\s*(?!\s*(transparent|none|inherit|initial|unset)\b)/i,
+	/background(?:-color)?\s*:(?!\s*(?:transparent|none|inherit|initial|unset)\b)/i,
 	/position\s*:\s*(absolute|fixed)/i,
 	/<center[\s>]/i
 ];
@@ -33,7 +33,7 @@ const QUOTE_BOUNDARY = [
 	/class\s*=\s*["'][^"']*yahoo_quoted/i,
 	/id\s*=\s*["']?appendonsend/i,
 	/id\s*=\s*["']?divRplyFwdMsg/i,
-	/-{2,}\s*original message/i
+	/--\s*original message/i
 ];
 
 /**
@@ -48,6 +48,8 @@ function ownContent(html: string): string {
 		const match = marker.exec(html);
 		if (match && match.index < cut) cut = match.index;
 	}
+	// The dashes rule matches its last two dashes; the boundary starts at the first.
+	while (cut > 0 && html[cut - 1] === '-') cut -= 1;
 
 	// A bare forward is all quote and no words; judge it whole.
 	return cut > 30 ? html.slice(0, cut) : html;

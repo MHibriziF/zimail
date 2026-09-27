@@ -234,7 +234,7 @@ function parseJsonOutput(text) {
 }
 
 function parseVersion(text) {
-	const match = String(text).match(/(\d+)\.(\d+)\.(\d+)/);
+	const match = String(text).match(/(?<!\d)(\d{1,9})\.(\d{1,9})\.(\d{1,9})/);
 	return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : [0, 0, 0];
 }
 
@@ -419,7 +419,8 @@ function upsertEnvFile(file, updates, { fromExample = false } = {}) {
 
 function normalizeDomain(raw) {
 	let value = String(raw).trim().toLowerCase();
-	value = value.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+	value = value.replace(/^https?:\/\//, '');
+	if (value.includes('/')) value = value.slice(0, value.indexOf('/'));
 	if (value.includes('@')) value = value.slice(value.lastIndexOf('@') + 1);
 	value = value.replace(/\.$/, '').replace(/^www\./, '');
 	return value;
@@ -964,7 +965,10 @@ function parseDeployUrl(text) {
 	const workers = text.match(/https:\/\/[a-z0-9.-]+\.workers\.dev/i);
 	if (workers) return workers[0];
 	const https = text.match(/https:\/\/[a-z0-9.-]+\.[a-z]{2,}[^\s]*/i);
-	return https ? https[0].replace(/[).,]+$/, '') : null;
+	if (!https) return null;
+	let url = https[0];
+	while (/[).,]$/.test(url)) url = url.slice(0, -1);
+	return url;
 }
 
 function deploy() {

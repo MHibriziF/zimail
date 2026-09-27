@@ -1,3 +1,5 @@
+import { firstAngled, firstEmailLike, splitTrailingAngled } from '../../utils/text';
+
 export type EmailIdentity = {
 	name: string | null;
 	address: string;
@@ -11,12 +13,12 @@ export type EmailIdentity = {
  */
 export function parseEmailIdentity(value: string): EmailIdentity {
 	const trimmed = value.trim();
-	const bracketMatch = trimmed.match(/^(.*?)<([^>]+)>$/);
+	const bracketMatch = splitTrailingAngled(trimmed);
 	if (!bracketMatch) {
 		return { name: null, address: parseEmailAddress(trimmed) };
 	}
 
-	const rawName = bracketMatch[1].trim();
+	const rawName = bracketMatch.before.trim();
 	// A quoted name may escape characters; unwrap it before storing.
 	const name =
 		rawName.startsWith('"') && rawName.endsWith('"')
@@ -25,19 +27,18 @@ export function parseEmailIdentity(value: string): EmailIdentity {
 
 	return {
 		name: name || null,
-		address: parseEmailAddress(bracketMatch[2])
+		address: parseEmailAddress(bracketMatch.inside)
 	};
 }
 
 export function parseEmailAddress(value: string): string {
 	const trimmed = value.trim();
-	const bracketMatch = trimmed.match(/<([^>]+)>/);
-	if (bracketMatch) {
-		return bracketMatch[1].toLowerCase().trim();
+	const bracketed = firstAngled(trimmed);
+	if (bracketed) {
+		return bracketed.toLowerCase().trim();
 	}
 
-	const emailMatch = trimmed.match(/[^\s<>]+@[^\s<>]+/);
-	return (emailMatch?.[0] ?? trimmed).toLowerCase().trim();
+	return (firstEmailLike(trimmed) ?? trimmed).toLowerCase().trim();
 }
 
 export function parseEmailIdentities(value: string | null | undefined): EmailIdentity[] {

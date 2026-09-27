@@ -1,14 +1,16 @@
+import { stripTags } from '../../utils/text';
+
 /**
  * Server-side HTML → text. The browser helper in $lib/utils/html.ts uses
  * DOMParser, which does not exist in the Workers runtime.
  */
 export function stripHtml(html: string): string {
-	return html
+	const blocks = html
 		.replace(/<style[\s\S]*?<\/style>/gi, '')
 		.replace(/<script[\s\S]*?<\/script>/gi, '')
 		.replace(/<br\s*\/?>/gi, '\n')
-		.replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
-		.replace(/<[^>]+>/g, '')
+		.replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n');
+	return stripTags(blocks)
 		.replace(/&nbsp;/g, ' ')
 		.replace(/&amp;/g, '&')
 		.replace(/&lt;/g, '<')

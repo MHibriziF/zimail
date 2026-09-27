@@ -1,4 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { firstAngled } from '../../utils/text';
 
 /**
  * Conversation grouping.
@@ -16,7 +17,7 @@ import type { D1Database } from '@cloudflare/workers-types';
  */
 
 /** "Re:", "Fwd:", "FW:", "Re[2]:" … stripped one layer at a time. */
-const SUBJECT_PREFIX = /^\s*(re|fw|fwd)\s*(\[\d+\])?\s*:\s*/i;
+const SUBJECT_PREFIX = /^\s*(?:re|fwd?)\s*(?:\[\d+\]\s*)?:\s*/i;
 
 /** Conversations stop absorbing new mail after this long without activity. */
 const SUBJECT_MATCH_DAYS = 180;
@@ -82,8 +83,7 @@ function addressesIn(value: string | null | undefined): string[] {
 	return value
 		.split(',')
 		.map((part) => {
-			const match = part.match(/<([^>]+)>/);
-			return (match ? match[1] : part).trim().toLowerCase();
+			return (firstAngled(part) ?? part).trim().toLowerCase();
 		})
 		.filter((address) => address.includes('@'));
 }

@@ -23,7 +23,7 @@ const FORBIDDEN = [
 	{ label: 'GitHub token', pattern: /\b(ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|gho_[A-Za-z0-9]{30,})\b/ },
 	{ label: 'Cloudflare API token', pattern: /\bCLOUDFLARE_API_TOKEN\s*[:=]\s*["']?[A-Za-z0-9_-]{30,}/ },
 	{ label: 'Private key block', pattern: /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/ },
-	{ label: 'Live Cloudflare account id', pattern: /^\s*"account_id"\s*:\s*"[0-9a-f]{32}"/m },
+	{ label: 'Live Cloudflare account id', pattern: /^[ \t]*"account_id"[ \t]*:[ \t]*"[0-9a-f]{32}"/m },
 	{ label: 'Maintainer infrastructure name', pattern: /divinprince[.-]/i }
 ];
 
@@ -87,7 +87,7 @@ if (!existsSync(wranglerPath)) {
 			'wrangler.jsonc no longer has the database_id placeholder — a real D1 id was committed'
 		);
 	}
-	const route = wrangler.match(/^\s*"pattern"\s*:\s*"([^"]+)"/m);
+	const route = wrangler.match(/^[ \t]*"pattern"[ \t]*:[ \t]*"([^"\n]+)"/m);
 	if (route && !route[1].includes('example.com')) {
 		fail(`wrangler.jsonc has a live route pattern: ${route[1]} — it should stay commented out`);
 	}

@@ -1,3 +1,5 @@
+import { trimTrailing } from '../../utils/text';
+
 /**
  * TOTP (RFC 6238) on WebCrypto — no dependency needed.
  *
@@ -37,7 +39,7 @@ export function encodeBase32(bytes: Uint8Array): string {
 export function decodeBase32(secret: string): Uint8Array {
 	// Authenticator apps show the secret in spaced groups, and users paste it back
 	// that way. Padding is optional in otpauth URIs.
-	const clean = secret.replace(/[\s-]/g, '').replace(/=+$/, '').toUpperCase();
+	const clean = trimTrailing(secret.replace(/[\s-]/g, ''), '=').toUpperCase();
 
 	let bits = 0;
 	let value = 0;
