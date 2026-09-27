@@ -11,6 +11,55 @@ export function trimTrailing(value: string, chars: string): string {
 	return value.slice(0, end);
 }
 
+/** Removes every `<…>` tag, leaving a `<` that never closes as text — `/<[^>]+>/g`. */
+export function stripTags(html: string): string {
+	let result = '';
+	let index = 0;
+	while (index < html.length) {
+		const open = html.indexOf('<', index);
+		if (open === -1) break;
+		const close = html.indexOf('>', open + 1);
+		if (close === -1) break;
+		if (close === open + 1) {
+			result += html.slice(index, close);
+			index = close;
+			continue;
+		}
+		result += html.slice(index, open);
+		index = close + 1;
+	}
+	return result + html.slice(index);
+}
+
+const ELEMENT_BOUNDS = {
+	script: { open: /<script\b/gi, close: /<\/script\b/gi },
+	style: { open: /<style\b/gi, close: /<\/style\b/gi }
+};
+
+/**
+ * Drops every `<script>` or `<style>` element with its contents. Case-insensitive,
+ * tolerates `</script >`, and an element that never closes runs to the end — as
+ * a browser would treat it.
+ */
+export function removeElements(html: string, tag: keyof typeof ELEMENT_BOUNDS): string {
+	const { open, close } = ELEMENT_BOUNDS[tag];
+	let result = '';
+	let index = 0;
+	open.lastIndex = 0;
+	let start = open.exec(html);
+	while (start) {
+		result += html.slice(index, start.index);
+		close.lastIndex = start.index;
+		const end = close.exec(html);
+		const after = end ? html.indexOf('>', end.index) : -1;
+		if (after === -1) return result;
+		index = after + 1;
+		open.lastIndex = index;
+		start = open.exec(html);
+	}
+	return result + html.slice(index);
+}
+
 /** The contents of the first non-empty `<…>` — `/<([^>]+)>/`. */
 export function firstAngled(value: string): string | null {
 	let open = value.indexOf('<');

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { stripHtml } from '../../server/util/html';
-import { firstAngled, firstEmailLike, splitTrailingAngled, trimTrailing } from '../text';
+import { firstAngled, firstEmailLike, removeElements, splitTrailingAngled, stripTags, trimTrailing } from '../text';
 
 /** Short strings over the characters these parsers care about, so every edge case comes up. */
 function samples(alphabet: string, count = 5000, maxLength = 12): string[] {
@@ -32,6 +32,23 @@ describe('text helpers match the regexes they replace', () => {
 			assert.equal(trimTrailing(value, ').,'), value.replace(/[).,]+$/, ''), value);
 		}
 		assertFast(() => trimTrailing('='.repeat(HOSTILE) + 'x', '='));
+	});
+
+	test('stripTags', () => {
+		for (const value of samples('ab<> ')) {
+			assert.equal(stripTags(value), value.replace(/<[^>]+>/g, ''), value);
+		}
+		assertFast(() => stripTags('<'.repeat(HOSTILE)));
+	});
+
+	test('removeElements drops whole elements, however the close tag is written', () => {
+		assert.equal(removeElements('a<script>x()</script>b', 'script'), 'ab');
+		assert.equal(removeElements('a<SCRIPT type="t">x</Script >b', 'script'), 'ab');
+		assert.equal(removeElements('a<style>p{}</style>b<style>q{}</style>c', 'style'), 'abc');
+		assert.equal(removeElements('a<script>never closed', 'script'), 'a');
+		assert.equal(removeElements('a<scripts>b', 'script'), 'a<scripts>b');
+		assertFast(() => removeElements('<script'.repeat(HOSTILE / 7), 'script'));
+		assertFast(() => removeElements('<script></script'.repeat(HOSTILE / 16), 'script'));
 	});
 
 	test('stripHtml stays linear on unclosed tags and decodes &amp; last', () => {
