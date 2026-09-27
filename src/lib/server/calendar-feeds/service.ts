@@ -13,8 +13,12 @@ import { FeedFetchError } from './fetch';
 const SYNC_PAST_DAYS = 60;
 const SYNC_FUTURE_DAYS = 400;
 const DAY_MS = 86_400_000;
-/** A cron-driven feed is refreshed at most this often. Google itself only republishes every few hours. */
-export const FEED_REFRESH_MINUTES = 30;
+/**
+ * A cron-driven feed is refreshed at most this often. ICS has no push and
+ * Google only republishes every few hours, so polling faster buys nothing;
+ * "Sync now" covers the case where a change has to show up at once.
+ */
+export const FEED_REFRESH_MINUTES = 6 * 60;
 
 export type FeedWriteOutcome =
 	| { type: 'ok'; feed: CalendarFeed }
