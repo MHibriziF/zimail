@@ -40,7 +40,8 @@ async function syncKeyOf(text: string, at: Date, timeZone: string): Promise<stri
 	// every fetch look like a change. Nothing reads DTSTAMP when expanding.
 	const content = text
 		.split('\n')
-		.filter((line) => !line.startsWith('DTSTAMP'))
+		// Property names are case-insensitive (RFC 5545).
+		.filter((line) => line.slice(0, 7).toUpperCase() !== 'DTSTAMP')
 		.join('\n');
 	const bytes = new TextEncoder().encode(`${at.toISOString().slice(0, 10)}|${timeZone}|${content}`);
 	const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));

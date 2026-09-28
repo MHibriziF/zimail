@@ -199,7 +199,7 @@ describe('CalendarFeedsService', () => {
 
 		body = ICS.replace('UID:one', 'UID:one\r\nDTSTAMP:20260924T010000Z');
 		await service.sync('u1', added.feed.id);
-		body = ICS.replace('UID:one', 'UID:one\r\nDTSTAMP:20260924T010500Z');
+		body = ICS.replace('UID:one', 'UID:one\r\ndtstamp:20260924T010500Z');
 		await service.sync('u1', added.feed.id);
 		assert.equal(syncCalls.length, 1, 'Google’s per-fetch DTSTAMP is not a change');
 		body = ICS;

@@ -29,8 +29,11 @@ export const BOOKING_REFRESH_WAIT_MS = 5_000;
 
 async function settleWithin(work: Promise<void>, ms: number): Promise<void> {
 	let timer: ReturnType<typeof setTimeout> | undefined;
-	await Promise.race([work, new Promise<void>((resolve) => (timer = setTimeout(resolve, ms)))]);
-	clearTimeout(timer);
+	try {
+		await Promise.race([work, new Promise<void>((resolve) => (timer = setTimeout(resolve, ms)))]);
+	} finally {
+		clearTimeout(timer);
+	}
 }
 
 export type PageWriteOutcome =
