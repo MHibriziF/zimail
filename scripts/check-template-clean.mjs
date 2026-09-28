@@ -88,7 +88,7 @@ if (!existsSync(wranglerPath)) {
 		);
 	}
 	const route = wrangler.match(/^[ \t]*"pattern"[ \t]*:[ \t]*"([^"\n]+)"/m);
-	const routeHost = route?.[1].split('/')[0].toLowerCase() ?? '';
+	const routeHost = route?.[1].replace(/^https?:\/\//i, '').split('/')[0].toLowerCase() ?? '';
 	if (route && routeHost !== 'example.com' && !routeHost.endsWith('.example.com')) {
 		fail(`wrangler.jsonc has a live route pattern: ${route[1]} — it should stay commented out`);
 	}
