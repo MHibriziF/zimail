@@ -7,6 +7,9 @@ import { DOMAIN_COOKIE, UI_THEME_COOKIE, UI_THEME_COOKIE_MAX_AGE } from '$lib/se
 import { getDomainsService } from '$lib/server/domains';
 import { ensureSchema } from '$lib/server/migrations/migrate';
 import { isPublicPath, pageRedirect } from '$lib/server/page-access';
+import { finishHead } from '$lib/server/page-head';
+import { APP_NAME } from '$lib/constants';
+import { translate } from '$lib/i18n/translate';
 import { BUILTIN_THEME_IDS, DEFAULT_UI_THEME, parseThemeId } from '$lib/ui-theme/ids';
 import {
 	DEFAULT_LOCALE,
@@ -34,9 +37,15 @@ function jsonError(error: string, status: number): Response {
 function render(event: RequestEvent, resolve: Resolve): ReturnType<Handle> {
 	const uiTheme = event.locals.uiTheme || DEFAULT_UI_THEME;
 	const locale = event.locals.locale || DEFAULT_LOCALE;
+	const preview = {
+		image: new URL('/icons/icon-512.png', event.url.origin).href,
+		siteName: APP_NAME,
+		// The meeting page renders only in the browser, so the server can't see its title.
+		fallbackTitle: event.url.pathname.startsWith('/meet/') ? translate(locale, 'meet.title', { app: APP_NAME }) : undefined
+	};
 	return resolve(event, {
 		transformPageChunk: ({ html }) =>
-			html.replace('<html lang="en">', `<html lang="${locale}" data-ui-theme="${uiTheme}">`)
+			finishHead(html.replace('<html lang="en">', `<html lang="${locale}" data-ui-theme="${uiTheme}">`), preview)
 	});
 }
 

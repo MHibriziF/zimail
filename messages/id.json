@@ -986,7 +986,8 @@
 		"confirmationSent": "Konfirmasi sedang dikirim ke {email}.",
 		"poweredBy": "Dipesan dengan {app}",
 		"videoCall": "Panggilan video Zimail",
-		"joinLink": "Gabung ke rapat"
+		"joinLink": "Gabung ke rapat",
+		"previewDescription": "Pilih waktu dengan {host}."
 	},
 	"invitation": {
 		"invitation": "Undangan",

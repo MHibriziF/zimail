@@ -986,7 +986,8 @@
 		"confirmationSent": "Te enviamos una confirmación a {email}.",
 		"poweredBy": "Reservado con {app}",
 		"videoCall": "Videollamada de Zimail",
-		"joinLink": "Unirse a la reunión"
+		"joinLink": "Unirse a la reunión",
+		"previewDescription": "Elige un horario con {host}."
 	},
 	"invitation": {
 		"invitation": "Invitación",

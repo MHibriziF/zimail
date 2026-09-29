@@ -986,7 +986,8 @@
 		"confirmationSent": "A confirmation is on its way to {email}.",
 		"poweredBy": "Booked with {app}",
 		"videoCall": "Zimail video call",
-		"joinLink": "Join the meeting"
+		"joinLink": "Join the meeting",
+		"previewDescription": "Pick a time with {host}."
 	},
 	"invitation": {
 		"invitation": "Invitation",

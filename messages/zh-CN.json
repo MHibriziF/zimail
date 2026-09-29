@@ -986,7 +986,8 @@
 		"confirmationSent": "确认邮件正在发送至 {email}。",
 		"poweredBy": "由 {app} 提供预约",
 		"videoCall": "Zimail 视频通话",
-		"joinLink": "加入会议"
+		"joinLink": "加入会议",
+		"previewDescription": "选择与 {host} 会面的时间。"
 	},
 	"invitation": {
 		"invitation": "邀请",
