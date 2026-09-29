@@ -330,6 +330,8 @@
 		"copyEmail": "Copy {email}",
 		"hideQuoted": "Hide quoted text",
 		"showQuoted": "Show quoted text",
+		"showOriginalColours": "Show original colours",
+		"showDarkColours": "Show in dark colours",
 		"emptyMessage": "Empty message",
 		"messageContent": "Message content",
 		"didNotReach": "This message didn't reach the recipient.",

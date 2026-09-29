@@ -1,27 +1,36 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { EMAIL_STYLE_ID, buildEmailDocument, emailCss, isRichHtml } from '$lib/utils/email-html';
+	import { EMAIL_STYLE_ID, adaptsToDark, buildEmailDocument, emailCss, isRichHtml, supportsDarkScheme } from '$lib/utils/email-html';
+	import Icon from '$lib/components/Icon.svelte';
 	import { canFoldQuotes, foldQuotedHtml } from '$lib/utils/quotes';
 	import { t } from '$lib/i18n';
 
 	let { html }: { html: string } = $props();
 
 	const rich = $derived(isRichHtml(html));
+	/** In dark mode, the reader asked for this message's own light colours instead of the recoloured ones. */
+	let original = $state(false);
 
 	/**
 	 * Stamped on <html> by the inline script in app.html, so it is settled well
 	 * before this runs — but only in the browser. Reading it up front rather
 	 * than in an effect keeps the first document correct; switching themes later
-	 * rebuilds it, since a recoloured message cannot be restyled in place.
+	 * rebuilds it, since a plain message's dark styles hang off the document's own `data-theme`.
 	 */
 	let theme = $state(browser ? (document.documentElement.dataset.theme ?? 'light') : 'light');
+
+	/** A styled message with no dark version of its own: recoloured in dark mode, unless the reader asked otherwise. */
+	const recolourable = $derived(rich && theme === 'dark' && !supportsDarkScheme(html));
+	const adapted = $derived(adaptsToDark(html, { rich, theme, original }));
+	/** On its own light page: always in light mode, and in dark mode when not recoloured. */
+	const lightOnly = $derived(rich && !supportsDarkScheme(html) && !adapted);
 
 	/**
 	 * Rendering the frame on the server would bake in a theme it cannot know and
 	 * cost a reload to correct, and nothing about a scriptless frame benefits
 	 * from it: the frame is invisible until measured from out here.
 	 */
-	const srcdoc = $derived(browser ? buildEmailDocument(html, { rich, theme }) : '');
+	const srcdoc = $derived(browser ? buildEmailDocument(html, { rich, theme, original }) : '');
 
 	let mounted = $state(false);
 	let frame = $state<HTMLIFrameElement | null>(null);
@@ -257,6 +266,7 @@
 		bind:this={frame}
 		class="frame"
 		class:rich
+		class:light-only={lightOnly}
 		class:painted
 		title={t('thread.messageContent')}
 		sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
@@ -265,6 +275,13 @@
 		onload={onLoad}
 		style:height={height ? `${height}px` : undefined}
 	></iframe>
+{/if}
+
+{#if recolourable}
+	<button type="button" class="colours-toggle" onclick={() => (original = !original)}>
+		<Icon name={original ? 'moon-line' : 'sun-line'} size={14} />
+		{original ? t('thread.showDarkColours') : t('thread.showOriginalColours')}
+	</button>
 {/if}
 
 {#if quoted.length > 0}
@@ -300,6 +317,22 @@
 
 	/* The quoted history sits at the end of the message, so its control belongs
 	   under the frame rather than inside it. */
+	.colours-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin: 0.5rem 0 0;
+		padding: 0.25rem 0.5rem;
+		border-radius: 0.375rem;
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+	}
+
+	.colours-toggle:hover {
+		color: var(--color-text);
+		background: var(--color-surface-hover);
+	}
+
 	.quote-toggle {
 		display: inline-flex;
 		align-items: center;
@@ -327,9 +360,14 @@
 		background: #ffffff;
 	}
 
-	/* In dark mode the page is the message's own — recoloured, or the dark one
-	   its sender wrote — so the card gets out of its way. */
-	:global(html[data-theme='dark']) .frame.rich {
+	/* A sender who wrote no dark version keeps their light page in dark mode, as
+	   Gmail does — its colours are never rewritten. */
+	:global(html[data-theme]) .frame.light-only {
+		color-scheme: light;
+	}
+
+	/* One who did gets their dark page, so the card gets out of its way. */
+	:global(html[data-theme='dark']) .frame.rich:not(.light-only) {
 		background: transparent;
 	}
 </style>
