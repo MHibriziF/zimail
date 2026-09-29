@@ -181,6 +181,8 @@ export type CalendarFeedsRepository = {
 	 * differs, in one batch so a reader never sees it half-written.
 	 */
 	syncEvents(userId: string, feedId: string, events: FeedEvent[]): Promise<void>;
+	/** Which of `ids` are the user's own Zimail events (anything not from a feed). */
+	ownEventIds(userId: string, ids: string[]): Promise<Set<string>>;
 };
 
 export function createD1CalendarFeedsRepository(db: D1Database): CalendarFeedsRepository {
@@ -292,6 +294,18 @@ export function createD1CalendarFeedsRepository(db: D1Database): CalendarFeedsRe
 				)
 				.bind(record.error, record.syncedAt, record.eventCount, record.syncKey, id)
 				.run();
+		},
+
+		async ownEventIds(userId, ids) {
+			if (ids.length === 0) return new Set();
+			const { results } = await db
+				.prepare(
+					`SELECT id FROM calendar_events
+					 WHERE user_id = ? AND source <> 'feed' AND id IN (SELECT value FROM json_each(?))`
+				)
+				.bind(userId, JSON.stringify(ids))
+				.all<{ id: string }>();
+			return new Set(results.map((row) => row.id));
 		},
 
 		async syncEvents(userId, feedId, events) {
