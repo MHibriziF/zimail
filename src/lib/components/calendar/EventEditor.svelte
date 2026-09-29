@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n';
 	import Icon from '../Icon.svelte';
 	import { addGuests, guestStatusKey, type EventDraft } from '$lib/calendar/editor';
+	import { RecipientSuggestions } from '$lib/mail/recipient-suggestions.svelte';
 	import {
 		MAX_EVENT_LOCATION_LENGTH,
 		MAX_EVENT_NOTES_LENGTH,
@@ -51,6 +52,12 @@
 
 	const answers = $derived(new Map(guests.map((guest) => [guest.email, guest.status])));
 
+	const typeahead = new RecipientSuggestions();
+	let guestInput = $state<HTMLInputElement | null>(null);
+
+	/** Keys that turn what's typed into a chip, as in the compose recipient field. */
+	const GUEST_COMMIT_KEYS = [' ', ',', ';', 'Enter', 'Tab'];
+
 	/** Takes what's typed as guests; `false` if it had to stay in the field. */
 	function commitGuests(): boolean {
 		if (!draft.guests || !guestText.trim()) return true;
@@ -59,16 +66,63 @@
 		if (entry.error) return false;
 		draft.guests = entry.guests;
 		guestText = '';
+		typeahead.close();
 		return true;
 	}
 
+	function pickGuest(address: string) {
+		guestText = address;
+		commitGuests();
+		guestInput?.focus();
+	}
+
+	/** A pasted list breaks straight into chips, leaving the last part to keep typing. */
+	function onGuestInput() {
+		const parts = guestText.split(/[\s,;]+/);
+		if (parts.length > 1) {
+			const tail = parts.pop() ?? '';
+			guestText = parts.join(' ');
+			if (commitGuests()) guestText = tail;
+			else guestText = `${guestText} ${tail}`;
+		}
+		void typeahead.search(guestText, draft.guests ?? []);
+	}
+
 	function onGuestKey(event: KeyboardEvent) {
-		if (event.key === 'Enter' || event.key === ',') {
+		if (typeahead.move(event.key)) {
 			event.preventDefault();
+			return;
+		}
+		if (event.key === 'Escape' && typeahead.open) {
+			// Closes the suggestions, not the editor.
+			event.preventDefault();
+			event.stopPropagation();
+			typeahead.hide();
+			return;
+		}
+		if (GUEST_COMMIT_KEYS.includes(event.key)) {
+			const choice = typeahead.highlighted;
+			// Tab only commits when there's something to commit, so it still moves focus.
+			if (event.key === 'Tab' && !guestText.trim() && !choice) return;
+			event.preventDefault();
+			if (choice) guestText = choice;
 			commitGuests();
-		} else if (event.key === 'Backspace' && !guestText && draft.guests?.length) {
+			return;
+		}
+		if (event.key === 'Backspace' && !guestText && draft.guests?.length) {
+			event.preventDefault();
+			// Pulled back for editing rather than dropped, as in the compose field.
+			guestText = draft.guests[draft.guests.length - 1];
 			draft.guests = draft.guests.slice(0, -1);
 		}
+	}
+
+	function onGuestBlur() {
+		// Let a click on a suggestion land before the list goes.
+		setTimeout(() => {
+			commitGuests();
+			typeahead.hide();
+		}, 120);
 	}
 
 	function removeGuest(email: string) {
@@ -206,11 +260,39 @@
 							type="text"
 							inputmode="email"
 							autocomplete="off"
+							autocapitalize="none"
+							spellcheck="false"
+							role="combobox"
+							aria-expanded={typeahead.open}
+							aria-controls="cal-guest-listbox"
+							bind:this={guestInput}
 							bind:value={guestText}
-							placeholder={t('calendar.guestsPlaceholder')}
+							placeholder={draft.guests.length ? '' : t('calendar.guestsPlaceholder')}
+							oninput={onGuestInput}
 							onkeydown={onGuestKey}
-							onblur={commitGuests}
+							onblur={onGuestBlur}
 						/>
+						{#if typeahead.open}
+							<ul class="cal-suggestions" id="cal-guest-listbox" role="listbox">
+								{#each typeahead.items as suggestion, index (suggestion)}
+									<li role="none">
+										<button
+											type="button"
+											role="option"
+											aria-selected={index === typeahead.active}
+											class="cal-suggestion"
+											class:on={index === typeahead.active}
+											onmousedown={(event) => {
+												event.preventDefault();
+												pickGuest(suggestion);
+											}}
+										>
+											{suggestion}
+										</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
 					</div>
 					{#if guestError}
 						<small class="cal-help cal-help-error" role="alert">{guestError}</small>
@@ -378,6 +460,7 @@
 	}
 
 	.cal-guests {
+		position: relative;
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.375rem;
@@ -448,6 +531,40 @@
 
 	.cal-guest-input:focus {
 		outline: none;
+	}
+
+	.cal-suggestions {
+		position: absolute;
+		top: calc(100% + 0.25rem);
+		left: 0;
+		z-index: 20;
+		width: min(22rem, 100%);
+		max-height: 14rem;
+		margin: 0;
+		overflow-y: auto;
+		padding: 0.25rem;
+		list-style: none;
+		border-radius: 0.75rem;
+		background: var(--color-surface);
+		box-shadow: var(--shadow-md);
+	}
+
+	.cal-suggestion {
+		display: block;
+		width: 100%;
+		padding: 0.5rem 0.625rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		text-align: left;
+		color: var(--color-text);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.cal-suggestion:hover,
+	.cal-suggestion.on {
+		background: var(--color-surface-muted);
 	}
 
 	.cal-meeting {
