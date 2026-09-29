@@ -42,7 +42,8 @@ export function settleTitle(html: string, fallbackTitle?: string): string {
 	const headEnd = html.indexOf('</head>');
 	const head = headEnd === -1 ? html : html.slice(0, headEnd);
 	if (head.replace(fallback, '').includes('<title')) return html.replace(fallback, '');
-	return fallbackTitle ? html.replace(fallback, `${FALLBACK_TITLE_TAG}${fallbackTitle}</title>`) : html;
+	// A function, so a `$&` or `$'` in the title is text rather than a replacement pattern.
+	return fallbackTitle ? html.replace(fallback, () => `${FALLBACK_TITLE_TAG}${fallbackTitle}</title>`) : html;
 }
 
 /** Adds whichever of the basic Open Graph tags the page didn't set itself. */

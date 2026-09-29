@@ -40,6 +40,10 @@ describe('finishHead', () => {
 		assert.equal(meta(html, 'og:title'), 'Office hours');
 	});
 
+	test('a $& in the fallback title is kept as text', () => {
+		assert.deepEqual(titles(finishHead(page(''), { ...defaults, fallbackTitle: 'Pay $& go' })), ['Pay $& go']);
+	});
+
 	test('quotes in a title cannot break out of the attribute', () => {
 		const html = finishHead(page('<title>Say "hi"</title>'), defaults);
 		assert.equal(meta(html, 'og:title'), 'Say &quot;hi&quot;');
