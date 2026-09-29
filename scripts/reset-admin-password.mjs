@@ -3,9 +3,10 @@
  * Reset a user's password in remote (or local) D1.
  * Usage: bun scripts/reset-admin-password.mjs <email> <password> [--local]
  */
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const { subtle } = webcrypto;
 const PBKDF2_ITERATIONS = 100_000;
@@ -62,9 +63,14 @@ const sql = `UPDATE users SET password_hash = '${escape(passwordHash)}' WHERE em
 	email.toLowerCase()
 )}';`;
 
-execSync(
-	`bunx wrangler d1 execute ${databaseName} ${local ? '--local' : '--remote'} --command "${sql.replace(/"/g, '\\"')}"`,
-	{ stdio: 'inherit', cwd: new URL('..', import.meta.url).pathname }
+// Arguments go straight to wrangler, never through a shell, so nothing in the
+// email or hash can be read as shell syntax.
+const wrangler = fileURLToPath(new URL('../node_modules/wrangler/bin/wrangler.js', import.meta.url));
+const result = spawnSync(
+	process.execPath,
+	[wrangler, 'd1', 'execute', databaseName, local ? '--local' : '--remote', '--command', sql],
+	{ stdio: 'inherit', cwd: fileURLToPath(new URL('..', import.meta.url)) }
 );
+if (result.status !== 0) process.exit(result.status ?? 1);
 
 console.log(`\nPassword reset for ${email} (${local ? 'local' : 'remote'} DB).`);
