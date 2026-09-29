@@ -142,12 +142,23 @@
 		previewStream?.getVideoTracks().forEach((track) => (track.enabled = cameraOn));
 	}
 
-	/** Re-requests both devices so the picked one actually takes effect in the preview. */
-	async function applyDeviceSelection() {
+	function exactDevice(id: string): MediaTrackConstraints | true {
+		return id ? { deviceId: { exact: id } } : true;
+	}
+
+	/**
+	 * Re-requests the preview so the picked device takes effect. Only the devices the
+	 * preview already has, plus the picked one: a missing camera mustn't fail a mic change.
+	 */
+	async function applyDeviceSelection(picked: 'camera' | 'mic') {
+		const has = (kind: 'video' | 'audio') =>
+			!previewStream || previewStream.getTracks().some((track) => track.kind === kind);
+		const wantVideo = picked === 'camera' || has('video');
+		const wantAudio = picked === 'mic' || has('audio');
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
-				video: cameraDeviceId ? { deviceId: { exact: cameraDeviceId } } : true,
-				audio: micDeviceId ? { deviceId: { exact: micDeviceId } } : true
+				video: wantVideo && exactDevice(cameraDeviceId),
+				audio: wantAudio && exactDevice(micDeviceId)
 			});
 			stopPreview();
 			attachPreview(stream);
@@ -161,12 +172,12 @@
 
 	function selectMic(id: string) {
 		micDeviceId = id;
-		void applyDeviceSelection();
+		void applyDeviceSelection('mic');
 	}
 
 	function selectCamera(id: string) {
 		cameraDeviceId = id;
-		void applyDeviceSelection();
+		void applyDeviceSelection('camera');
 	}
 
 	async function join(event: SubmitEvent) {
