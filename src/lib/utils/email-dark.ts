@@ -16,8 +16,8 @@ const COLOUR_DECLARATION =
 const COLOUR_LITERAL =
 	/#[0-9a-f]{3,8}|rgba?\([^)]{1,160}\)|\b(?:black|white|darkgray|darkgrey|lightgray|lightgrey)\b/gi;
 const HTML_TAG = /<[a-z][^>]{0,8192}>/gi;
-const COLOUR_ATTRIBUTE =
-	/(^|\s)(bgcolor|color)\s*=\s*(["']?)(#[0-9a-f]{3,8}|rgba?\([^)]{1,160}\)|(?:black|white|darkgray|darkgrey|lightgray|lightgrey))\3/gi;
+/** A `bgcolor` or `color` attribute and its value, quoted or not; the colour parser decides what it is. */
+const COLOUR_ATTRIBUTE = /(^|\s)(bgcolor|color)\s*=\s*("[^"]{1,200}"|'[^']{1,200}'|[^\s>"']{1,200})/gi;
 
 const NAMED_COLOUR_VALUES: Record<string, [number, number, number, number]> = {
 	black: [0, 0, 0, 1],
@@ -168,8 +168,11 @@ export function adaptDarkColours(source: string): string {
 	return declarationsAdapted.replace(HTML_TAG, (tag) =>
 		tag.replace(
 			COLOUR_ATTRIBUTE,
-			(attribute, _prefix: string, property: string, _quote: string, literal: string) =>
-				attribute.replace(literal, darkModeColour(literal, property))
+			(attribute, _prefix: string, property: string, value: string) => {
+				const quoted = value.startsWith('"') || value.startsWith("'");
+				const literal = quoted ? value.slice(1, -1) : value;
+				return attribute.replace(literal, darkModeColour(literal, property));
+			}
 		)
 	);
 }

@@ -57,6 +57,14 @@ describe('adaptDarkColours', () => {
 		assert.ok(!out.includes('color="black"'));
 	});
 
+	test('unquoted attributes are read too; values that are not colours stay as they are', () => {
+		const out = adaptDarkColours('<td bgcolor=#ffffff><font color=black>x</font></td>');
+		assert.ok(!out.includes('bgcolor=#ffffff'));
+		assert.ok(!out.includes('color=black'));
+		const html = '<td bgcolor="transparent"><font color="inherit" data-color="black">x</font></td>';
+		assert.equal(adaptDarkColours(html), html);
+	});
+
 	test('images and their links are never touched', () => {
 		const html = '<img src="https://cdn.test/logo-white-black.png" alt="Logo black on white">';
 		assert.equal(adaptDarkColours(html), html);
