@@ -5,6 +5,7 @@
 	import LabelChip from './LabelChip.svelte';
 	import SwipeRow from './SwipeRow.svelte';
 	import { formatRelativeDate } from '$lib/utils/date';
+	import { page } from '$app/stores';
 	import { t } from '$lib/i18n';
 	import type { MailAddress, MailboxView, ThreadParticipant, ThreadSummary } from '$lib/types';
 
@@ -169,7 +170,7 @@
 				{/if}
 			</span>
 
-			<span class="date">{formatRelativeDate(thread.created_at)}</span>
+			<span class="date">{formatRelativeDate(thread.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</span>
 		</a>
 
 		<span class="row-actions">

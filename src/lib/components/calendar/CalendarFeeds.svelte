@@ -74,7 +74,7 @@
 		if (feed.lastError) return feed.lastError;
 		if (!feed.lastSyncedAt) return t('calendar.feeds.neverSynced');
 		return t('calendar.feeds.synced', {
-			time: formatRelativeDate(feed.lastSyncedAt, locale),
+			time: formatRelativeDate(feed.lastSyncedAt, locale, $page.data.timeZone ?? undefined),
 			count: feed.eventCount
 		});
 	}

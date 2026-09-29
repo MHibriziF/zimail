@@ -10,6 +10,7 @@
 	import type { Meeting } from '$lib/server/meet/meetings';
 	import { DEFAULT_SCREEN_SHARE, type ScreenShareMode, type ScreenSharePolicy } from '$lib/meet/screen-share';
 	import { MEETINGS_PAGE_SIZE, nextShowCount } from '$lib/meet/meetings-list';
+	import { parseTimestamp } from '$lib/utils/date';
 	import type { CalendarEvent } from '$lib/calendar/events';
 
 	let {
@@ -70,7 +71,7 @@
 
 	/** Intl throws on an invalid date, so one bad row must not take the page down. */
 	function formatDate(iso: string): string {
-		const date = new Date(iso);
+		const date = parseTimestamp(iso);
 		return Number.isNaN(date.getTime()) ? '' : dateFormat.format(date);
 	}
 
