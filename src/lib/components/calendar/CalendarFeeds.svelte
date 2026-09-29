@@ -236,7 +236,7 @@
 	}
 
 	.feeds-danger {
-		color: #fff;
+		color: var(--color-on-danger);
 		background: var(--color-danger);
 		box-shadow: none;
 	}

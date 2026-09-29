@@ -506,7 +506,7 @@
 		border-radius: 0.625rem;
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: #fff;
+		color: var(--color-on-danger);
 		background: var(--color-danger);
 	}
 

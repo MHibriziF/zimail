@@ -1392,7 +1392,7 @@
 
 [data-ui-theme='zero'] .z-composer-link:hover {
 	background: var(--z-hover);
-	color: #a8a8a8;
+	color: var(--z-fg);
 }
 
 [data-ui-theme='zero'] .z-composer-body {
