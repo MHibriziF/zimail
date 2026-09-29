@@ -138,6 +138,24 @@ function randomSuffix(): string {
 	return crypto.randomUUID().replaceAll('-', '').slice(0, 5);
 }
 
+/** What every email about an existing booking says, at its next revision; `changes` overrides. */
+function detailsFor(eventId: string, booking: StoredBooking, changes: Partial<BookingDetails> = {}) {
+	return {
+		uid: inviteUid(eventId),
+		pageTitle: booking.pageTitle,
+		guestName: booking.guestName,
+		guestEmail: booking.guestEmail,
+		note: booking.note ?? '',
+		start: new Date(booking.start),
+		end: new Date(booking.end),
+		timeZone: booking.timeZone,
+		meetingUrl: booking.meetingUrl,
+		location: booking.location,
+		sequence: booking.sequence + 1,
+		...changes
+	};
+}
+
 export function createReservationsService(deps: ReservationsServiceDeps): ReservationsService {
 	const { repo } = deps;
 	const now = deps.now ?? (() => new Date());
@@ -186,24 +204,6 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 	const manageLink = (baseUrl: string, token: string) => new URL(`/book/manage/${token}`, baseUrl).href;
 	const changeDeadline = (start: Date, page: StoredPage) =>
 		new Date(start.getTime() - page.rescheduleCutoffHours * 3_600_000);
-
-	/** What every email about an existing booking says, at its next revision; `changes` overrides. */
-	function detailsFor(eventId: string, booking: StoredBooking, changes: Partial<BookingDetails> = {}) {
-		return {
-			uid: inviteUid(eventId),
-			pageTitle: booking.pageTitle,
-			guestName: booking.guestName,
-			guestEmail: booking.guestEmail,
-			note: booking.note ?? '',
-			start: new Date(booking.start),
-			end: new Date(booking.end),
-			timeZone: booking.timeZone,
-			meetingUrl: booking.meetingUrl,
-			location: booking.location,
-			sequence: booking.sequence + 1,
-			...changes
-		};
-	}
 
 	/** A guest's link, resolved to its booking and page. */
 	async function loadManaged(token: string): Promise<{ booking: ManagedBooking; page: StoredPage } | null> {

@@ -182,7 +182,7 @@ export function validatePageSettings(
 			: null;
 	const location = clean(input.location, MAX_PAGE_LOCATION_LENGTH) || null;
 	const rescheduleCutoffHours = input.rescheduleCutoffHours ?? DEFAULT_RESCHEDULE_CUTOFF_HOURS;
-	if (!RESCHEDULE_CUTOFF_HOURS.some((hours) => hours === rescheduleCutoffHours)) {
+	if (typeof rescheduleCutoffHours !== 'number' || !(RESCHEDULE_CUTOFF_HOURS as readonly number[]).includes(rescheduleCutoffHours)) {
 		return { ok: false, error: 'invalid_cutoff' };
 	}
 	return {
