@@ -7,6 +7,7 @@
 	import DeviceSelect from '$lib/components/meet/DeviceSelect.svelte';
 	import BackgroundPickerModal from '$lib/components/meet/BackgroundPickerModal.svelte';
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
+	import { deviceErrorKey } from '$lib/meet/device-errors';
 	import { APP_NAME } from '$lib/constants';
 	import { initials } from '$lib/mail/folders';
 	import { DEFAULT_SCREEN_SHARE, type ScreenShareSettings } from '$lib/meet/screen-share';
@@ -64,12 +65,15 @@
 	}
 
 	async function startPreview() {
+		// The combined request's error speaks for both devices, so it's the one to explain.
+		let bothFailed: unknown;
 		try {
 			attachPreview(await navigator.mediaDevices.getUserMedia({ video: true, audio: true }));
 			return;
-		} catch {
+		} catch (error) {
 			// Fall through — camera and mic may need to be requested separately
 			// when only one of them is actually available or permitted.
+			bothFailed = error;
 		}
 		try {
 			cameraOn = true;
@@ -84,7 +88,7 @@
 			attachPreview(await navigator.mediaDevices.getUserMedia({ audio: true }));
 		} catch {
 			micOn = false;
-			deviceError = t('meet.deviceError');
+			deviceError = t(deviceErrorKey(bothFailed));
 		}
 	}
 
@@ -138,30 +142,42 @@
 		previewStream?.getVideoTracks().forEach((track) => (track.enabled = cameraOn));
 	}
 
-	/** Re-requests both devices so the picked one actually takes effect in the preview. */
-	async function applyDeviceSelection() {
+	function exactDevice(id: string): MediaTrackConstraints | true {
+		return id ? { deviceId: { exact: id } } : true;
+	}
+
+	/**
+	 * Re-requests the preview so the picked device takes effect. Only the devices the
+	 * preview already has, plus the picked one: a missing camera mustn't fail a mic change.
+	 */
+	async function applyDeviceSelection(picked: 'camera' | 'mic') {
+		const has = (kind: 'video' | 'audio') =>
+			!previewStream || previewStream.getTracks().some((track) => track.kind === kind);
+		const wantVideo = picked === 'camera' || has('video');
+		const wantAudio = picked === 'mic' || has('audio');
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({
-				video: cameraDeviceId ? { deviceId: { exact: cameraDeviceId } } : true,
-				audio: micDeviceId ? { deviceId: { exact: micDeviceId } } : true
+				video: wantVideo && exactDevice(cameraDeviceId),
+				audio: wantAudio && exactDevice(micDeviceId)
 			});
 			stopPreview();
 			attachPreview(stream);
 			stream.getAudioTracks().forEach((track) => (track.enabled = micOn));
 			stream.getVideoTracks().forEach((track) => (track.enabled = cameraOn));
-		} catch {
-			deviceError = t('meet.deviceError');
+			deviceError = '';
+		} catch (error) {
+			deviceError = t(deviceErrorKey(error));
 		}
 	}
 
 	function selectMic(id: string) {
 		micDeviceId = id;
-		void applyDeviceSelection();
+		void applyDeviceSelection('mic');
 	}
 
 	function selectCamera(id: string) {
 		cameraDeviceId = id;
-		void applyDeviceSelection();
+		void applyDeviceSelection('camera');
 	}
 
 	async function join(event: SubmitEvent) {

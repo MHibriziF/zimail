@@ -16,6 +16,7 @@
 	} from 'livekit-client';
 	import { BackgroundProcessor, supportsBackgroundProcessors } from '@livekit/track-processors';
 	import { applyDeafenToggle, applyMicToggle } from '$lib/meet/av-state';
+	import { deviceErrorKey } from '$lib/meet/device-errors';
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { normalizeDisplayName } from '$lib/meet/display-name';
 	import { isHostIdentity } from '$lib/meet/host-identity';
@@ -923,23 +924,9 @@
 				isHost = isHostIdentity(instance.localParticipant.identity);
 				if (isHost) void loadMeetingSettings();
 				if (deafened) syncDeafenedAttribute('1');
-				await instance.localParticipant.setMicrophoneEnabled(
-					micEnabled,
-					micDeviceId ? { deviceId: micDeviceId } : undefined
-				);
-				const cameraPublication = await instance.localParticipant.setCameraEnabled(
-					cameraEnabled,
-					cameraDeviceId ? { deviceId: cameraDeviceId } : undefined
-				);
-				const track = cameraPublication?.track;
-				if (track) {
-					const el = track.attach();
-					el.muted = true;
-					el.style.transform = 'scaleX(-1)';
-					localMediaEl?.appendChild(el);
-				}
-				// A background may have been chosen before this first publish (from the lobby's popup).
-				void reapplyBackground();
+				// A device that won't start is the caller's to fix, not a failed connection.
+				if (micEnabled) await enableMic();
+				if (cameraEnabled) await enableCamera();
 				canShareScreen = mayShareScreen(instance.localParticipant);
 				for (const participant of instance.remoteParticipants.values()) {
 					ensureRemoteTile(participant);
@@ -1004,7 +991,43 @@
 			syncDeafenedAttribute('0');
 		}
 		playToggleTone(micEnabled);
-		await room.localParticipant.setMicrophoneEnabled(micEnabled);
+		if (micEnabled) await enableMic();
+		else await room.localParticipant.setMicrophoneEnabled(false);
+	}
+
+	/** Turns the mic on, or explains why it can't be and shows it as off. */
+	async function enableMic() {
+		if (!room) return;
+		try {
+			await room.localParticipant.setMicrophoneEnabled(true, micDeviceId ? { deviceId: micDeviceId } : undefined);
+		} catch (error) {
+			micEnabled = false;
+			showNotice(t(deviceErrorKey(error)));
+		}
+	}
+
+	/** Turns the camera on, or explains why it can't be and shows it as off. */
+	async function enableCamera() {
+		if (!room) return;
+		try {
+			const publication = await room.localParticipant.setCameraEnabled(
+				true,
+				cameraDeviceId ? { deviceId: cameraDeviceId } : undefined
+			);
+			const track = publication?.track;
+			if (track && localMediaEl) {
+				localMediaEl.innerHTML = '';
+				const el = track.attach();
+				el.muted = true;
+				el.style.transform = 'scaleX(-1)';
+				localMediaEl.appendChild(el);
+			}
+			// A background may have been chosen before this publish (from the lobby's popup).
+			void reapplyBackground();
+		} catch (error) {
+			cameraEnabled = false;
+			showNotice(t(deviceErrorKey(error)));
+		}
 	}
 
 	/**
@@ -1039,7 +1062,9 @@
 		playToggleTone(!deafened);
 		setRemoteAudioMuted(deafened);
 		syncDeafenedAttribute(deafened ? '1' : '0');
-		if (micEnabled !== micWas) await room.localParticipant.setMicrophoneEnabled(micEnabled);
+		if (micEnabled === micWas) return;
+		if (micEnabled) await enableMic();
+		else await room.localParticipant.setMicrophoneEnabled(false);
 	}
 
 	async function toggleCamera() {
@@ -1047,19 +1072,7 @@
 		cameraEnabled = !cameraEnabled;
 		playToggleTone(cameraEnabled);
 		if (cameraEnabled) {
-			const publication = await room.localParticipant.setCameraEnabled(
-				true,
-				cameraDeviceId ? { deviceId: cameraDeviceId } : undefined
-			);
-			const track = publication?.track;
-			if (track && localMediaEl) {
-				localMediaEl.innerHTML = '';
-				const el = track.attach();
-				el.muted = true;
-				el.style.transform = 'scaleX(-1)';
-				localMediaEl.appendChild(el);
-			}
-			void reapplyBackground();
+			await enableCamera();
 		} else {
 			await room.localParticipant.setCameraEnabled(false);
 			if (localMediaEl) localMediaEl.innerHTML = '';
