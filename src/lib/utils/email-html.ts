@@ -11,6 +11,8 @@
  * that document.
  */
 
+import { adaptDarkColours } from './email-dark';
+
 /**
  * Did the sender style the message, or just write it? Anything styled is shown
  * the way its sender made it — on white, untouched. Only a message with no
@@ -79,13 +81,22 @@ function valueEnd(lower: string, start: number): number {
  */
 function hasInlineStyling(html: string): boolean {
 	const lower = html.toLowerCase();
-	let at = lower.indexOf('style=');
+	const skipSpaces = (index: number) => {
+		while (index < lower.length && /\s/.test(lower[index])) index += 1;
+		return index;
+	};
+	let at = lower.indexOf('style');
 	while (at !== -1) {
-		const start = at + 'style='.length;
-		const end = valueEnd(lower, start);
-		const value = lower.slice(start, end);
-		if (STYLING_PROPERTIES.some((property) => value.includes(property))) return true;
-		at = lower.indexOf('style=', Math.max(end, start));
+		// HTML allows space on either side of the `=`: \`style = "color: red"\`.
+		const equals = skipSpaces(at + 'style'.length);
+		let next = at + 'style'.length;
+		if (lower[equals] === '=') {
+			const start = skipSpaces(equals + 1);
+			const end = valueEnd(lower, start);
+			if (STYLING_PROPERTIES.some((property) => lower.slice(start, end).includes(property))) return true;
+			next = Math.max(end, start);
+		}
+		at = lower.indexOf('style', next);
 	}
 	return false;
 }
@@ -187,6 +198,12 @@ body { color: #202124; background: #ffffff; }
 `;
 
 /** The sender ships a dark version; the page follows the theme and theirs paints over it. */
+/** Recoloured for a dark page: the page the colours now sit on, and ink for text that set none. */
+const ADAPTED_PAGE_CSS = `
+html { color-scheme: dark; }
+body { color: #e4e4e7; background: transparent; }
+`;
+
 const SCHEME_PAGE_CSS = `
 @media (prefers-color-scheme: light) {
 	html { color-scheme: light; }
@@ -225,13 +242,13 @@ const CSP =
 	"form-action 'none'; base-uri 'none'";
 
 /** A styled message's fallbacks; a plain one gets none, since everything it needs comes last. */
-function styledDefaults(html: string): string {
-	const page = supportsDarkScheme(html) ? SCHEME_PAGE_CSS : LIGHT_PAGE_CSS;
-	return `<style>${STYLED_DEFAULTS_CSS}${page}</style>`;
+function pageCss(html: string, adapted: boolean): string {
+	if (supportsDarkScheme(html)) return SCHEME_PAGE_CSS;
+	return adapted ? ADAPTED_PAGE_CSS : LIGHT_PAGE_CSS;
 }
 
-function headStart(html: string, rich: boolean): string {
-	const defaults = rich ? styledDefaults(html) : '';
+function headStart(html: string, rich: boolean, adapted: boolean): string {
+	const defaults = rich ? `<style>${STYLED_DEFAULTS_CSS}${pageCss(html, adapted)}</style>` : '';
 	return `<meta http-equiv="Content-Security-Policy" content="${CSP}">
 <meta name="referrer" content="no-referrer">${defaults}`;
 }
@@ -281,13 +298,23 @@ function withTheme(html: string, theme: string): string {
 	);
 }
 
+/**
+ * Would this message be recoloured for the dark theme? Only a styled one whose
+ * sender wrote no dark version — and only until the reader asks for the original.
+ */
+export function adaptsToDark(html: string, options: { rich: boolean; theme?: string; original?: boolean }): boolean {
+	return options.rich && options.theme === 'dark' && !options.original && !supportsDarkScheme(html);
+}
+
 export function buildEmailDocument(
 	html: string,
-	options: { rich: boolean; theme?: string }
+	options: { rich: boolean; theme?: string; original?: boolean }
 ): string {
 	const theme = options.theme ?? 'light';
-	const before = headStart(html, options.rich);
+	const adapted = adaptsToDark(html, options);
+	const before = headStart(html, options.rich, adapted);
 	const after = headEnd(options.rich);
+	const body = adapted ? adaptDarkColours(html) : html;
 
 	// A complete document cannot be nested inside another one — that drops its
 	// <head>, and with it any <style> the layout needs. Our own assets are
@@ -295,10 +322,10 @@ export function buildEmailDocument(
 	// after load matters in dark mode: the colour scheme and the transparency
 	// opt-out have to be in the very first paint, or the message flashes up as a
 	// white sheet while it waits for script.
-	if (isFullDocument(html)) return withTheme(spliceHead(html, before, after), theme);
+	if (isFullDocument(body)) return withTheme(spliceHead(body, before, after), theme);
 
 	return `<!doctype html><html data-theme="${theme}"><head><meta charset="utf-8">
 ${before}
 ${after}
-</head><body>${html}</body></html>`;
+</head><body>${body}</body></html>`;
 }

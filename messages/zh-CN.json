@@ -330,6 +330,8 @@
 		"copyEmail": "复制 {email}",
 		"hideQuoted": "隐藏引用文字",
 		"showQuoted": "显示引用文字",
+		"showOriginalColours": "显示原始颜色",
+		"showDarkColours": "以深色显示",
 		"emptyMessage": "空邮件",
 		"messageContent": "邮件内容",
 		"didNotReach": "此邮件未能送达收件人。",

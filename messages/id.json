@@ -330,6 +330,8 @@
 		"copyEmail": "Salin {email}",
 		"hideQuoted": "Sembunyikan kutipan",
 		"showQuoted": "Tampilkan kutipan",
+		"showOriginalColours": "Tampilkan warna asli",
+		"showDarkColours": "Tampilkan dalam warna gelap",
 		"emptyMessage": "Pesan kosong",
 		"messageContent": "Isi pesan",
 		"didNotReach": "Pesan ini tidak sampai ke penerima.",

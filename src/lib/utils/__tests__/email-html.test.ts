@@ -17,6 +17,9 @@ describe('isRichHtml: did the sender style it?', () => {
 		for (const html of [
 			'<p>Hello <span style="color:#c00">in red</span></p>',
 			'<p style="font-family: Georgia">Serif on purpose</p>',
+			'<p style= "color: red">spaced after the equals</p>',
+			'<p style = \'color: red\'>spaced on both sides</p>',
+			'<p STYLE=color:red>unquoted, upper case</p>',
 			'<p><span style="background-color: yellow">highlighted</span></p>',
 			'<p><font color="blue">old-school</font></p>',
 			'<table><tr><td>laid out</td></tr></table>',
@@ -49,13 +52,28 @@ describe('buildEmailDocument', () => {
 		assert.ok(ourDefaults < theirs, 'defaults first');
 	});
 
-	test('a styled message gets none of the app’s typography, and its colours are never rewritten', () => {
+	test('a styled message gets none of the app’s typography', () => {
 		const html = '<table bgcolor="#ffffff"><tr><td style="color:#000000;background:#fafafa">Hi</td></tr></table>';
-		const doc = buildEmailDocument(html, { rich: true, theme: 'dark' });
-		assert.ok(!doc.includes('font-size: 15px'));
-		assert.ok(!doc.includes('line-height: 1.65'));
-		assert.ok(doc.includes('style="color:#000000;background:#fafafa"'));
-		assert.ok(doc.includes('bgcolor="#ffffff"'));
+		for (const theme of ['light', 'dark']) {
+			const doc = buildEmailDocument(html, { rich: true, theme });
+			assert.ok(!doc.includes('font-size: 15px'), theme);
+			assert.ok(!doc.includes('line-height: 1.65'), theme);
+		}
+	});
+
+	test('dark mode recolours it; light mode and "original" leave its colours exactly as sent', () => {
+		const html = '<table bgcolor="#ffffff"><tr><td style="color:#000000;background:#fafafa">Hi</td></tr></table>';
+		const untouched = (doc: string) => doc.includes('style="color:#000000;background:#fafafa"') && doc.includes('bgcolor="#ffffff"');
+		assert.ok(untouched(buildEmailDocument(html, { rich: true, theme: 'light' })));
+		assert.ok(untouched(buildEmailDocument(html, { rich: true, theme: 'dark', original: true })));
+		const dark = buildEmailDocument(html, { rich: true, theme: 'dark' });
+		assert.ok(!untouched(dark));
+		assert.ok(dark.includes('html { color-scheme: dark; }'));
+	});
+
+	test('a sender’s own dark design is never recoloured', () => {
+		const html = '<style>@media (prefers-color-scheme: dark) { body { background: #000 } }</style><td style="color:#000000">Hi</td>';
+		assert.ok(buildEmailDocument(html, { rich: true, theme: 'dark' }).includes('style="color:#000000"'));
 	});
 
 	test('a plain message still reads in the app’s type and colours', () => {
@@ -66,7 +84,8 @@ describe('buildEmailDocument', () => {
 	});
 
 	test('without a dark version the light page is declared outright, not through a media query', () => {
-		const doc = buildEmailDocument(styled, { rich: true, theme: 'dark' });
+		// The original in dark mode — the page the reader switches to.
+		const doc = buildEmailDocument(styled, { rich: true, theme: 'dark', original: true });
 		const defaults = doc.slice(0, doc.indexOf('font-family: Georgia'));
 		assert.match(defaults, /html \{ color-scheme: light; \}\s*body \{ color: #202124; background: #ffffff; \}/);
 		assert.ok(!defaults.includes('prefers-color-scheme'));
