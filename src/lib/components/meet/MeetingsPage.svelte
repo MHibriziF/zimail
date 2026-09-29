@@ -521,6 +521,10 @@
 		box-shadow: none;
 	}
 
+	.meetings-btn-accent:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+	}
+
 	.meetings-error {
 		margin: 0;
 		font-size: 0.875rem;
@@ -706,8 +710,13 @@
 
 	.meetings-btn-danger {
 		border-color: transparent;
-		color: var(--color-on-accent, #fff);
+		color: var(--color-on-danger);
 		background: var(--color-danger);
+	}
+
+	/* Variants keep their own colour on hover; the base rule above would swap it for the neutral surface. */
+	.meetings-btn-danger:hover:not(:disabled) {
+		background: var(--color-danger-hover);
 	}
 
 	.meetings-btn-danger:disabled {
