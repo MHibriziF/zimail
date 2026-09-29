@@ -110,7 +110,9 @@ export function createCalendarFeedsService(deps: CalendarFeedsServiceDeps): Cale
 	 * someone else's Zimail still shows.
 	 */
 	async function withoutEchoes(userId: string, events: FeedEvent[]): Promise<FeedEvent[]> {
-		const idOf = (event: FeedEvent) => ownEventId(event.uid.slice(0, event.uid.lastIndexOf('#')));
+		// Occurrence uids are `<series uid>#<start>`; the series uid is what Zimail sent.
+		const seriesOf = (uid: string) => (uid.includes('#') ? uid.slice(0, uid.lastIndexOf('#')) : uid);
+		const idOf = (event: FeedEvent) => ownEventId(seriesOf(event.uid));
 		const candidates = [...new Set(events.map(idOf).filter((id): id is string => id !== null))];
 		if (candidates.length === 0) return events;
 		const own = await repo.ownEventIds(userId, candidates);
