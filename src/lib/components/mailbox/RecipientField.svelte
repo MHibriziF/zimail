@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import Icon from '$lib/components/Icon.svelte';
 	import { t } from '$lib/i18n';
+	import { RecipientSuggestions } from '$lib/mail/recipient-suggestions.svelte';
 
 	/**
 	 * Recipient entry as chips.
@@ -41,11 +42,8 @@
 	const SEPARATORS = [' ', ',', ';', 'Enter', 'Tab'];
 
 	let draft = $state('');
-	let suggestions = $state<string[]>([]);
-	let active = $state(-1);
-	let open = $state(false);
 	let inputEl = $state<HTMLInputElement | null>(null);
-	let seq = 0;
+	const typeahead = new RecipientSuggestions();
 
 	// The string is the source of truth; chips are derived from it so an outside
 	// change (loading a draft, hitting reply) shows up without extra wiring.
@@ -68,39 +66,11 @@
 			write([...chips, clean]);
 		}
 		draft = '';
-		suggestions = [];
-		active = -1;
-		open = false;
+		typeahead.close();
 	}
 
 	function remove(index: number) {
 		write(chips.filter((_, i) => i !== index));
-	}
-
-	async function search(term: string) {
-		const mine = ++seq;
-		if (!term.trim()) {
-			suggestions = [];
-			open = false;
-			return;
-		}
-
-		try {
-			const res = await fetch(`/api/recipients?q=${encodeURIComponent(term)}`);
-			if (!res.ok) return;
-			const body = (await res.json()) as { suggestions?: Array<{ address: string }> };
-			// A slower earlier request must not overwrite a newer one's results.
-			if (mine !== seq) return;
-
-			const taken = new Set(chips.map((chip) => chip.toLowerCase()));
-			suggestions = (body.suggestions ?? [])
-				.map((entry) => entry.address)
-				.filter((address) => !taken.has(address.toLowerCase()));
-			active = -1;
-			open = suggestions.length > 0;
-		} catch {
-			// Typeahead is a convenience; typing still works without it.
-		}
 	}
 
 	function onInput(event: Event) {
@@ -114,29 +84,27 @@
 		} else {
 			draft = el.value;
 		}
-		void search(draft);
+		void typeahead.search(draft, chips);
 	}
 
 	function onKeydown(event: KeyboardEvent) {
-		if (open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+		if (typeahead.move(event.key)) {
 			event.preventDefault();
-			const step = event.key === 'ArrowDown' ? 1 : -1;
-			active = (active + step + suggestions.length) % suggestions.length;
 			return;
 		}
 
-		if (event.key === 'Escape' && open) {
+		if (event.key === 'Escape' && typeahead.open) {
 			event.preventDefault();
-			open = false;
+			typeahead.hide();
 			return;
 		}
 
 		if (SEPARATORS.includes(event.key)) {
 			// Tab only commits when there is something to commit, so it still moves
 			// focus on an empty field.
-			if (event.key === 'Tab' && !draft.trim() && active < 0) return;
+			if (event.key === 'Tab' && !draft.trim() && !typeahead.highlighted) return;
 			event.preventDefault();
-			add(active >= 0 ? suggestions[active] : draft);
+			add(typeahead.highlighted ?? draft);
 			return;
 		}
 
@@ -152,7 +120,7 @@
 		// Let a click on a suggestion land before the list disappears.
 		setTimeout(() => {
 			if (draft.trim()) add(draft);
-			open = false;
+			typeahead.hide();
 		}, 120);
 	}
 </script>
@@ -187,7 +155,7 @@
 			autocapitalize="none"
 			spellcheck="false"
 			role="combobox"
-			aria-expanded={open}
+			aria-expanded={typeahead.open}
 			aria-controls={`${id}-listbox`}
 			aria-labelledby={`${id}-label`}
 			oninput={onInput}
@@ -195,16 +163,16 @@
 			onblur={onBlur}
 		/>
 
-		{#if open}
+		{#if typeahead.open}
 			<ul class="suggestions" id={`${id}-listbox`} role="listbox">
-				{#each suggestions as suggestion, index (suggestion)}
+				{#each typeahead.items as suggestion, index (suggestion)}
 					<li role="none">
 						<button
 							type="button"
 							role="option"
-							aria-selected={index === active}
+							aria-selected={index === typeahead.active}
 							class="suggestion"
-							class:on={index === active}
+							class:on={index === typeahead.active}
 							onmousedown={(event) => {
 								event.preventDefault();
 								add(suggestion);
