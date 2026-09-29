@@ -66,6 +66,12 @@ export type NewCalendarEvent = ValidEventInput & {
 export type CalendarRepository = {
 	/** Events overlapping `[from, to)`, by the stored instants. */
 	listOverlapping(userId: string, from: string, to: string, limit: number): Promise<CalendarEvent[]>;
+	/**
+	 * Events with a meeting room that still exists — the event's own, or its
+	 * booking's — not yet over at `now` and starting between `since` and `until`.
+	 * `since` only bounds the index scan; `now` decides what has ended.
+	 */
+	listWithMeetings(userId: string, range: { since: string; now: string; until: string }, limit: number): Promise<CalendarEvent[]>;
 	get(userId: string, id: string): Promise<CalendarEvent | null>;
 	insert(event: NewCalendarEvent): Promise<void>;
 	/** The revision the event is at after the change, or `null` if there was no such event. */
@@ -96,6 +102,21 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 					 ORDER BY e.starts_at LIMIT ?`
 				)
 				.bind(userId, to, from, limit)
+				.all<EventRow>();
+			return results.map(toEvent);
+		},
+
+		async listWithMeetings(userId, { since, now, until }, limit) {
+			const { results } = await db
+				.prepare(
+					`SELECT ${COLUMNS.replace('e.meeting_code', 'm.code AS meeting_code')}
+					 FROM ${FROM}
+					 LEFT JOIN reservations r ON r.event_id = e.id AND r.user_id = e.user_id
+					 JOIN meetings m ON m.user_id = e.user_id AND m.code = COALESCE(e.meeting_code, r.meeting_code)
+					 WHERE e.user_id = ? AND e.starts_at >= ? AND e.starts_at < ? AND e.ends_at > ?
+					 ORDER BY e.starts_at LIMIT ?`
+				)
+				.bind(userId, since, until, now, limit)
 				.all<EventRow>();
 			return results.map(toEvent);
 		},

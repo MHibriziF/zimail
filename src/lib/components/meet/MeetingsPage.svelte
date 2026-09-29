@@ -10,12 +10,14 @@
 	import type { Meeting } from '$lib/server/meet/meetings';
 	import { DEFAULT_SCREEN_SHARE, type ScreenShareMode, type ScreenSharePolicy } from '$lib/meet/screen-share';
 	import { MEETINGS_PAGE_SIZE, nextShowCount } from '$lib/meet/meetings-list';
+	import type { CalendarEvent } from '$lib/calendar/events';
 
 	let {
 		meetings,
+		upcoming = [],
 		shown = MEETINGS_PAGE_SIZE,
 		hasMore = false
-	}: { meetings: Meeting[]; shown?: number; hasMore?: boolean } = $props();
+	}: { meetings: Meeting[]; upcoming?: CalendarEvent[]; shown?: number; hasMore?: boolean } = $props();
 
 	/** Meetings started from this page this session — prepended ahead of `meetings`. */
 	let created = $state<Meeting[]>([]);
@@ -59,11 +61,26 @@
 		})
 	);
 
+	const timeFormat = $derived(
+		new Intl.DateTimeFormat(intlLocale($page.data.locale ?? DEFAULT_LOCALE), {
+			timeStyle: 'short',
+			timeZone: $page.data.timeZone ?? undefined
+		})
+	);
+
 	/** Intl throws on an invalid date, so one bad row must not take the page down. */
 	function formatDate(iso: string): string {
 		const date = new Date(iso);
 		return Number.isNaN(date.getTime()) ? '' : dateFormat.format(date);
 	}
+
+	function formatSpan(event: CalendarEvent): string {
+		const end = new Date(event.end);
+		const start = formatDate(event.start);
+		return Number.isNaN(end.getTime()) || !start ? start : `${start} – ${timeFormat.format(end)}`;
+	}
+
+	const isHappening = (event: CalendarEvent) => new Date(event.start).getTime() <= Date.now();
 
 	function joinUrlFor(code: string): string {
 		return `${$page.url.origin}/meet/${code}`;
@@ -248,6 +265,51 @@
 
 	{#if error}
 		<p class="meetings-error" role="alert">{error}</p>
+	{/if}
+
+	{#if upcoming.length > 0}
+		<section class="meetings-list-section">
+			<h2 class="meetings-section-title">
+				{t('meetings.upcomingHeading')}
+				<span class="meetings-count">{upcoming.length}</span>
+			</h2>
+			<ul class="surface-lg meetings-list">
+				{#each upcoming as event (event.id)}
+					<li class="meetings-item">
+						<div class="meetings-row">
+							<div class="meetings-row-icon" aria-hidden="true">
+								<Icon name="calendar-event-line" size={18} />
+							</div>
+							<div class="meetings-row-info">
+								<span class="meetings-row-title">{event.title || t('meetings.untitled')}</span>
+								<span class="meetings-row-meta">
+									<span>{formatSpan(event)}</span>
+									{#if isHappening(event)}
+										<span class="meetings-badge meetings-badge-live">{t('meetings.happeningNow')}</span>
+									{/if}
+									{#if event.source === 'reservation'}
+										<span class="meetings-badge">{t('meetings.bookingBadge')}</span>
+									{/if}
+								</span>
+							</div>
+							{#if event.meetingCode}
+								<div class="meetings-row-actions">
+									<a class="meetings-btn meetings-btn-accent" href="/meet/{event.meetingCode}">{t('meetings.joinButton')}</a>
+									<button
+										type="button"
+										class="meetings-btn"
+										onclick={() => copyLink(event.id, joinUrlFor(event.meetingCode!))}
+									>
+										<Icon name={copiedId === event.id ? 'check-line' : 'link'} size={16} />
+										{copiedId === event.id ? t('meetings.linkCopied') : t('meetings.copyLink')}
+									</button>
+								</div>
+							{/if}
+						</div>
+					</li>
+				{/each}
+			</ul>
+		</section>
 	{/if}
 
 	<section class="meetings-list-section">
@@ -634,6 +696,11 @@
 		border-radius: 999px;
 		color: var(--color-accent-text);
 		background: var(--color-accent-soft);
+	}
+
+	.meetings-badge-live {
+		color: var(--tone-good-fg);
+		background: var(--tone-good-bg);
 	}
 
 	.meetings-row-actions {

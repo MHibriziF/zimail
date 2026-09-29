@@ -14,6 +14,13 @@ function fakeRepo(seed: Row[] = [], seedGuests: Record<string, EventGuest[]> = {
 		async listOverlapping(userId, from, to) {
 			return rows.filter((row) => row.userId === userId && row.start < to && row.end > from).map(strip);
 		},
+		async listWithMeetings(userId, { since, now, until }, limit) {
+			return rows
+				.filter((row) => row.userId === userId && row.meetingCode && row.start >= since && row.start < until && row.end > now)
+				.sort((a, b) => a.start.localeCompare(b.start))
+				.slice(0, limit)
+				.map(strip);
+		},
 		async get(userId, id) {
 			const row = rows.find((entry) => entry.userId === userId && entry.id === id);
 			return row ? strip(row) : null;
@@ -133,6 +140,29 @@ describe('CalendarService', () => {
 		assert.equal(outcome.type, 'ok');
 		assert.equal(rows.length, 1);
 		assert.equal(rows[0].source, 'manual');
+	});
+
+	test('upcoming meetings: in progress through two weeks out, rooms only, soonest first', async () => {
+		const now = new Date('2026-09-24T02:30:00.000Z');
+		const at = (hours: number) => new Date(now.getTime() + hours * 3_600_000).toISOString();
+		const meeting = (id: string, from: number, to: number, code: string | null = `room-${id}`): Row => ({
+			...feedRow,
+			id,
+			source: 'manual',
+			calendar: null,
+			start: at(from),
+			end: at(to),
+			meetingCode: code
+		});
+		const { repo } = fakeRepo([
+			meeting('later', 48, 49),
+			meeting('now', -1, 1),
+			meeting('ended', -3, -2),
+			meeting('no-room', 2, 3, null),
+			meeting('too-far', 15 * 24, 15 * 24 + 1)
+		]);
+		const events = await createCalendarService({ repo }).upcomingMeetings('u1', now);
+		assert.deepEqual(events.map((event) => event.id), ['now', 'later']);
 	});
 
 	test('feed events are read-only', async () => {

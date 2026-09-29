@@ -823,7 +823,10 @@
 		"deleteAction": "删除",
 		"deleting": "正在删除…",
 		"couldNotDelete": "无法删除该会议。",
-		"showMore": "显示更多"
+		"showMore": "显示更多",
+		"upcomingHeading": "即将召开的会议",
+		"happeningNow": "进行中",
+		"bookingBadge": "预约"
 	},
 	"labels": {
 		"title": "标签",

@@ -823,7 +823,10 @@
 		"deleteAction": "Hapus",
 		"deleting": "Menghapus…",
 		"couldNotDelete": "Tidak dapat menghapus rapat itu.",
-		"showMore": "Tampilkan lebih banyak"
+		"showMore": "Tampilkan lebih banyak",
+		"upcomingHeading": "Rapat mendatang",
+		"happeningNow": "Sekarang",
+		"bookingBadge": "Reservasi"
 	},
 	"labels": {
 		"title": "Label",
