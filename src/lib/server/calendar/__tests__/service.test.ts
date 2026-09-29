@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import type { CalendarEvent, EventGuest, ValidEventInput } from '../../../calendar/events';
 import type { CalendarRepository, NewCalendarEvent } from '../repository';
 import { createCalendarService, type GuestMail } from '../service';
+import type { RoomSettings } from '../../../meet/room-settings';
 
 type Row = CalendarEvent & { userId: string; sequence?: number };
 
@@ -91,19 +92,31 @@ function fakeRepo(seed: Row[] = [], seedGuests: Record<string, EventGuest[]> = {
 function rooms(failOpen = false) {
 	const open: string[] = [];
 	const closed: string[] = [];
+	/** Settings per room code, as opened or configured. */
+	const settings = new Map<string, RoomSettings | undefined>();
 	let next = 0;
 	const meetings = {
-		async open(_userId: string, title: string) {
+		async open(_userId: string, title: string, chosen?: RoomSettings) {
 			if (failOpen) throw new Error('LiveKit down');
 			open.push(title);
-			return `room-${++next}`;
+			const code = `room-${++next}`;
+			settings.set(code, chosen);
+			return code;
 		},
 		async close(_userId: string, code: string) {
 			closed.push(code);
+		},
+		async settingsOf(_userId: string, code: string) {
+			return settings.get(code) ?? null;
+		},
+		async configure(_userId: string, code: string, chosen: RoomSettings) {
+			settings.set(code, chosen);
 		}
 	};
-	return { meetings, open, closed };
+	return { meetings, open, closed, settings };
 }
+
+const locked: RoomSettings = { requireApproval: true, screenSharePolicy: 'approval', screenShareMode: 'single' };
 
 function mailbox() {
 	const sent: GuestMail[] = [];
@@ -416,6 +429,29 @@ describe('CalendarService', () => {
 		await service.update('u1', 'm1', { ...same, withMeeting: false });
 		assert.equal(rows[0].meetingCode, null);
 		assert.deepEqual(closed, ['room-1']);
+	});
+
+	test('a new room opens with the settings the event asked for', async () => {
+		const { repo } = fakeRepo();
+		const { meetings, settings } = rooms();
+		const service = createCalendarService({ repo, meetings });
+		await service.create('u1', { ...input, withMeeting: true, meeting: locked });
+		await service.create('u1', { ...input, withMeeting: true });
+		assert.deepEqual(settings.get('room-1'), locked);
+		assert.equal(settings.get('room-2'), undefined, 'left out, the room gets the defaults');
+	});
+
+	test('editing an event with a room changes its settings only when sent', async () => {
+		const { repo } = fakeRepo([{ ...manual, meetingCode: 'room-9' }]);
+		const { meetings, settings } = rooms();
+		settings.set('room-9', { ...locked, requireApproval: false });
+		const service = createCalendarService({ repo, meetings });
+		await service.update('u1', 'm1', same);
+		assert.equal(settings.get('room-9')?.requireApproval, false, 'left out, the room keeps its settings');
+		await service.update('u1', 'm1', { ...same, meeting: locked });
+		assert.deepEqual(settings.get('room-9'), locked);
+		const found = await service.get('u1', 'm1');
+		assert.deepEqual(found?.room, locked, 'the editor gets them back');
 	});
 
 	test('deleting an event closes its room', async () => {

@@ -13,6 +13,7 @@ import {
 	type EventGuest
 } from './events';
 import { dateKeyIn } from './grid';
+import { DEFAULT_ROOM_SETTINGS, type RoomSettings } from '../meet/room-settings';
 
 export type EventDraft = {
 	title: string;
@@ -27,6 +28,8 @@ export type EventDraft = {
 	/** Guest addresses, or `null` when the list couldn't be loaded — then saving leaves it alone. */
 	guests: string[] | null;
 	withMeeting: boolean;
+	/** The room's settings; `null` when an existing room's couldn't be loaded — then saving leaves them alone. */
+	room: RoomSettings | null;
 };
 
 const GUEST_SEPARATORS = new Set([',', ';', ' ', '\t', '\n', '\r']);
@@ -94,12 +97,22 @@ export function draftForNew(dayKey: string, timeZone: string, now = new Date()):
 		location: '',
 		notes: '',
 		guests: [],
-		withMeeting: false
+		withMeeting: false,
+		room: DEFAULT_ROOM_SETTINGS
 	};
 }
 
-/** `guests` is the event's guest list, or `null` if it couldn't be loaded. */
-export function draftFromEvent(event: CalendarEvent, timeZone: string, guests: EventGuest[] | null = []): EventDraft {
+/**
+ * `guests` is the event's guest list, or `null` if it couldn't be loaded; `room`
+ * the same for its meeting room's settings. An event without a room starts from
+ * the defaults, for when one is added.
+ */
+export function draftFromEvent(
+	event: CalendarEvent,
+	timeZone: string,
+	guests: EventGuest[] | null = [],
+	room: RoomSettings | null = null
+): EventDraft {
 	const start = new Date(event.start);
 	const end = new Date(event.end);
 	const shared = {
@@ -107,7 +120,8 @@ export function draftFromEvent(event: CalendarEvent, timeZone: string, guests: E
 		location: event.location ?? '',
 		notes: event.notes ?? '',
 		guests: guests?.map((guest) => guest.email) ?? null,
-		withMeeting: event.meetingCode !== null
+		withMeeting: event.meetingCode !== null,
+		room: event.meetingCode === null ? DEFAULT_ROOM_SETTINGS : room
 	};
 	if (event.allDay) {
 		return {
@@ -144,7 +158,8 @@ export function draftToInput(draft: EventDraft, timeZone: string): CalendarEvent
 		location: draft.location,
 		notes: draft.notes,
 		guests: draft.guests ?? undefined,
-		withMeeting: draft.withMeeting
+		withMeeting: draft.withMeeting,
+		meeting: draft.withMeeting ? (draft.room ?? undefined) : undefined
 	};
 	if (draft.allDay) return { ...base, start: draft.startDate, end: addDays(draft.endDate, 1) };
 	return {

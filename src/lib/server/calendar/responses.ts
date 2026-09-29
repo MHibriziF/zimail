@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { MAX_EVENT_GUESTS, type CalendarEventInput } from '../../calendar/events';
 import type { CalendarWriteOutcome } from './service';
+import { parseRoomSettings } from '../../meet/room-settings';
 
 /** One mapping from service outcome to HTTP, shared by create and update. */
 export function calendarWriteResponse(outcome: CalendarWriteOutcome, okStatus = 200): Response {
@@ -32,6 +33,7 @@ export async function readEventInput(request: Request): Promise<CalendarEventInp
 		location: text(body.location),
 		notes: text(body.notes),
 		guests: Array.isArray(body.guests) ? body.guests.map(text) : undefined,
-		withMeeting: typeof body.withMeeting === 'boolean' ? body.withMeeting : undefined
+		withMeeting: typeof body.withMeeting === 'boolean' ? body.withMeeting : undefined,
+		meeting: parseRoomSettings(body.meeting)
 	};
 }

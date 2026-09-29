@@ -20,13 +20,31 @@ export function meetingsConfigured(platform: App.Platform | undefined | null): b
 export function meetingRooms(platform: App.Platform | undefined | null): MeetingRooms | null {
 	if (!meetingsConfigured(platform)) return null;
 	const meetings = getMeetingsService(platform);
+	const owned = async (userId: string, code: string) => {
+		const meeting = await meetings.findByCode(code);
+		return meeting?.user_id === userId ? meeting : null;
+	};
 	return {
-		async open(userId, title) {
-			return (await meetings.create(userId, { title })).code;
+		async open(userId, title, settings) {
+			return (await meetings.create(userId, { title, ...settings })).code;
 		},
 		async close(userId, code) {
-			const meeting = await meetings.findByCode(code);
-			if (meeting?.user_id === userId) await meetings.remove(userId, meeting.id);
+			const meeting = await owned(userId, code);
+			if (meeting) await meetings.remove(userId, meeting.id);
+		},
+		async settingsOf(userId, code) {
+			const meeting = await owned(userId, code);
+			return meeting
+				? {
+						requireApproval: meeting.require_approval,
+						screenSharePolicy: meeting.screen_share_policy,
+						screenShareMode: meeting.screen_share_mode
+					}
+				: null;
+		},
+		async configure(userId, code, settings) {
+			const meeting = await owned(userId, code);
+			if (meeting) await meetings.update(userId, meeting.id, settings);
 		}
 	};
 }

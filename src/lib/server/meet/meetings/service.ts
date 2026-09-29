@@ -93,7 +93,13 @@ function isUniqueConstraintError(error: unknown): boolean {
 export type MeetingsService = {
 	create(
 		userId: string,
-		options?: { title?: string; domainId?: string | null; requireApproval?: boolean }
+		options?: {
+			title?: string;
+			domainId?: string | null;
+			requireApproval?: boolean;
+			screenSharePolicy?: ScreenSharePolicy;
+			screenShareMode?: ScreenShareMode;
+		}
 	): Promise<CreatedMeeting>;
 	list(userId: string, limit?: number): Promise<Meeting[]>;
 	/** Owner-only. False when the meeting doesn't exist or isn't the caller's. */
@@ -175,6 +181,8 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			const id = crypto.randomUUID();
 			const title = options.title?.trim().slice(0, 200) || (await defaultTitle(userId));
 			const requireApproval = options.requireApproval ?? false;
+			const screenSharePolicy = options.screenSharePolicy ?? DEFAULT_SCREEN_SHARE.policy;
+			const screenShareMode = options.screenShareMode ?? DEFAULT_SCREEN_SHARE.mode;
 			const createdAt = new Date().toISOString();
 
 			for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
@@ -187,6 +195,8 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 						title,
 						code,
 						requireApproval,
+						screenSharePolicy,
+						screenShareMode,
 						createdAt
 					});
 
@@ -198,8 +208,8 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 							code,
 							title,
 							require_approval: requireApproval,
-							screen_share_policy: DEFAULT_SCREEN_SHARE.policy,
-							screen_share_mode: DEFAULT_SCREEN_SHARE.mode,
+							screen_share_policy: screenSharePolicy,
+							screen_share_mode: screenShareMode,
 							created_at: createdAt
 						}
 					};

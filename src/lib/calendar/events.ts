@@ -5,6 +5,7 @@
 import { instantFromWall } from '../timezone';
 import type { LabelColor } from '../mail/labels';
 import type { PartStat } from './ics/invite';
+import type { RoomSettings } from '../meet/room-settings';
 
 export const CALENDAR_EVENT_SOURCES = ['manual', 'feed', 'reservation', 'invite'] as const;
 export type CalendarEventSource = (typeof CALENDAR_EVENT_SOURCES)[number];
@@ -49,6 +50,8 @@ export type CalendarEventInput = {
 	guests?: string[];
 	/** Whether the event has its own meeting room; left out, it stays as it is. */
 	withMeeting?: boolean;
+	/** The room's settings; left out, a new room gets the defaults and an existing one keeps its own. */
+	meeting?: RoomSettings;
 };
 
 export type ValidEventInput = {

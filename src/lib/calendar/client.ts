@@ -2,6 +2,7 @@ import type { ReservationPage, ReservationPageSettings } from './reservations';
 import type { CalendarFeed } from './feeds';
 import type { LabelColor } from '../mail/labels';
 import type { CalendarEvent, CalendarEventInput, EventGuest } from './events';
+import type { RoomSettings } from '../meet/room-settings';
 import type { AnswerAction, GuestAnswerView, InvitationAction, InvitationView } from './invitations';
 
 export class CalendarRequestError extends Error {}
@@ -24,9 +25,11 @@ export async function fetchEvents(
 }
 
 /** One event with its guests and their answers. */
-export async function fetchEventGuests(id: string): Promise<EventGuest[]> {
+/** What the range listing leaves out: the guest list, and the meeting room's settings if there is one. */
+export async function fetchEventDetails(id: string): Promise<{ guests: EventGuest[]; room: RoomSettings | null }> {
 	const response = await fetch(`/api/calendar/events/${encodeURIComponent(id)}`);
-	return (await readJson<{ guests: EventGuest[] }>(response, 'Could not load the guests')).guests;
+	const body = await readJson<{ guests: EventGuest[]; room?: RoomSettings | null }>(response, 'Could not load the guests');
+	return { guests: body.guests, room: body.room ?? null };
 }
 
 /** Creates when `id` is missing, otherwise replaces that event. */

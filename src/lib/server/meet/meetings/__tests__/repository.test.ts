@@ -46,17 +46,19 @@ function setup(seed: Row[] = []) {
 			return [{ count: rows.filter((entry) => entry.user_id === userId).length }];
 		}
 		if (sql.startsWith('INSERT INTO meetings')) {
-			const [id, userId, domainId, title, code, requireApproval, createdAt] = args as [
+			const [id, userId, domainId, title, code, requireApproval, policy, mode, createdAt] = args as [
 				string,
 				string,
 				string | null,
 				string | null,
 				string,
 				number,
+				string,
+				string,
 				string
 			];
 			assertCodeFree(code);
-			rows.push({ id, user_id: userId, domain_id: domainId, title, code, require_approval: requireApproval, screen_share_policy: 'open', screen_share_mode: 'multiple', created_at: createdAt });
+			rows.push({ id, user_id: userId, domain_id: domainId, title, code, require_approval: requireApproval, screen_share_policy: policy, screen_share_mode: mode, created_at: createdAt });
 			return [];
 		}
 		if (sql.includes('WHERE code = ?')) {
@@ -106,13 +108,17 @@ describe('MeetingsRepository', () => {
 
 	test('insert then findByCode round-trips, and rejects a duplicate code', async () => {
 		const { repo } = setup();
-		await repo.insert({ id: 'a', userId: 'user-1', domainId: null, title: 'Standup', code: 'aaa-aaaa-aaa', requireApproval: false, createdAt: '2026-01-01' });
+		await repo.insert({ id: 'a', userId: 'user-1', domainId: null, title: 'Standup', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'approval', screenShareMode: 'single', createdAt: '2026-01-01' });
 
-		assert.equal((await repo.findByCode('aaa-aaaa-aaa'))?.id, 'a');
+		const found = await repo.findByCode('aaa-aaaa-aaa');
+		assert.equal(found?.id, 'a');
+		assert.equal(found?.screen_share_policy, 'approval');
+		assert.equal(found?.screen_share_mode, 'single');
+		assert.equal(found?.created_at, '2026-01-01');
 		assert.equal(await repo.findByCode('missing'), null);
 
 		await assert.rejects(
-			repo.insert({ id: 'b', userId: 'user-1', domainId: null, title: 'Other', code: 'aaa-aaaa-aaa', requireApproval: false, createdAt: '2026-01-01' }),
+			repo.insert({ id: 'b', userId: 'user-1', domainId: null, title: 'Other', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'open', screenShareMode: 'multiple', createdAt: '2026-01-01' }),
 			/unique constraint/i
 		);
 	});

@@ -4,6 +4,7 @@
 	import Icon from '../Icon.svelte';
 	import { addGuests, guestStatusKey, type EventDraft } from '$lib/calendar/editor';
 	import { RecipientSuggestions } from '$lib/mail/recipient-suggestions.svelte';
+	import type { RoomSettings } from '$lib/meet/room-settings';
 	import {
 		MAX_EVENT_LOCATION_LENGTH,
 		MAX_EVENT_NOTES_LENGTH,
@@ -123,6 +124,10 @@
 			commitGuests();
 			typeahead.hide();
 		}, 120);
+	}
+
+	function setRoom(patch: Partial<RoomSettings>) {
+		if (draft.room) draft.room = { ...draft.room, ...patch };
 	}
 
 	function removeGuest(email: string) {
@@ -313,6 +318,45 @@
 					</small>
 				</span>
 			</label>
+
+			{#if draft.withMeeting && draft.room}
+				{@const room = draft.room}
+				<div class="cal-room">
+					<fieldset class="cal-room-group">
+						<legend>{t('meetings.admissionLabel')}</legend>
+						<label class="cal-radio">
+							<input type="radio" name="cal-room-admission" checked={!room.requireApproval} onchange={() => setRoom({ requireApproval: false })} />
+							{t('meetings.admissionOpen')}
+						</label>
+						<label class="cal-radio">
+							<input type="radio" name="cal-room-admission" checked={room.requireApproval} onchange={() => setRoom({ requireApproval: true })} />
+							{t('meetings.admissionApproval')}
+						</label>
+					</fieldset>
+					<fieldset class="cal-room-group">
+						<legend>{t('meet.screenSharePolicyLabel')}</legend>
+						<label class="cal-radio">
+							<input type="radio" name="cal-room-share" checked={room.screenSharePolicy === 'open'} onchange={() => setRoom({ screenSharePolicy: 'open' })} />
+							{t('meet.screenSharePolicyOpen')}
+						</label>
+						<label class="cal-radio">
+							<input type="radio" name="cal-room-share" checked={room.screenSharePolicy === 'approval'} onchange={() => setRoom({ screenSharePolicy: 'approval' })} />
+							{t('meet.screenSharePolicyApproval')}
+						</label>
+					</fieldset>
+					<fieldset class="cal-room-group">
+						<legend>{t('meet.screenShareModeLabel')}</legend>
+						<label class="cal-radio">
+							<input type="radio" name="cal-room-mode" checked={room.screenShareMode === 'single'} onchange={() => setRoom({ screenShareMode: 'single' })} />
+							{t('meet.screenShareModeSingle')}
+						</label>
+						<label class="cal-radio">
+							<input type="radio" name="cal-room-mode" checked={room.screenShareMode === 'multiple'} onchange={() => setRoom({ screenShareMode: 'multiple' })} />
+							{t('meet.screenShareModeMultiple')}
+						</label>
+					</fieldset>
+				</div>
+			{/if}
 		{/if}
 
 		{#if meetingCode && draft.withMeeting}
@@ -577,6 +621,37 @@
 
 	.cal-meeting small {
 		display: block;
+	}
+
+	/* Indented under the checkbox it belongs to. */
+	.cal-room {
+		display: grid;
+		gap: 0.75rem;
+		padding-left: 1.5rem;
+	}
+
+	.cal-room-group {
+		display: grid;
+		gap: 0.375rem;
+		margin: 0;
+		padding: 0;
+		border: 0;
+	}
+
+	.cal-room-group legend {
+		margin-bottom: 0.25rem;
+		padding: 0;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+	}
+
+	.cal-radio {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.875rem;
+		color: var(--color-text);
 	}
 
 	.cal-join {
