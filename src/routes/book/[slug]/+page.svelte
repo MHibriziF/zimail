@@ -14,6 +14,9 @@
 
 	let { data }: { data: PageData } = $props();
 	const reservation = $derived(data.reservation);
+	const previewDescription = $derived(
+		reservation.description?.trim() || t('book.previewDescription', { host: reservation.host })
+	);
 
 	const locale = $derived(intlLocale($page.data.locale ?? DEFAULT_LOCALE));
 	// Guests read times in their own zone; the page's zone only decides which hours exist.
@@ -118,6 +121,9 @@
 <svelte:head>
 	<title>{reservation.title} — {APP_NAME}</title>
 	<meta name="robots" content="noindex" />
+	<meta property="og:title" content={reservation.title} />
+	<meta property="og:description" content={previewDescription} />
+	<meta name="description" content={previewDescription} />
 </svelte:head>
 
 <main class="book">
