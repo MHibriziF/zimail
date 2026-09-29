@@ -40,6 +40,11 @@ or a source file must detect and restore the original line endings, or the diff
 becomes the whole file. `generate-migrations.mjs` normalizes to LF on purpose —
 CI checks out LF and would otherwise mismatch.
 
+**Stored timestamps are UTC with no zone.** `datetime('now')` / `CURRENT_TIMESTAMP`
+write `2026-09-29 15:06:00`, which `new Date()` reads as *local* time — hours off
+by the reader's offset. Parse them with `parseTimestamp()` from `$lib/utils/date`
+and format in `$page.data.timeZone ?? undefined`.
+
 **Heredocs in Bash are unreliable here.** Multi-line content and regexes get
 mangled. Write the script with the Write tool and run it with node, or use Edit.
 

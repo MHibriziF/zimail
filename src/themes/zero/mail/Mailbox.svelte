@@ -373,7 +373,7 @@
 										<Icon name="PencilCompose" size={12} />
 									{/if}
 								</span>
-								<span class="z-row-date">{formatRelativeDate(thread.created_at, $page.data.locale)}</span>
+								<span class="z-row-date">{formatRelativeDate(thread.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</span>
 							</span>
 							<span class="z-row-subject">
 								{thread.subject || t('mailbox.noSubject')}

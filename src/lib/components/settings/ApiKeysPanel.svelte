@@ -3,6 +3,7 @@
 	import Icon from '../Icon.svelte';
 	import Check from '../Check.svelte';
 	import { t } from '$lib/i18n';
+	import { parseTimestamp } from '$lib/utils/date';
 	import type { ApiTokenSummary } from '$lib/types';
 
 	let {
@@ -115,7 +116,7 @@
 	}
 
 	function formatDate(value: string): string {
-		return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+		return parseTimestamp(value).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 	}
 </script>
 

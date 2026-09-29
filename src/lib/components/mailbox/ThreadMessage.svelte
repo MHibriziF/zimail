@@ -8,6 +8,7 @@
 	import { isCalendarAttachment } from '$lib/utils/attachments';
 	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import { formatFullDate, formatRelativeDate } from '$lib/utils/date';
+	import { page } from '$app/stores';
 	import { splitQuotedText } from '$lib/utils/quotes';
 	import type { ThreadMessage } from '$lib/types';
 
@@ -115,7 +116,7 @@
 					<button type="button" class="direction" onclick={onToggle}>to {message.to_addr}</button>
 				</p>
 				<button type="button" class="when" onclick={onToggle}>
-					{formatFullDate(message.created_at)}
+					{formatFullDate(message.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}
 				</button>
 				{#if !outbound}
 					<p class="when">
@@ -177,7 +178,7 @@
 			{#if visibleAttachments(message.body_html, message.attachments).length > 0}
 				<Icon name="attachment-2" size={13} />
 			{/if}
-			<span class="when">{formatRelativeDate(message.created_at)}</span>
+			<span class="when">{formatRelativeDate(message.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</span>
 		</button>
 	{/if}
 </article>

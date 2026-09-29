@@ -657,14 +657,14 @@
 											{#if message.cc_addr}
 												<div><span>{t('thread.ccColon')}</span> {message.cc_addr}</div>
 											{/if}
-											<div><span>{t('thread.dateColon')}</span> {formatMailDate(message.created_at, $page.data.locale)} {formatMailTime(message.created_at, $page.data.locale)}</div>
+											<div><span>{t('thread.dateColon')}</span> {formatMailDate(message.created_at, $page.data.locale, $page.data.timeZone ?? undefined)} {formatMailTime(message.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</div>
 										</div>
 									{/if}
 								</div>
 								<div class="z-msg-when">
-									<time>{formatMailDate(message.created_at, $page.data.locale)}</time>
-									{#if shouldShowSeparateTime(message.created_at)}
-										<time class="z-msg-time">{formatMailTime(message.created_at, $page.data.locale)}</time>
+									<time>{formatMailDate(message.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</time>
+									{#if shouldShowSeparateTime(message.created_at, $page.data.timeZone ?? undefined)}
+										<time class="z-msg-time">{formatMailTime(message.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</time>
 									{/if}
 									<Tooltip text={t('thread.messageActions')}>
 										<button
