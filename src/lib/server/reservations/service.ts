@@ -57,7 +57,7 @@ export type GuestChangeOutcome =
 	| { type: GuestChangeBlock };
 
 export type BookingOutcome =
-	| { type: 'ok'; start: string; end: string; meetingUrl: string | null }
+	| { type: 'ok'; start: string; end: string; meetingUrl: string | null; manageUrl: string }
 	| { type: 'not_found' }
 	| { type: 'invalid_name' }
 	| { type: 'invalid_email' }
@@ -398,7 +398,13 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				location: page.location,
 				manage: { url: manageLink(baseUrl, manageToken), until: changeDeadline(start, page) }
 			});
-			return { type: 'ok', start: start.toISOString(), end: end.toISOString(), meetingUrl: room?.url ?? null };
+			return {
+				type: 'ok',
+				start: start.toISOString(),
+				end: end.toISOString(),
+				meetingUrl: room?.url ?? null,
+				manageUrl: manageLink(baseUrl, manageToken)
+			};
 		},
 
 		async cancelBooking(userId, eventId) {

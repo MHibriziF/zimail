@@ -991,6 +991,7 @@
 		"joinLink": "Rejoindre la réunion",
 		"previewDescription": "Choisissez un créneau avec {host}.",
 		"manageHeading": "Votre réservation",
+		"manageLink": "Déplacer ou annuler",
 		"changeUntil": "Vous pouvez la déplacer ou l’annuler jusqu’au {time}.",
 		"pickNewTime": "Choisir un nouveau créneau",
 		"reschedulesLeft": "Déplacements restants : {count}",

@@ -991,6 +991,7 @@
 		"joinLink": "Join the meeting",
 		"previewDescription": "Pick a time with {host}.",
 		"manageHeading": "Your reservation",
+		"manageLink": "Reschedule or cancel",
 		"changeUntil": "You can reschedule or cancel until {time}.",
 		"pickNewTime": "Pick a new time",
 		"reschedulesLeft": "Reschedules left: {count}",

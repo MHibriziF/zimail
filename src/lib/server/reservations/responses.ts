@@ -44,7 +44,7 @@ export function guestChangeResponse(outcome: GuestChangeOutcome): Response {
 
 export function bookingResponse(outcome: BookingOutcome): Response {
 	if (outcome.type === 'ok') {
-		return json({ start: outcome.start, end: outcome.end, meetingUrl: outcome.meetingUrl }, { status: 201 });
+		return json({ start: outcome.start, end: outcome.end, meetingUrl: outcome.meetingUrl, manageUrl: outcome.manageUrl }, { status: 201 });
 	}
 	const [error, status] = BOOKING_ERRORS[outcome.type];
 	return json({ error, code: outcome.type }, { status });

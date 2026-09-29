@@ -139,3 +139,31 @@ describe('where a booking takes place', () => {
 		assert.ok(rows.some((row) => row.label === 'Where' && row.value === 'Pacil'));
 	});
 });
+
+describe('changes the guest made', () => {
+	const now = new Date('2026-09-24T00:00:00.000Z');
+	const manage = { url: 'https://mail.example/book/manage/abc', until: new Date('2026-09-27T02:00:00.000Z') };
+
+	test('the confirmation carries the link and says until when it works', () => {
+		const content = bookingEmailContent({ ...details, manage });
+		assert.ok(content.details!.some((row) => row.label === 'Change or cancel' && row.value === manage.url));
+		assert.match(content.footer ?? '', /reschedule or cancel with the link above until Sunday, September 27, 2026/);
+	});
+
+	test('wording reads right to the guest and to the host on Bcc', () => {
+		const moved = bookingEmailContent(details, 'guest-moved');
+		assert.match(moved.title, /^New time: /);
+		assert.match(moved.lead ?? '', /^Ana, from Acme moved this reservation/);
+		const cancelled = bookingEmailContent(details, 'guest-cancel');
+		assert.match(cancelled.title, /^Cancelled: /);
+		assert.match(cancelled.lead ?? '', /^Ana, from Acme cancelled this reservation\./);
+	});
+
+	test('a guest cancellation is a real calendar cancellation', () => {
+		assert.equal(bookingMethod('guest-cancel'), 'CANCEL');
+		assert.equal(bookingMethod('guest-moved'), 'REQUEST');
+		const ics = bookingIcs({ ...details, sequence: 2 }, 'guest-cancel', now);
+		assert.match(ics, /\r\nMETHOD:CANCEL\r\n/);
+		assert.match(ics, /\r\nSTATUS:CANCELLED\r\n/);
+	});
+});

@@ -30,6 +30,8 @@ type SetupOptions = {
 	roomFails?: boolean;
 	insertConflict?: boolean;
 	refresh?: (userId: string) => Promise<void>;
+	/** Moved by a test to act closer to (or past) a booking. */
+	clock?: { now: Date };
 };
 
 function setup(options: SetupOptions = {}) {
@@ -180,7 +182,7 @@ function setup(options: SetupOptions = {}) {
 		},
 		refreshCalendars: options.refresh,
 		defer: (work) => deferred.push(work),
-		now: () => NOW
+		now: () => options.clock?.now ?? NOW
 	});
 	return { service, pages, bookings, notified, deletedEvents, rooms, deferred };
 }
@@ -312,12 +314,14 @@ describe('ReservationsService slots and booking', () => {
 
 	test('booking a free slot stores it, notifies, and then blocks it', async () => {
 		const { service, bookings, notified } = await withPage();
-		assert.deepEqual(await service.book('office-hours', guest, BASE), {
+		const { manageUrl, ...outcome } = (await service.book('office-hours', guest, BASE)) as { manageUrl?: string };
+		assert.deepEqual(outcome, {
 			type: 'ok',
 			start: '2026-09-28T02:00:00.000Z',
 			end: '2026-09-28T03:00:00.000Z',
 			meetingUrl: null
 		});
+		assert.equal(manageUrl, notified[0].booking.manage?.url, 'the guest gets the same link on screen as in the email');
 		assert.equal(bookings[0].eventTitle, 'Ana · Office hours');
 		assert.match(bookings[0].eventNotes, /ana@example.com/);
 		assert.equal(notified[0].hostUserId, 'owner');
@@ -461,5 +465,94 @@ describe('ReservationsService slots and booking', () => {
 		const { service, bookings } = await withPage({ notifyFails: true });
 		assert.equal((await service.book('office-hours', guest, BASE)).type, 'ok');
 		assert.equal(bookings.length, 1);
+	});
+});
+
+describe('ReservationsService guest changes', () => {
+	/** Books \`guest\` and returns the token from the link in the confirmation. */
+	async function bookWithLink(options: SetupOptions = {}, pageChanges: Record<string, unknown> = {}) {
+		const state = setup(options);
+		assert.equal((await state.service.create('owner', { ...body, ...pageChanges })).type, 'ok');
+		assert.equal((await state.service.book('office-hours', guest, BASE)).type, 'ok');
+		const manage = state.notified.at(-1)?.booking.manage;
+		assert.ok(manage, 'the confirmation carries the link');
+		const token = decodeURIComponent(new URL(manage.url).pathname.split('/').at(-1)!);
+		return { ...state, token, manage };
+	}
+
+	test('the confirmation links to the booking, open until the cutoff', async () => {
+		const { manage, bookings } = await bookWithLink();
+		assert.match(manage.url, /^https:\/\/mail\.test\/book\/manage\/[\w-]{40,}$/);
+		assert.equal(manage.until.toISOString(), '2026-09-27T02:00:00.000Z', '24 hours before the start');
+		assert.notEqual(bookings[0].manageTokenHash, manage.url.split('/').at(-1), 'only a hash is stored');
+	});
+
+	test('the guest sees their booking and what they can still do', async () => {
+		const { service, token } = await bookWithLink();
+		const view = await service.managedBooking(token);
+		assert.equal(view?.start, guest.start);
+		assert.equal(view?.rescheduleBlock, null);
+		assert.equal(view?.cancelBlock, null);
+		assert.equal(view?.reschedulesLeft, 3);
+		assert.equal(await service.managedBooking('not-a-real-token'), null);
+	});
+
+	test('moving offers the other free times, not the current one', async () => {
+		const { service, token } = await bookWithLink();
+		const days = await service.rescheduleSlots(token, null);
+		const monday = days?.find((day) => day.date === '2026-09-28')?.slots ?? [];
+		assert.ok(!monday.includes(guest.start), 'its own time is left out');
+		assert.ok(monday.includes('2026-09-28T03:00:00.000Z'), 'the next hour is free — the booking does not block itself');
+	});
+
+	test('a guest moves their booking, is told, and uses up one of three moves', async () => {
+		const { service, token, notified, bookings } = await bookWithLink();
+		const outcome = await service.rescheduleByGuest(token, { start: '2026-09-28T03:00:00.000Z' }, BASE);
+		assert.deepEqual(outcome, { type: 'ok', start: '2026-09-28T03:00:00.000Z', end: '2026-09-28T04:00:00.000Z' });
+		assert.equal(bookings[0].start, '2026-09-28T03:00:00.000Z');
+		assert.equal(notified.at(-1)?.kind, 'guest-moved');
+		assert.equal((await service.managedBooking(token))?.reschedulesLeft, 2);
+	});
+
+	test('after three moves only cancelling is left', async () => {
+		const { service, token } = await bookWithLink();
+		for (const start of ['2026-09-28T03:00:00.000Z', '2026-09-28T04:00:00.000Z', '2026-09-29T02:00:00.000Z']) {
+			assert.equal((await service.rescheduleByGuest(token, { start }, BASE)).type, 'ok', start);
+		}
+		const fourth = await service.rescheduleByGuest(token, { start: '2026-09-29T03:00:00.000Z' }, BASE);
+		assert.deepEqual(fourth, { type: 'limit_reached' });
+		const view = await service.managedBooking(token);
+		assert.equal(view?.rescheduleBlock, 'limit_reached');
+		assert.equal(view?.cancelBlock, null);
+		assert.equal((await service.cancelByGuest(token)).type, 'ok');
+	});
+
+	test('a taken or invalid time is refused and nothing moves', async () => {
+		const { service, token, bookings } = await bookWithLink();
+		assert.deepEqual(await service.rescheduleByGuest(token, { start: guest.start }, BASE), { type: 'slot_taken' });
+		assert.deepEqual(await service.rescheduleByGuest(token, { start: '2026-09-28T02:30:00.000Z' }, BASE), { type: 'slot_taken' });
+		assert.deepEqual(await service.rescheduleByGuest(token, { start: 'soon' }, BASE), { type: 'slot_taken' });
+		assert.equal(bookings[0].start, guest.start);
+	});
+
+	test('inside the cutoff nothing can be changed; after the start neither', async () => {
+		const clock = { now: NOW };
+		const { service, token, bookings } = await bookWithLink({ clock });
+		clock.now = new Date('2026-09-27T12:00:00.000Z'); // 14 hours before
+		assert.deepEqual(await service.rescheduleByGuest(token, { start: '2026-09-28T03:00:00.000Z' }, BASE), { type: 'too_late' });
+		assert.deepEqual(await service.cancelByGuest(token), { type: 'too_late' });
+		clock.now = new Date('2026-09-28T02:30:00.000Z');
+		assert.equal((await service.managedBooking(token))?.cancelBlock, 'past');
+		assert.equal(bookings.length, 1, 'still booked');
+	});
+
+	test('a guest cancels: the booking and its room go, and they are told', async () => {
+		const { service, token, bookings, notified, rooms } = await bookWithLink({ meetings: true }, { withMeeting: true });
+		assert.equal(rooms.opened.length, 1);
+		assert.equal((await service.cancelByGuest(token)).type, 'ok');
+		assert.equal(bookings.length, 0);
+		assert.equal(rooms.closed.length, 1);
+		assert.equal(notified.at(-1)?.kind, 'guest-cancel');
+		assert.equal(await service.managedBooking(token), null, 'the link is spent');
 	});
 });

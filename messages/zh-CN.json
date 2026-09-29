@@ -991,6 +991,7 @@
 		"joinLink": "加入会议",
 		"previewDescription": "选择与 {host} 会面的时间。",
 		"manageHeading": "您的预约",
+		"manageLink": "改期或取消",
 		"changeUntil": "您可以在 {time} 之前改期或取消。",
 		"pickNewTime": "选择新时间",
 		"reschedulesLeft": "剩余改期次数：{count}",

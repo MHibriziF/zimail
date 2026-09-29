@@ -991,6 +991,7 @@
 		"joinLink": "Gabung ke rapat",
 		"previewDescription": "Pilih waktu dengan {host}.",
 		"manageHeading": "Reservasi Anda",
+		"manageLink": "Jadwal ulang atau batalkan",
 		"changeUntil": "Anda bisa menjadwal ulang atau membatalkan hingga {time}.",
 		"pickNewTime": "Pilih waktu baru",
 		"reschedulesLeft": "Sisa penjadwalan ulang: {count}",

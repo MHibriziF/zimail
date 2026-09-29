@@ -991,6 +991,7 @@
 		"joinLink": "Unirse a la reunión",
 		"previewDescription": "Elige un horario con {host}.",
 		"manageHeading": "Tu reserva",
+		"manageLink": "Cambiar o cancelar",
 		"changeUntil": "Puedes cambiarla o cancelarla hasta el {time}.",
 		"pickNewTime": "Elige un nuevo horario",
 		"reschedulesLeft": "Cambios restantes: {count}",

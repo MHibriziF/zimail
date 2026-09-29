@@ -30,7 +30,7 @@
 	let note = $state('');
 	let submitting = $state(false);
 	let submitError = $state('');
-	let booked = $state<{ start: string; end: string; meetingUrl: string | null } | null>(null);
+	let booked = $state<{ start: string; end: string; meetingUrl: string | null; manageUrl: string | null } | null>(null);
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -47,11 +47,12 @@
 				start?: string;
 				end?: string;
 				meetingUrl?: string | null;
+				manageUrl?: string;
 				error?: string;
 				code?: string;
 			};
 			if (response.ok && body.start && body.end) {
-				booked = { start: body.start, end: body.end, meetingUrl: body.meetingUrl ?? null };
+				booked = { start: body.start, end: body.end, meetingUrl: body.meetingUrl ?? null, manageUrl: body.manageUrl ?? null };
 				return;
 			}
 			submitError = body.error ?? t('book.couldNotBook');
@@ -103,6 +104,9 @@
 					<p class="book-hint book-link">{booked.meetingUrl}</p>
 				{/if}
 				<p class="book-hint">{t('book.confirmationSent', { email })}</p>
+				{#if booked.manageUrl}
+					<a class="book-manage" href={booked.manageUrl}>{t('book.manageLink')}</a>
+				{/if}
 			</div>
 		{:else}
 			<SlotPicker
@@ -237,6 +241,11 @@
 		margin: 0;
 		font-size: 0.875rem;
 		color: var(--color-danger);
+	}
+
+	.book-manage {
+		font-size: 0.875rem;
+		color: var(--color-accent-text);
 	}
 
 	.book-hint {

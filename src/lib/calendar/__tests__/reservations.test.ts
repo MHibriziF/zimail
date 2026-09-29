@@ -8,6 +8,9 @@ import {
 	slugify,
 	timeToMinutes,
 	validateGuest,
+	guestChangeBlock,
+	MAX_GUEST_RESCHEDULES,
+	DEFAULT_RESCHEDULE_CUTOFF_HOURS,
 	validatePageSettings,
 	type ReservationPageSettings
 } from '../reservations';
@@ -173,5 +176,33 @@ describe('computeSlots', () => {
 		assert.ok(isFreeSlot(page, [], new Date('2026-09-28T02:00:00.000Z'), now, '2026-09-28'));
 		assert.ok(!isFreeSlot(page, [], new Date('2026-09-28T02:30:00.000Z'), now, '2026-09-28'));
 		assert.ok(!isFreeSlot(page, [], new Date('2026-10-03T02:00:00.000Z'), now, '2026-10-03'));
+	});
+});
+
+describe('guestChangeBlock', () => {
+	const start = new Date('2026-09-28T02:00:00.000Z');
+	const hoursBefore = (hours: number) => new Date(start.getTime() - hours * 3_600_000);
+	const check = (now: Date, rescheduleCount = 0, action: 'reschedule' | 'cancel' = 'reschedule') =>
+		guestChangeBlock({ start, now, cutoffHours: 24, rescheduleCount, action });
+
+	test('allowed until the cutoff, then too late, then past', () => {
+		assert.equal(check(hoursBefore(25)), null);
+		assert.equal(check(hoursBefore(24)), null, 'exactly at the cutoff still counts');
+		assert.equal(check(hoursBefore(23)), 'too_late');
+		assert.equal(check(hoursBefore(0)), 'past');
+		assert.equal(check(hoursBefore(-1), 0, 'cancel'), 'past');
+	});
+
+	test('the reschedule limit binds moves, not cancelling', () => {
+		assert.equal(check(hoursBefore(48), MAX_GUEST_RESCHEDULES - 1), null);
+		assert.equal(check(hoursBefore(48), MAX_GUEST_RESCHEDULES), 'limit_reached');
+		assert.equal(check(hoursBefore(48), MAX_GUEST_RESCHEDULES, 'cancel'), null);
+	});
+
+	test('a missing cutoff defaults to 24 hours; anything off the list is refused', () => {
+		const result = validatePageSettings({ ...settings });
+		assert.equal(result.ok && result.value.rescheduleCutoffHours, DEFAULT_RESCHEDULE_CUTOFF_HOURS);
+		assert.deepEqual(validatePageSettings({ ...settings, rescheduleCutoffHours: 5 }), { ok: false, error: 'invalid_cutoff' });
+		assert.deepEqual(validatePageSettings({ ...settings, rescheduleCutoffHours: '24' }), { ok: false, error: 'invalid_cutoff' });
 	});
 });
