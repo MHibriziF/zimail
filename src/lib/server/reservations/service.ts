@@ -14,6 +14,7 @@ import {
 import { computeSlots, isFreeSlot, type DaySlots, type Interval } from '../../calendar/slots';
 import type { CalendarRepository } from '../calendar/repository';
 import type { BookingDetails, InviteKind } from './email';
+import type { RoomSettings } from '../../meet/room-settings';
 import type { ReservationsRepository, StoredPage } from './repository';
 
 const DAY_MS = 86_400_000;
@@ -90,9 +91,13 @@ export type ReservationsServiceDeps = {
 };
 
 export type MeetingRooms = {
-	/** Opens a room owned by `userId` and returns its join code. */
-	open(userId: string, title: string): Promise<string>;
+	/** Opens a room owned by `userId` and returns its join code; left out, settings default. */
+	open(userId: string, title: string, settings?: RoomSettings): Promise<string>;
 	close(userId: string, code: string): Promise<void>;
+	/** The room's settings, or `null` when it's gone or not the user's. */
+	settingsOf?(userId: string, code: string): Promise<RoomSettings | null>;
+	/** Changes an existing room's settings; a room that's gone or not the user's is left alone. */
+	configure?(userId: string, code: string, settings: RoomSettings): Promise<void>;
 };
 
 type Room = { code: string; url: string };

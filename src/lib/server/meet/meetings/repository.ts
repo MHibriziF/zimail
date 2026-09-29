@@ -40,6 +40,8 @@ export type NewMeeting = {
 	title: string;
 	code: string;
 	requireApproval: boolean;
+	screenSharePolicy: ScreenSharePolicy;
+	screenShareMode: ScreenShareMode;
 	createdAt: string;
 };
 
@@ -84,8 +86,8 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 		async insert(meeting) {
 			await db
 				.prepare(
-					`INSERT INTO meetings (id, user_id, domain_id, title, code, require_approval, created_at)
-					 VALUES (?, ?, ?, ?, ?, ?, ?)`
+					`INSERT INTO meetings (id, user_id, domain_id, title, code, require_approval, screen_share_policy, screen_share_mode, created_at)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(
 					meeting.id,
@@ -94,6 +96,8 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 					meeting.title,
 					meeting.code,
 					meeting.requireApproval ? 1 : 0,
+					meeting.screenSharePolicy,
+					meeting.screenShareMode,
 					meeting.createdAt
 				)
 				.run();

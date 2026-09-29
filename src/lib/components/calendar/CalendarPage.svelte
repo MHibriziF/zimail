@@ -25,7 +25,7 @@
 		type YearMonth
 	} from '$lib/calendar/grid';
 	import { draftForNew, draftFromEvent, draftToInput, type EventDraft } from '$lib/calendar/editor';
-	import { deleteEvent, fetchEventGuests, fetchEvents, saveEvent } from '$lib/calendar/client';
+	import { deleteEvent, fetchEventDetails, fetchEvents, saveEvent } from '$lib/calendar/client';
 
 	/** `guests` carries each guest's answer, which the draft (just addresses) doesn't. */
 	type Editing = { event: CalendarEvent | null; draft: EventDraft; guests: EventGuest[] };
@@ -125,8 +125,12 @@
 			editing = { event, draft: draftFromEvent(event, timeZone), guests: [] };
 			return;
 		}
-		const guests = await fetchEventGuests(event.id).catch(() => null);
-		editing = { event, draft: draftFromEvent(event, timeZone, guests), guests: guests ?? [] };
+		const details = await fetchEventDetails(event.id).catch(() => null);
+		editing = {
+			event,
+			draft: draftFromEvent(event, timeZone, details?.guests ?? null, details?.room ?? null),
+			guests: details?.guests ?? []
+		};
 	}
 
 	async function afterWrite() {

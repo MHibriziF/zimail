@@ -14,6 +14,34 @@ describe('event drafts', () => {
 		assert.equal(draft.endDate, '2026-09-24');
 	});
 
+	test('room settings are sent only with a room, and only when they are known', () => {
+		const locked = { requireApproval: true, screenSharePolicy: 'approval', screenShareMode: 'single' } as const;
+		const base: CalendarEvent = {
+			id: 'e',
+			title: 'Sync',
+			start: '2026-09-24T05:00:00.000Z',
+			end: '2026-09-24T06:00:00.000Z',
+			allDay: false,
+			location: null,
+			notes: null,
+			source: 'manual',
+			busy: true,
+			calendar: null,
+			meetingCode: null
+		};
+		const fresh = draftForNew('2026-10-01', zone);
+		assert.equal(draftToInput(fresh, zone).meeting, undefined, 'no room, nothing sent');
+		assert.deepEqual(draftToInput({ ...fresh, withMeeting: true }, zone).meeting, fresh.room, 'a new room sends the defaults');
+
+		const withRoom = { ...base, meetingCode: 'room-1' };
+		assert.deepEqual(draftToInput(draftFromEvent(withRoom, zone, [], locked), zone).meeting, locked);
+		assert.equal(
+			draftToInput(draftFromEvent(withRoom, zone, [], null), zone).meeting,
+			undefined,
+			'settings that could not be loaded are left alone'
+		);
+	});
+
 	test('a new event on another day starts at nine', () => {
 		const draft = draftForNew('2026-10-01', zone, new Date('2026-09-24T03:20:00.000Z'));
 		assert.equal(draft.startTime, '09:00');

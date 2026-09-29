@@ -9,6 +9,7 @@ import {
 	type EventGuest
 } from '../../calendar/events';
 import type { MeetingRooms } from '../reservations/service';
+import type { RoomSettings } from '../../meet/room-settings';
 import type { InviteNotice } from './email';
 import type { CalendarRepository } from './repository';
 
@@ -34,7 +35,8 @@ export type CalendarService = {
 	 * not the zone's, and then filtered exactly.
 	 */
 	listBetween(userId: string, from: Date, to: Date, timeZone: string): Promise<CalendarRangeOutcome>;
-	get(userId: string, id: string): Promise<{ event: CalendarEvent; guests: EventGuest[] } | null>;
+	/** `room` is the meeting room's settings, when the event has one that could be read. */
+	get(userId: string, id: string): Promise<{ event: CalendarEvent; guests: EventGuest[]; room: RoomSettings | null } | null>;
 	create(userId: string, input: CalendarEventInput): Promise<CalendarWriteOutcome>;
 	update(userId: string, id: string, input: CalendarEventInput): Promise<CalendarWriteOutcome>;
 	remove(userId: string, id: string): Promise<'ok' | 'read_only' | 'not_found'>;
@@ -86,12 +88,21 @@ export function createCalendarService({
 	meetings
 }: CalendarServiceDeps): CalendarService {
 	/** A failure saves the event without a room rather than not at all. */
-	async function openRoom(userId: string, title: string): Promise<string | null> {
+	async function openRoom(userId: string, title: string, settings?: RoomSettings): Promise<string | null> {
 		if (!meetings) return null;
 		try {
-			return await meetings.open(userId, title);
+			return await meetings.open(userId, title, settings);
 		} catch (error_) {
 			console.error('Could not open a meeting room for an event', error_);
+			return null;
+		}
+	}
+
+	/** Best effort: an editor that can't see the settings just doesn't offer to change them. */
+	async function roomSettings(userId: string, code: string): Promise<RoomSettings | null> {
+		try {
+			return (await meetings?.settingsOf?.(userId, code)) ?? null;
+		} catch {
 			return null;
 		}
 	}
@@ -100,10 +111,27 @@ export function createCalendarService({
 		if (code) await meetings?.close(userId, code).catch(() => undefined);
 	}
 
-	/** Opens or closes the event's room as asked; `undefined` leaves it as it is. */
-	async function syncRoom(userId: string, event: CalendarEvent, wanted: boolean | undefined): Promise<string | null> {
-		if (wanted === undefined || wanted === (event.meetingCode !== null)) return event.meetingCode;
-		const code = wanted ? await openRoom(userId, event.title) : null;
+	/** A failure keeps the room as it was; the event itself has already saved. */
+	async function configureRoom(userId: string, code: string, settings: RoomSettings): Promise<void> {
+		try {
+			await meetings?.configure?.(userId, code, settings);
+		} catch (error_) {
+			console.error('Could not change the settings of an event\'s meeting room', error_);
+		}
+	}
+
+	/** Opens or closes the event's room as asked; `undefined` leaves it as it is. Settings apply to a kept room too. */
+	async function syncRoom(
+		userId: string,
+		event: CalendarEvent,
+		wanted: boolean | undefined,
+		settings: RoomSettings | undefined
+	): Promise<string | null> {
+		if (wanted === undefined || wanted === (event.meetingCode !== null)) {
+			if (event.meetingCode && settings) await configureRoom(userId, event.meetingCode, settings);
+			return event.meetingCode;
+		}
+		const code = wanted ? await openRoom(userId, event.title, settings) : null;
 		if (code === event.meetingCode) return code;
 		await repo.setMeetingCode(userId, event.id, code);
 		await closeRoom(userId, event.meetingCode);
@@ -179,7 +207,7 @@ export function createCalendarService({
 		const sequence = await repo.updateManual(userId, id, valid.value);
 		if (sequence === null) return { type: 'not_found' };
 
-		const meetingCode = await syncRoom(userId, { ...existing, ...valid.value }, input.withMeeting);
+		const meetingCode = await syncRoom(userId, { ...existing, ...valid.value }, input.withMeeting, input.meeting);
 		const changed = changedFields(existing, { ...valid.value, meetingCode });
 		// A new time needs everyone to answer again, as Google and Outlook ask.
 		if (emails || (changed.moved && before.length > 0)) {
@@ -212,7 +240,9 @@ export function createCalendarService({
 		async get(userId, id) {
 			const event = await repo.get(userId, id);
 			if (!event) return null;
-			return { event, guests: event.source === 'manual' ? await repo.listGuests(userId, id) : [] };
+			const guests = event.source === 'manual' ? await repo.listGuests(userId, id) : [];
+			const room = event.meetingCode ? await roomSettings(userId, event.meetingCode) : null;
+			return { event, guests, room };
 		},
 
 		async create(userId, input) {
@@ -227,7 +257,7 @@ export function createCalendarService({
 				source: 'manual',
 				busy: true,
 				calendar: null,
-				meetingCode: input.withMeeting ? await openRoom(userId, valid.value.title) : null
+				meetingCode: input.withMeeting ? await openRoom(userId, valid.value.title, input.meeting) : null
 			};
 			await repo.insert({ ...valid.value, id: event.id, userId, source: 'manual', meetingCode: event.meetingCode });
 			if (emails.length > 0) await repo.setGuests(userId, event.id, emails, false);

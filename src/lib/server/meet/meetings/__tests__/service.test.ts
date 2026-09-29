@@ -42,8 +42,8 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 				code: input.code,
 				title: input.title,
 				require_approval: input.requireApproval,
-				screen_share_policy: 'open',
-				screen_share_mode: 'multiple',
+				screen_share_policy: input.screenSharePolicy,
+				screen_share_mode: input.screenShareMode,
 				created_at: input.createdAt
 			});
 		},
@@ -184,6 +184,20 @@ describe('create', () => {
 		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
 		const created = await service.create('user-1', { title: 'Standup' });
 		assert.equal(created.meeting.title, 'Standup');
+	});
+
+	test('settings chosen up front are stored; left out, they default', async () => {
+		const { repo, rows } = fakeMeetingsRepo();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		await service.create('user-1', { requireApproval: true, screenSharePolicy: 'approval', screenShareMode: 'single' });
+		await service.create('user-1');
+		assert.deepEqual(
+			rows.map((row) => [row.require_approval, row.screen_share_policy, row.screen_share_mode]),
+			[
+				[true, 'approval', 'single'],
+				[false, 'open', 'multiple']
+			]
+		);
 	});
 
 	test('a code collision is retried rather than failing the create', async () => {
