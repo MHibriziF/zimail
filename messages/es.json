@@ -939,6 +939,7 @@
 			"add": "Nueva página",
 			"title": "Título",
 			"titlePlaceholder": "Llamada de 30 minutos",
+			"locationPlaceholder": "Dónde se reúnen, si es en persona — p. ej. Pacil, sala 3.1",
 			"description": "Descripción",
 			"from": "Desde",
 			"to": "Hasta",

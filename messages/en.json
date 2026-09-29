@@ -939,6 +939,7 @@
 			"add": "New page",
 			"title": "Title",
 			"titlePlaceholder": "30-minute call",
+			"locationPlaceholder": "Where you meet, if in person — e.g. Pacil, room 3.1",
 			"description": "Description",
 			"from": "From",
 			"to": "To",

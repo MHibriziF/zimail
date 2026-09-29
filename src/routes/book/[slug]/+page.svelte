@@ -134,6 +134,9 @@
 			<p class="book-meta">
 				<span><Icon name="time-line" size={15} />{t('book.minutes', { count: reservation.slotMinutes })}</span>
 				<span><Icon name="global-line" size={15} />{t('book.timesIn', { zone: guestZone })}</span>
+				{#if reservation.location}
+					<span><Icon name="map-pin-line" size={15} />{reservation.location}</span>
+				{/if}
 				{#if reservation.withMeeting}
 					<span><Icon name="vidicon-line" size={15} />{t('book.videoCall')}</span>
 				{/if}

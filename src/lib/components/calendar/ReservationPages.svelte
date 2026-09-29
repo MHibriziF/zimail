@@ -9,6 +9,7 @@
 	import { dateKeyIn } from '$lib/calendar/grid';
 	import {
 		MAX_PAGE_DESCRIPTION_LENGTH,
+		MAX_PAGE_LOCATION_LENGTH,
 		MAX_PAGE_TITLE_LENGTH,
 		SLOT_LENGTHS,
 		minutesToTime,
@@ -66,6 +67,7 @@
 		draft = {
 			title: '',
 			description: '',
+			location: '',
 			slug: '',
 			timeZone,
 			startDate: today,
@@ -84,7 +86,13 @@
 	function openEdit(existing: ReservationPage) {
 		editingId = existing.id;
 		error = '';
-		draft = { ...existing, description: existing.description ?? '', dayStart: minutesToTime(existing.dayStart), dayEnd: minutesToTime(existing.dayEnd) };
+		draft = {
+			...existing,
+			description: existing.description ?? '',
+			location: existing.location ?? '',
+			dayStart: minutesToTime(existing.dayStart),
+			dayEnd: minutesToTime(existing.dayEnd)
+		};
 	}
 
 	function toggleWeekday(day: number) {
@@ -179,6 +187,16 @@
 			<label class="resv-field">
 				<span>{t('calendar.reservations.description')}</span>
 				<textarea class="resv-input" rows="2" bind:value={draft.description} maxlength={MAX_PAGE_DESCRIPTION_LENGTH}></textarea>
+			</label>
+			<label class="resv-field">
+				<span>{t('calendar.location')}</span>
+				<input
+					class="resv-input"
+					type="text"
+					bind:value={draft.location}
+					maxlength={MAX_PAGE_LOCATION_LENGTH}
+					placeholder={t('calendar.reservations.locationPlaceholder')}
+				/>
 			</label>
 			<div class="resv-row">
 				<label class="resv-field">

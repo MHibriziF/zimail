@@ -26,6 +26,8 @@ export type BookingDetails = {
 	timeZone: string;
 	/** The booking's Zimail meeting room, if the page gives one. */
 	meetingUrl?: string | null;
+	/** Where it takes place, when the page meets somewhere physical. */
+	location?: string | null;
 	/** The revision this message is; defaults to 0 for a new booking and 1 for its cancellation. */
 	sequence?: number;
 };
@@ -51,7 +53,11 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 		return {
 			title: `Cancelled: ${details.pageTitle}`,
 			lead: `${details.hostName} cancelled your reservation. If it was on your calendar, it has been taken off.`,
-			details: [{ label: 'Was', value: formatWhen(details) }, withHost],
+			details: [
+			{ label: 'Was', value: formatWhen(details) },
+			withHost,
+			...(details.location ? [{ label: 'Where', value: details.location }] : [])
+		],
 			footer: 'Reply to this email to find another time.'
 		};
 	}
@@ -64,6 +70,7 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 		details: [{ label: 'When', value: formatWhen(details) }, withHost, { label: 'Name', value: details.guestName }],
 		footer: 'Need to change something? Reply to this email.'
 	};
+	if (details.location) content.details!.push({ label: 'Where', value: details.location });
 	if (details.meetingUrl) {
 		content.details!.push({ label: 'Meeting', value: details.meetingUrl });
 		content.action = { label: 'Join the meeting', href: details.meetingUrl };
@@ -103,8 +110,9 @@ export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request'
 		'TRANSP:OPAQUE',
 		`ORGANIZER;CN=${icsParam(details.hostName)}:mailto:${details.hostEmail}`,
 		`ATTENDEE;CN=${icsParam(details.guestName)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${details.guestEmail}`,
-		// LOCATION is what calendars show and link; URL is the standard field for it.
-		...(details.meetingUrl ? [`LOCATION:${icsText(details.meetingUrl)}`, `URL:${details.meetingUrl}`] : []),
+		// LOCATION is what calendars show: the place when there is one, else the join link. URL always carries the link.
+		...(details.location || details.meetingUrl ? [`LOCATION:${icsText(details.location ?? details.meetingUrl ?? '')}`] : []),
+		...(details.meetingUrl ? [`URL:${details.meetingUrl}`] : []),
 		...(description(details) ? [`DESCRIPTION:${icsText(description(details))}`] : []),
 		'END:VEVENT',
 		'END:VCALENDAR'
