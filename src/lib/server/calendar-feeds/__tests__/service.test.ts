@@ -23,6 +23,8 @@ function fakeRepo() {
 	const records: { id: string; record: SyncRecord }[] = [];
 	const attempts = new Map<string, string>();
 	const syncCalls: string[] = [];
+	/** The user's own Zimail event ids, for echo detection. */
+	const ownIds = new Set<string>();
 	const repo: CalendarFeedsRepository = {
 		async listForUser(userId) {
 			return feeds.filter((feed) => feed.userId === userId);
@@ -71,12 +73,15 @@ function fakeRepo() {
 			if (record.eventCount !== null) feed.eventCount = record.eventCount;
 			if (record.syncKey !== null) feed.syncKey = record.syncKey;
 		},
+		async ownEventIds(_userId, ids) {
+			return new Set(ids.filter((id) => ownIds.has(id)));
+		},
 		async syncEvents(_userId, feedId, list) {
 			syncCalls.push(feedId);
 			events.set(feedId, list);
 		}
 	};
-	return { repo, feeds, events, records, attempts, syncCalls };
+	return { repo, feeds, events, records, attempts, syncCalls, ownIds };
 }
 
 function setup(fetchFeed: (url: string) => Promise<string> = async () => ICS) {
@@ -235,5 +240,26 @@ describe('CalendarFeedsService', () => {
 		assert.equal(fetched.length, 1, 'still fresh');
 		await service.refreshStale('u2');
 		assert.equal(fetched.length, 1, 'another host has no feeds');
+	});
+	test('the user’s own Zimail events coming back through the feed are dropped', async () => {
+		const vevent = (uid: string, summary: string) =>
+			['BEGIN:VEVENT', `UID:${uid}`, `SUMMARY:${summary}`, 'DTSTART:20260925T020000Z', 'DTEND:20260925T030000Z', 'END:VEVENT'];
+		const body = [
+			'BEGIN:VCALENDAR',
+			...vevent('mine-1@zimail', 'My own event, echoed'),
+			...vevent('someone-else@zimail', 'Invite from another Zimail'),
+			...vevent('abc@google.com', 'Ordinary Google event'),
+			'END:VCALENDAR'
+		].join('\r\n');
+		const { service, events, ownIds } = setup(async () => body);
+		ownIds.add('mine-1');
+		const added = await service.add('u1', input);
+		assert.equal(added.type, 'ok');
+		if (added.type !== 'ok') return;
+		assert.deepEqual(
+			events.get(added.feed.id)?.map((event) => event.title).sort(),
+			['Invite from another Zimail', 'Ordinary Google event']
+		);
+		assert.equal(added.feed.eventCount, 2);
 	});
 });

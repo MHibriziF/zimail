@@ -4,7 +4,8 @@ import {
 	normalizeFeedUrl,
 	type CalendarFeed
 } from '../../calendar/feeds';
-import { expandCalendar } from '../../calendar/ics';
+import { expandCalendar, type FeedEvent } from '../../calendar/ics';
+import { ownEventId } from '../invitations/answers';
 import type { LabelColor } from '../../mail/labels';
 import type { CalendarFeedsRepository, StoredFeed } from './repository';
 import { FeedFetchError } from './fetch';
@@ -102,6 +103,23 @@ export function createCalendarFeedsService(deps: CalendarFeedsServiceDeps): Cale
 	const { repo } = deps;
 	const now = deps.now ?? (() => new Date());
 
+	/**
+	 * Drops events that are the user's own Zimail events coming back: invite your
+	 * own Gmail and Google adds the event to the very calendar this feed reads.
+	 * Matched on the event's id, not just the UID suffix, so an invitation from
+	 * someone else's Zimail still shows.
+	 */
+	async function withoutEchoes(userId: string, events: FeedEvent[]): Promise<FeedEvent[]> {
+		const idOf = (event: FeedEvent) => ownEventId(event.uid.slice(0, event.uid.lastIndexOf('#')));
+		const candidates = [...new Set(events.map(idOf).filter((id): id is string => id !== null))];
+		if (candidates.length === 0) return events;
+		const own = await repo.ownEventIds(userId, candidates);
+		return events.filter((event) => {
+			const id = idOf(event);
+			return id === null || !own.has(id);
+		});
+	}
+
 	/** Syncs one feed if the claim succeeds; `staleBefore` null claims unconditionally ("Sync now"). */
 	async function runSync(feed: StoredFeed, staleBefore: string | null): Promise<SyncResult> {
 		const at = now();
@@ -116,11 +134,14 @@ export function createCalendarFeedsService(deps: CalendarFeedsServiceDeps): Cale
 				return 'synced';
 			}
 
-			const events = expandCalendar(text, {
-				from: new Date(at.getTime() - SYNC_PAST_DAYS * DAY_MS),
-				to: new Date(at.getTime() + SYNC_FUTURE_DAYS * DAY_MS),
-				fallbackTimeZone: timeZone
-			});
+			const events = await withoutEchoes(
+				feed.userId,
+				expandCalendar(text, {
+					from: new Date(at.getTime() - SYNC_PAST_DAYS * DAY_MS),
+					to: new Date(at.getTime() + SYNC_FUTURE_DAYS * DAY_MS),
+					fallbackTimeZone: timeZone
+				})
+			);
 			await repo.syncEvents(feed.userId, feed.id, events);
 			await repo.recordSync(feed.id, { syncedAt: at.toISOString(), error: null, eventCount: events.length, syncKey });
 			return 'synced';
