@@ -3,6 +3,7 @@
 	import { createLocalVideoTrack, type LocalVideoTrack } from 'livekit-client';
 	import { BackgroundProcessor } from '@livekit/track-processors';
 	import { t } from '$lib/i18n';
+	import { deviceErrorKey } from '$lib/meet/device-errors';
 	import Icon from '../Icon.svelte';
 
 	let {
@@ -144,8 +145,8 @@
 				el.style.transform = 'scaleX(-1)';
 				previewMediaEl?.appendChild(el);
 				if (option !== 'none') void applyToPreview(option);
-			} catch {
-				previewError = t('meet.deviceError');
+			} catch (error) {
+				previewError = t(deviceErrorKey(error));
 			}
 		})();
 	});
