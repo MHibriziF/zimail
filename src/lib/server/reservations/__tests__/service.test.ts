@@ -37,6 +37,8 @@ function setup(options: SetupOptions = {}) {
 	const bookings: NewBooking[] = [];
 	const notified: { hostUserId: string; booking: BookingDetails; kind: string }[] = [];
 	const deletedEvents: string[] = [];
+	/** Guest reschedules per booking event. */
+	const guestMoves = new Map<string, number>();
 	const deferred: Promise<unknown>[] = [];
 	const sequences = new Map<string, number>();
 
@@ -100,7 +102,7 @@ function setup(options: SetupOptions = {}) {
 			}
 			bookings.push(booking);
 		},
-		async moveBooking(userId, eventId, start, end) {
+		async moveBooking(userId, eventId, start, end, byGuest = false) {
 			const booking = bookings.find((entry) => entry.userId === userId && entry.eventId === eventId);
 			if (!booking) return false;
 			if (bookings.some((entry) => entry !== booking && entry.pageId === booking.pageId && entry.start === start)) {
@@ -108,7 +110,20 @@ function setup(options: SetupOptions = {}) {
 			}
 			Object.assign(booking, { start, end });
 			sequences.set(eventId, (sequences.get(eventId) ?? 0) + 1);
+			if (byGuest) guestMoves.set(eventId, (guestMoves.get(eventId) ?? 0) + 1);
 			return true;
+		},
+		async getBookingByToken(tokenHash) {
+			const booking = bookings.find((entry) => entry.manageTokenHash === tokenHash);
+			if (!booking) return null;
+			const stored = await repo.getBookingByEvent(booking.userId, booking.eventId);
+			return stored && {
+				...stored,
+				eventId: booking.eventId,
+				userId: booking.userId,
+				pageId: booking.pageId,
+				rescheduleCount: guestMoves.get(booking.eventId) ?? 0
+			};
 		}
 	};
 

@@ -27,7 +27,14 @@ const settings = {
 	noticeMinutes: 0
 };
 
-const page: ReservationPageSettings = { ...settings, description: null, location: null, active: true, withMeeting: false };
+const page: ReservationPageSettings = {
+	...settings,
+	description: null,
+	location: null,
+	active: true,
+	withMeeting: false,
+	rescheduleCutoffHours: 24
+};
 const now = new Date('2026-09-24T00:00:00.000Z');
 
 describe('validatePageSettings', () => {

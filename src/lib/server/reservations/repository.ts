@@ -19,6 +19,7 @@ type PageRow = {
 	notice_minutes: number;
 	active: number;
 	with_meeting: number;
+	reschedule_cutoff_hours: number;
 };
 
 export type StoredPage = ReservationPage & { userId: string };
@@ -44,12 +45,13 @@ function toPage(row: PageRow): StoredPage {
 		bufferMinutes: row.buffer_minutes,
 		noticeMinutes: row.notice_minutes,
 		active: row.active === 1,
-		withMeeting: row.with_meeting === 1
+		withMeeting: row.with_meeting === 1,
+		rescheduleCutoffHours: row.reschedule_cutoff_hours
 	};
 }
 
 const COLUMNS = `id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
-	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting`;
+	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours`;
 
 export type NewBooking = {
 	id: string;
@@ -70,6 +72,8 @@ export type NewBooking = {
 	meetingUrl: string | null;
 	/** The page's place, or failing that the join link — what calendars show as the location. */
 	eventLocation: string | null;
+	/** SHA-256 of the guest's link to change the booking. */
+	manageTokenHash: string;
 };
 
 /**
@@ -93,8 +97,21 @@ export type ReservationsRepository = {
 	insertBooking(booking: NewBooking): Promise<void>;
 	/** The booking behind a calendar event, with what a cancellation email needs. */
 	getBookingByEvent(userId: string, eventId: string): Promise<StoredBooking | null>;
-	/** Moves a booking and bumps its invitation revision; `false` if there was no such booking. */
-	moveBooking(userId: string, eventId: string, start: string, end: string): Promise<boolean>;
+	/**
+	 * Moves a booking and bumps its invitation revision; `false` if there was no
+	 * such booking. `byGuest` also counts it against the guest's reschedule limit.
+	 */
+	moveBooking(userId: string, eventId: string, start: string, end: string, byGuest?: boolean): Promise<boolean>;
+	/** The booking a guest's link points at, by the link's hash. */
+	getBookingByToken(tokenHash: string): Promise<ManagedBooking | null>;
+};
+
+/** A booking as its guest manages it: what the email says, plus what the rules need. */
+export type ManagedBooking = StoredBooking & {
+	eventId: string;
+	userId: string;
+	pageId: string;
+	rescheduleCount: number;
 };
 
 export type StoredBooking = {
@@ -130,7 +147,8 @@ function settingsValues(page: ReservationPageSettings): unknown[] {
 		page.bufferMinutes,
 		page.noticeMinutes,
 		page.active ? 1 : 0,
-		page.withMeeting ? 1 : 0
+		page.withMeeting ? 1 : 0,
+		page.rescheduleCutoffHours
 	];
 }
 
@@ -173,8 +191,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				.prepare(
 					`INSERT INTO reservation_pages
 					 (id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
-					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(page.id, page.userId, ...settingsValues(page))
 				.run();
@@ -186,7 +204,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					`UPDATE reservation_pages
 					 SET slug = ?, title = ?, description = ?, location = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
 					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?,
-					     with_meeting = ?
+					     with_meeting = ?, reschedule_cutoff_hours = ?
 					 WHERE id = ? AND user_id = ?`
 				)
 				.bind(...settingsValues(page), id, userId)
@@ -219,6 +237,24 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				.bind(pageId, email, now)
 				.first<{ count: number }>();
 			return row?.count ?? 0;
+		},
+
+		async getBookingByToken(tokenHash) {
+			const row = await db
+				.prepare('SELECT event_id, user_id, page_id, reschedule_count FROM reservations WHERE manage_token_hash = ?')
+				.bind(tokenHash)
+				.first<{ event_id: string; user_id: string; page_id: string; reschedule_count: number }>();
+			if (!row) return null;
+			const booking = await this.getBookingByEvent(row.user_id, row.event_id);
+			return booking
+				? {
+						...booking,
+						eventId: row.event_id,
+						userId: row.user_id,
+						pageId: row.page_id,
+						rescheduleCount: row.reschedule_count
+					}
+				: null;
 		},
 
 		async getBookingByEvent(userId, eventId) {
@@ -267,8 +303,9 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				db
 					.prepare(
 						`INSERT INTO reservations
-						 (id, page_id, user_id, event_id, guest_name, guest_email, note, starts_at, ends_at, created_at, meeting_code, meeting_url)
-						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+						 (id, page_id, user_id, event_id, guest_name, guest_email, note, starts_at, ends_at, created_at, meeting_code, meeting_url,
+						  manage_token_hash)
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 					)
 					.bind(
 						booking.id,
@@ -282,7 +319,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 						booking.end,
 						booking.createdAt,
 						booking.meetingCode,
-						booking.meetingUrl
+						booking.meetingUrl,
+						booking.manageTokenHash
 					),
 				db
 					.prepare(
@@ -305,11 +343,14 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 			]);
 		},
 
-		async moveBooking(userId, eventId, start, end) {
+		async moveBooking(userId, eventId, start, end, byGuest = false) {
 			const [, moved] = await db.batch([
 				db
-					.prepare('UPDATE reservations SET starts_at = ?, ends_at = ? WHERE event_id = ? AND user_id = ?')
-					.bind(start, end, eventId, userId),
+					.prepare(
+						`UPDATE reservations SET starts_at = ?, ends_at = ?, reschedule_count = reschedule_count + ?
+						 WHERE event_id = ? AND user_id = ?`
+					)
+					.bind(start, end, byGuest ? 1 : 0, eventId, userId),
 				db
 					.prepare(
 						`UPDATE calendar_events

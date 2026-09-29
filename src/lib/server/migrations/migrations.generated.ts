@@ -184,5 +184,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0045_booking_location.sql",
 		sql: "-- Where a booking takes place, for pages that meet somewhere physical.\nALTER TABLE reservation_pages ADD COLUMN location TEXT;\n\n-- A booking's join link, kept on the booking itself. It used to live only in\n-- the calendar event's location, which now holds the physical place when the\n-- page has one.\nALTER TABLE reservations ADD COLUMN meeting_url TEXT;\n\nUPDATE reservations\nSET meeting_url = (SELECT e.location FROM calendar_events e WHERE e.id = reservations.event_id)\nWHERE meeting_code IS NOT NULL;\n"
+	},
+	{
+		name: "0046_guest_reschedule.sql",
+		sql: "-- How close to the start a guest may still move or cancel their booking.\nALTER TABLE reservation_pages ADD COLUMN reschedule_cutoff_hours INTEGER NOT NULL DEFAULT 24;\n\n-- The guest's link to change their booking: only its SHA-256 is kept, so the\n-- database alone can't be used to act on a booking. Older bookings have none.\nALTER TABLE reservations ADD COLUMN manage_token_hash TEXT;\nALTER TABLE reservations ADD COLUMN reschedule_count INTEGER NOT NULL DEFAULT 0;\nCREATE UNIQUE INDEX reservations_manage_token_idx ON reservations(manage_token_hash) WHERE manage_token_hash IS NOT NULL;\n"
 	}
 ];
