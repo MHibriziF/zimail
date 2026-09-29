@@ -9,4 +9,4 @@
 
 <svelte:head><title>{t('meetings.title', { app: APP_NAME })}</title></svelte:head>
 
-<MeetingsPage meetings={data.meetings} shown={data.shown} hasMore={data.hasMore} />
+<MeetingsPage meetings={data.meetings} upcoming={data.upcomingMeetings} shown={data.shown} hasMore={data.hasMore} />

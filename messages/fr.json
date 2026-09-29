@@ -823,7 +823,10 @@
 		"deleteAction": "Supprimer",
 		"deleting": "Suppression…",
 		"couldNotDelete": "Impossible de supprimer cette réunion.",
-		"showMore": "Afficher plus"
+		"showMore": "Afficher plus",
+		"upcomingHeading": "Réunions à venir",
+		"happeningNow": "En cours",
+		"bookingBadge": "Réservation"
 	},
 	"labels": {
 		"title": "Libellés",

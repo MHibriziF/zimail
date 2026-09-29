@@ -823,7 +823,10 @@
 		"deleteAction": "Delete",
 		"deleting": "Deleting…",
 		"couldNotDelete": "Couldn't delete that meeting.",
-		"showMore": "Show more"
+		"showMore": "Show more",
+		"upcomingHeading": "Upcoming meetings",
+		"happeningNow": "Now",
+		"bookingBadge": "Booking"
 	},
 	"labels": {
 		"title": "Labels",

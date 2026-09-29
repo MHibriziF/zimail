@@ -40,7 +40,12 @@ export type CalendarService = {
 	remove(userId: string, id: string): Promise<'ok' | 'read_only' | 'not_found'>;
 	/** Moves one of the user's own events — a guest's proposed time, accepted — and tells every guest. */
 	reschedule(userId: string, id: string, start: Date, end: Date): Promise<'ok' | 'not_found'>;
+	/** Events with a meeting room, from those in progress through the next `UPCOMING_MEETING_DAYS`. */
+	upcomingMeetings(userId: string, now: Date): Promise<CalendarEvent[]>;
 };
+
+export const UPCOMING_MEETING_DAYS = 14;
+const MAX_UPCOMING_MEETINGS = 20;
 
 type EventFields = Pick<CalendarEvent, 'title' | 'start' | 'end' | 'allDay' | 'location' | 'notes' | 'meetingCode'>;
 
@@ -242,6 +247,18 @@ export function createCalendarService({
 				end: end.toISOString()
 			});
 			return outcome.type === 'ok' ? 'ok' : 'not_found';
+		},
+
+		upcomingMeetings(userId, now) {
+			return repo.listWithMeetings(
+				userId,
+				{
+					since: new Date(now.getTime() - DAY_MS).toISOString(),
+					now: now.toISOString(),
+					until: new Date(now.getTime() + UPCOMING_MEETING_DAYS * DAY_MS).toISOString()
+				},
+				MAX_UPCOMING_MEETINGS
+			);
 		},
 
 		async remove(userId, id) {
