@@ -1,18 +1,20 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { EMAIL_STYLE_ID, buildEmailDocument, emailCss, isRichHtml } from '$lib/utils/email-html';
+	import { EMAIL_STYLE_ID, buildEmailDocument, emailCss, isRichHtml, supportsDarkScheme } from '$lib/utils/email-html';
 	import { canFoldQuotes, foldQuotedHtml } from '$lib/utils/quotes';
 	import { t } from '$lib/i18n';
 
 	let { html }: { html: string } = $props();
 
 	const rich = $derived(isRichHtml(html));
+	/** A styled message with no dark version of its own stays on its light page in dark mode. */
+	const lightOnly = $derived(rich && !supportsDarkScheme(html));
 
 	/**
 	 * Stamped on <html> by the inline script in app.html, so it is settled well
 	 * before this runs — but only in the browser. Reading it up front rather
 	 * than in an effect keeps the first document correct; switching themes later
-	 * rebuilds it, since a recoloured message cannot be restyled in place.
+	 * rebuilds it, since a plain message's dark styles hang off the document's own `data-theme`.
 	 */
 	let theme = $state(browser ? (document.documentElement.dataset.theme ?? 'light') : 'light');
 
@@ -257,6 +259,7 @@
 		bind:this={frame}
 		class="frame"
 		class:rich
+		class:light-only={lightOnly}
 		class:painted
 		title={t('thread.messageContent')}
 		sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
@@ -327,9 +330,14 @@
 		background: #ffffff;
 	}
 
-	/* In dark mode the page is the message's own — recoloured, or the dark one
-	   its sender wrote — so the card gets out of its way. */
-	:global(html[data-theme='dark']) .frame.rich {
+	/* A sender who wrote no dark version keeps their light page in dark mode, as
+	   Gmail does — its colours are never rewritten. */
+	:global(html[data-theme]) .frame.light-only {
+		color-scheme: light;
+	}
+
+	/* One who did gets their dark page, so the card gets out of its way. */
+	:global(html[data-theme='dark']) .frame.rich:not(.light-only) {
 		background: transparent;
 	}
 </style>

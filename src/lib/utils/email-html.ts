@@ -12,10 +12,10 @@
  */
 
 /**
- * Was the message laid out, or just written? Anything with a layout is shown
- * as its sender designed it — on white, untouched. Ordinary correspondence is
- * shown in the app's own colours, so a reply reads like part of the thread
- * rather than a sheet of paper dropped into it.
+ * Did the sender style the message, or just write it? Anything styled is shown
+ * the way its sender made it — on white, untouched. Only a message with no
+ * styling of its own is shown in the app's colours and type, so a plain reply
+ * reads like part of the thread rather than a sheet of paper dropped into it.
  */
 const LAYOUT_MARKERS = [
 	/<table[\s>]/i,
@@ -23,8 +23,13 @@ const LAYOUT_MARKERS = [
 	/\sbgcolor\s*=/i,
 	/background(?:-color)?\s*:(?!\s*(?:transparent|none|inherit|initial|unset)\b)/i,
 	/position\s*:\s*(absolute|fixed)/i,
-	/<center[\s>]/i
+	/<center[\s>]/i,
+	/<font[\s>]/i,
+	/\scolor\s*=/i
 ];
+
+/** Inline declarations that mean the sender chose how it looks. */
+const STYLING_PROPERTIES = ['color', 'background', 'font'];
 
 /** Where the sender's own words end and the conversation history begins. */
 const QUOTE_BOUNDARY = [
@@ -55,14 +60,44 @@ function ownContent(html: string): string {
 	return cut > 30 ? html.slice(0, cut) : html;
 }
 
-export function isRichHtml(html: string): boolean {
-	const own = ownContent(html);
-	return LAYOUT_MARKERS.some((marker) => marker.test(own));
+/** Where a `style=` value that starts at `start` ends: its closing quote, or for an unquoted one a space or `>`. */
+function valueEnd(lower: string, start: number): number {
+	const quote = lower[start];
+	if (quote === '"' || quote === "'") {
+		const close = lower.indexOf(quote, start + 1);
+		return close === -1 ? lower.length : close;
+	}
+	let end = start;
+	while (end < lower.length && lower[end] !== ' ' && lower[end] !== '>') end += 1;
+	return end;
 }
 
 /**
- * Did the sender design a dark version? Theirs is shown untouched when so, and
- * a message without one is recoloured instead. A bare `color-scheme`
+ * Any `style=` attribute setting a colour, background or font. Each value is
+ * read once and the scan resumes after it, so it stays linear however many
+ * there are — a regex over this would not.
+ */
+function hasInlineStyling(html: string): boolean {
+	const lower = html.toLowerCase();
+	let at = lower.indexOf('style=');
+	while (at !== -1) {
+		const start = at + 'style='.length;
+		const end = valueEnd(lower, start);
+		const value = lower.slice(start, end);
+		if (STYLING_PROPERTIES.some((property) => value.includes(property))) return true;
+		at = lower.indexOf('style=', Math.max(end, start));
+	}
+	return false;
+}
+
+export function isRichHtml(html: string): boolean {
+	const own = ownContent(html);
+	return LAYOUT_MARKERS.some((marker) => marker.test(own)) || hasInlineStyling(own);
+}
+
+/**
+ * Did the sender design a dark version? Theirs is shown in dark mode when so;
+ * otherwise the message keeps its light page. A bare `color-scheme`
  * declaration does not count: it opts into the client adapting the message,
  * not into colours the sender picked.
  */
@@ -71,153 +106,32 @@ export function supportsDarkScheme(html: string): boolean {
 }
 
 /**
- * A declaration ends at a semicolon or a brace — but in markup it also ends at
- * the quote closing the style attribute. Without that, `color:#111"><td
- * style="background:#fff` reads as one long colour declaration and the
- * background is judged as if it were text.
+ * What the frame itself depends on — sizing from outside, no inner scrollbars,
+ * the quote toggle. It goes last in the head, so nothing a sender writes can
+ * undo it.
  */
-const COLOUR_DECLARATION =
-	/\b(background(?:-color)?|color|border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:[^;}"'<>]*/gi;
-const COLOUR_LITERAL =
-	/#[0-9a-f]{3,8}|rgba?\([^)]{1,160}\)|\b(?:black|white|darkgray|darkgrey|lightgray|lightgrey)\b/gi;
-const HTML_TAG = /<[a-z][^>]{0,8192}>/gi;
-const COLOUR_ATTRIBUTE =
-	/(^|\s)(bgcolor|color)\s*=\s*(["']?)(#[0-9a-f]{3,8}|rgba?\([^)]{1,160}\)|(?:black|white|darkgray|darkgrey|lightgray|lightgrey))\3/gi;
-
-const NAMED_COLOUR_VALUES: Record<string, [number, number, number, number]> = {
-	black: [0, 0, 0, 1],
-	white: [1, 1, 1, 1],
-	darkgray: [169 / 255, 169 / 255, 169 / 255, 1],
-	darkgrey: [169 / 255, 169 / 255, 169 / 255, 1],
-	lightgray: [211 / 255, 211 / 255, 211 / 255, 1],
-	lightgrey: [211 / 255, 211 / 255, 211 / 255, 1]
-};
-
-function rgba(literal: string): [number, number, number, number] | null {
-	const value = literal.trim().toLowerCase();
-
-	if (value.startsWith('#')) return hexRgba(value.slice(1));
-	if (Object.hasOwn(NAMED_COLOUR_VALUES, value)) return NAMED_COLOUR_VALUES[value];
-	return functionRgba(value);
-}
-
-/** `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`, without the `#`, as eight hex digits. */
-function expandHex(hex: string): string | null {
-	switch (hex.length) {
-		case 3:
-			return `${[...hex].map((digit) => digit + digit).join('')}ff`;
-		case 4:
-			return [...hex].map((digit) => digit + digit).join('');
-		case 6:
-			return `${hex}ff`;
-		case 8:
-			return hex;
-		default:
-			return null;
-	}
-}
-
-function hexRgba(hex: string): [number, number, number, number] | null {
-	const expanded = expandHex(hex);
-	if (!expanded) return null;
-
-	const packed = Number.parseInt(expanded, 16);
-	if (Number.isNaN(packed)) return null;
-	return [
-		((packed >>> 24) & 0xff) / 255,
-		((packed >>> 16) & 0xff) / 255,
-		((packed >>> 8) & 0xff) / 255,
-		(packed & 0xff) / 255
-	];
-}
-
-/** `rgb(…)` / `rgba(…)`, with channels as numbers or percentages. */
-function functionRgba(value: string): [number, number, number, number] | null {
-	const parts = value
-		.replace(/rgba?|\(|\)/g, '')
-		.split(/[,/\s]+/)
-		.filter(Boolean);
-	if (parts.length < 3) return null;
-
-	const channel = (part: string) => {
-		const parsed = Number.parseFloat(part);
-		if (Number.isNaN(parsed)) return null;
-		const normalized = part.endsWith('%') ? parsed / 100 : parsed / 255;
-		return Math.min(1, Math.max(0, normalized));
-	};
-	const alpha = (part: string | undefined) => {
-		if (!part) return 1;
-		const parsed = Number.parseFloat(part);
-		if (Number.isNaN(parsed)) return null;
-		const normalized = part.endsWith('%') ? parsed / 100 : parsed;
-		return Math.min(1, Math.max(0, normalized));
-	};
-	const red = channel(parts[0]);
-	const green = channel(parts[1]);
-	const blue = channel(parts[2]);
-	const opacity = alpha(parts[3]);
-	if (red === null || green === null || blue === null || opacity === null) return null;
-	return [red, green, blue, opacity];
-}
-
-/**
- * Near-white pages become the app's surface and near-black text becomes light,
- * while everything in between — the sender's accents, their brand colours — is
- * left exactly as it was. Inverting the whole rendering instead would flip
- * their logos with it.
- */
-function darkModeColour(literal: string, property: string): string {
-	const parsed = rgba(literal);
-	if (!parsed) return literal;
-
-	const [red, green, blue, alpha] = parsed;
-	if (alpha < 0.2) return literal;
-
-	const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-	const normalized = property.toLowerCase();
-
-	if (normalized.includes('background') || normalized === 'bgcolor') {
-		if (luminance > 0.78) return '#1f1f23';
-		if (luminance > 0.52) return '#2b2b31';
-		return literal;
-	}
-
-	if (luminance < 0.25) return '#f2f2f7';
-	if (luminance < 0.5) return '#d1d1d6';
-	return literal;
-}
-
-/** Rewrites colours in markup or a stylesheet for a dark page. */
-export function adaptDarkColours(source: string): string {
-	const declarationsAdapted = source.replace(COLOUR_DECLARATION, (declaration, property: string) =>
-			declaration.replace(COLOUR_LITERAL, (literal: string) =>
-				darkModeColour(literal, property)
-			)
-		);
-
-	return declarationsAdapted.replace(HTML_TAG, (tag) =>
-		tag.replace(
-			COLOUR_ATTRIBUTE,
-			(attribute, _prefix: string, property: string, _quote: string, literal: string) =>
-				attribute.replace(literal, darkModeColour(literal, property))
-		)
-	);
-}
-
-/** Applies to both modes: sizing, wrapping and the quote toggle. */
-const BASE_CSS = `
+const FRAME_CSS = `
 /* The frame is sized to its content from the outside, so percentage heights
    inside would feed back into that measurement. */
 html, body { height: auto !important; }
 /* A frame paints an opaque white canvas unless the document opts out, which is
    what put a white sheet under plain replies. A transparent background alone is
    not enough: a frame whose colour scheme differs from its embedder's is denied
-   transparency and painted in its own scheme instead, so each mode below
-   declares a scheme of its own to match. */
-/* Safari inflates text in a frame on its own judgement; keep the sizes we set. */
+   transparency and painted in its own scheme instead, so the plain styles below
+   declare a scheme of their own to match. */
+/* Safari inflates text in a frame on its own judgement; keep the sizes set. */
 html { overflow-x: auto; overflow-y: hidden; background: transparent; -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+/* Set from outside the frame; the control that clears it lives out there too. */
+.quote-hidden { display: none !important; }
+`;
+
+/**
+ * A message with no styling of its own: the app's type and colours. Nothing of
+ * the sender's is lost, since there was nothing of theirs to begin with.
+ */
+const SIMPLE_CSS = `
 body {
-	margin: 0;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 	font-size: 15px;
 	line-height: 1.65;
@@ -228,24 +142,16 @@ p { margin: 0 0 1em; }
 ul { list-style: disc outside; margin: 0.5em 0; padding-left: 1.5em; }
 ol { list-style: decimal outside; margin: 0.5em 0; padding-left: 1.5em; }
 pre { white-space: pre-wrap; }
-/* Set from outside the frame; the control that clears it lives out there too. */
-.quote-hidden { display: none !important; }
-`;
-
-/** Ordinary correspondence: the app's colours, the app's background. */
-const SIMPLE_CSS = `
-html:not([data-theme='dark']) { color-scheme: light; }
-body { color: #525252; background: transparent; }
 img, video, svg { max-width: 100%; height: auto; }
 table { max-width: 100%; }
+
+html:not([data-theme='dark']) { color-scheme: light; }
+body { color: #525252; background: transparent; }
 a { color: #4f6b58; }
 blockquote { border-color: rgba(0, 0, 0, 0.12) !important; }
 
-/*
- * Dark mode. A message written on a white page carries near-black text, which
- * has to give way to the theme's own or it is unreadable here. Inline styles
- * outrank stylesheets, hence !important.
- */
+/* Dark mode. Plain text written on a white page is near-black, which has to
+   give way to the theme's own or it is unreadable here. */
 :root[data-theme='dark'] { color-scheme: dark; }
 :root[data-theme='dark'] body { color: #a8a8b3 !important; background-color: transparent !important; }
 :root[data-theme='dark'] body *:not(a) {
@@ -258,33 +164,42 @@ blockquote { border-color: rgba(0, 0, 0, 0.12) !important; }
 `;
 
 /**
- * A designed message renders on the page its sender built it for. Recolouring
- * its parts one by one loses the relationships between their colours, and
- * inverting the whole rendering does not work either: a body background
- * propagates to the frame's canvas, which is painted outside the filtered
- * element, so the page stays light while its contents flip.
- *
- * Which page that is comes down to the scheme the frame is asked to render in,
- * and that is set from outside — on the <iframe> itself, since a document's
- * `prefers-color-scheme` reflects the embedding element rather than its own
- * root. A sender who wrote no dark styles is pinned to light out there, so the
- * white branch below is the one that runs for them.
+ * A styled message gets only what it may be assuming a client provides: a
+ * white page, dark text and a plain font. These go in *ahead* of the sender's
+ * own head, so any stylesheet of theirs wins — our rules are the fallback, never
+ * the override. Its colours are never rewritten: a sender who wrote no dark
+ * version is shown on its light page in dark mode too, as Gmail does, because
+ * recolouring parts one by one loses the relationships between them.
  */
-const RICH_CSS = `
-body { padding: 18px 20px; }
+const STYLED_DEFAULTS_CSS = `
+body { padding: 18px 20px; font: 14px/1.5 Arial, Helvetica, sans-serif; }
+`;
+
+/**
+ * No dark version: the light page is declared outright rather than through
+ * \`prefers-color-scheme\`, which inside a frame follows different things in
+ * different browsers — and a dark canvas under colours written for white is
+ * unreadable.
+ */
+const LIGHT_PAGE_CSS = `
+html { color-scheme: light; }
+body { color: #202124; background: #ffffff; }
+`;
+
+/** The sender ships a dark version; the page follows the theme and theirs paints over it. */
+const SCHEME_PAGE_CSS = `
 @media (prefers-color-scheme: light) {
 	html { color-scheme: light; }
-	body { color: #18181b; background: #ffffff; }
-	a { color: #1a56db; }
+	body { color: #202124; background: #ffffff; }
 }
-/* The sender ships a dark version; leave its colours alone and let it paint. */
 @media (prefers-color-scheme: dark) {
 	html { color-scheme: dark; }
 }
 `;
 
+/** The stylesheet that goes last: the frame's rules, plus the app's look for a plain message. */
 export function emailCss(rich: boolean): string {
-	return BASE_CSS + (rich ? RICH_CSS : SIMPLE_CSS);
+	return rich ? FRAME_CSS : FRAME_CSS + SIMPLE_CSS;
 }
 
 /** Marks our stylesheet so a later pass can tell it is already in place. */
@@ -309,9 +224,16 @@ const CSP =
 	"font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; " +
 	"form-action 'none'; base-uri 'none'";
 
-function headStart(): string {
+/** A styled message's fallbacks; a plain one gets none, since everything it needs comes last. */
+function styledDefaults(html: string): string {
+	const page = supportsDarkScheme(html) ? SCHEME_PAGE_CSS : LIGHT_PAGE_CSS;
+	return `<style>${STYLED_DEFAULTS_CSS}${page}</style>`;
+}
+
+function headStart(html: string, rich: boolean): string {
+	const defaults = rich ? styledDefaults(html) : '';
 	return `<meta http-equiv="Content-Security-Policy" content="${CSP}">
-<meta name="referrer" content="no-referrer">`;
+<meta name="referrer" content="no-referrer">${defaults}`;
 }
 
 /**
@@ -364,16 +286,8 @@ export function buildEmailDocument(
 	options: { rich: boolean; theme?: string }
 ): string {
 	const theme = options.theme ?? 'light';
-	const before = headStart();
+	const before = headStart(html, options.rich);
 	const after = headEnd(options.rich);
-
-	// A designed message written only for a white page is recoloured to suit a
-	// dark one. One that brought its own dark styles is left alone, and ordinary
-	// correspondence is handled by the stylesheet instead.
-	const source =
-		options.rich && theme === 'dark' && !supportsDarkScheme(html)
-			? adaptDarkColours(html)
-			: html;
 
 	// A complete document cannot be nested inside another one — that drops its
 	// <head>, and with it any <style> the layout needs. Our own assets are
@@ -381,10 +295,10 @@ export function buildEmailDocument(
 	// after load matters in dark mode: the colour scheme and the transparency
 	// opt-out have to be in the very first paint, or the message flashes up as a
 	// white sheet while it waits for script.
-	if (isFullDocument(source)) return withTheme(spliceHead(source, before, after), theme);
+	if (isFullDocument(html)) return withTheme(spliceHead(html, before, after), theme);
 
 	return `<!doctype html><html data-theme="${theme}"><head><meta charset="utf-8">
 ${before}
 ${after}
-</head><body>${source}</body></html>`;
+</head><body>${html}</body></html>`;
 }
