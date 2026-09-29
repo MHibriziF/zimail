@@ -1,11 +1,15 @@
 import { eventInterval } from '../../calendar/events';
 import { dateKeyIn, startOfDayIn } from '../../calendar/grid';
 import {
+	guestChangeBlock,
+	MAX_GUEST_RESCHEDULES,
 	MAX_PAGES_PER_USER,
 	SLOT_DAYS_PER_REQUEST,
 	slugify,
 	validateGuest,
 	validatePageSettings,
+	type GuestChangeBlock,
+	type ManagedBookingView,
 	type PublicReservationPage,
 	type ReservationPage,
 	type ReservationPageError,
@@ -15,7 +19,8 @@ import { computeSlots, isFreeSlot, type DaySlots, type Interval } from '../../ca
 import type { CalendarRepository } from '../calendar/repository';
 import type { BookingDetails, InviteKind } from './email';
 import type { RoomSettings } from '../../meet/room-settings';
-import type { ReservationsRepository, StoredPage } from './repository';
+import type { ManagedBooking, ReservationsRepository, StoredBooking, StoredPage } from './repository';
+import { createLinkToken, hashToken } from '../util/crypto';
 
 const DAY_MS = 86_400_000;
 /** A page takes at most this many bookings a day, and one guest address this many upcoming ones. */
@@ -44,8 +49,15 @@ export type PageWriteOutcome =
 	| { type: 'limit_reached' }
 	| { type: 'not_found' };
 
+/** A guest's own change through their link. */
+export type GuestChangeOutcome =
+	| { type: 'ok'; start: string; end: string }
+	| { type: 'not_found' }
+	| { type: 'slot_taken' }
+	| { type: GuestChangeBlock };
+
 export type BookingOutcome =
-	| { type: 'ok'; start: string; end: string; meetingUrl: string | null }
+	| { type: 'ok'; start: string; end: string; meetingUrl: string | null; manageUrl: string }
 	| { type: 'not_found' }
 	| { type: 'invalid_name' }
 	| { type: 'invalid_email' }
@@ -73,6 +85,13 @@ export type ReservationsService = {
 	 * another booking already in that slot still is.
 	 */
 	rescheduleBooking(userId: string, eventId: string, start: Date, end: Date): Promise<'ok' | 'not_found' | 'slot_taken'>;
+	/** The booking behind a guest's link, as they see it; `null` for a link that matches none. */
+	managedBooking(token: string): Promise<ManagedBookingView | null>;
+	/** Free slots to move it to; its own current time is left out. */
+	rescheduleSlots(token: string, fromKey: string | null): Promise<DaySlots[] | null>;
+	/** `baseUrl` is for the link in the updated invitation. */
+	rescheduleByGuest(token: string, body: Record<string, unknown>, baseUrl: string): Promise<GuestChangeOutcome>;
+	cancelByGuest(token: string): Promise<GuestChangeOutcome>;
 };
 
 export type ReservationsServiceDeps = {
@@ -119,6 +138,24 @@ function randomSuffix(): string {
 	return crypto.randomUUID().replaceAll('-', '').slice(0, 5);
 }
 
+/** What every email about an existing booking says, at its next revision; `changes` overrides. */
+function detailsFor(eventId: string, booking: StoredBooking, changes: Partial<BookingDetails> = {}) {
+	return {
+		uid: inviteUid(eventId),
+		pageTitle: booking.pageTitle,
+		guestName: booking.guestName,
+		guestEmail: booking.guestEmail,
+		note: booking.note ?? '',
+		start: new Date(booking.start),
+		end: new Date(booking.end),
+		timeZone: booking.timeZone,
+		meetingUrl: booking.meetingUrl,
+		location: booking.location,
+		sequence: booking.sequence + 1,
+		...changes
+	};
+}
+
 export function createReservationsService(deps: ReservationsServiceDeps): ReservationsService {
 	const { repo } = deps;
 	const now = deps.now ?? (() => new Date());
@@ -139,7 +176,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 	}
 
 	/** Busy intervals near `[fromKey, fromKey + days)`, read in the page's zone. */
-	async function busyNear(page: StoredPage, fromKey: string, days: number): Promise<Interval[]> {
+	/** `excluding` leaves one event out — the booking being moved doesn't block its own new time. */
+	async function busyNear(page: StoredPage, fromKey: string, days: number, excluding?: string): Promise<Interval[]> {
 		const from = startOfDayIn(fromKey, page.timeZone).getTime() - DAY_MS;
 		const to = from + (days + 2) * DAY_MS;
 		const events = await deps.calendar.listOverlapping(
@@ -148,7 +186,41 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			new Date(to).toISOString(),
 			2000
 		);
-		return events.filter((event) => event.busy).map((event) => eventInterval(event, page.timeZone));
+		return events
+			.filter((event) => event.busy && event.id !== excluding)
+			.map((event) => eventInterval(event, page.timeZone));
+	}
+
+	/** A week of free slots from `fromKey`, clamped to today and the page's first day. */
+	async function slotsFor(page: StoredPage, fromKey: string | null, excluding?: string): Promise<DaySlots[]> {
+		const at = now();
+		const today = dateKeyIn(at, page.timeZone);
+		const requested = fromKey && /^\d{4}-\d{2}-\d{2}$/.test(fromKey) ? fromKey : today;
+		const start = [requested, today, page.startDate].sort((a, b) => a.localeCompare(b))[2];
+		const busy = await busyNear(page, start, SLOT_DAYS_PER_REQUEST, excluding);
+		return computeSlots(page, busy, { fromKey: start, days: SLOT_DAYS_PER_REQUEST, now: at });
+	}
+
+	const manageLink = (baseUrl: string, token: string) => new URL(`/book/manage/${token}`, baseUrl).href;
+	const changeDeadline = (start: Date, page: StoredPage) =>
+		new Date(start.getTime() - page.rescheduleCutoffHours * 3_600_000);
+
+	/** A guest's link, resolved to its booking and page. */
+	async function loadManaged(token: string): Promise<{ booking: ManagedBooking; page: StoredPage } | null> {
+		if (!token || token.length > 100) return null;
+		const booking = await repo.getBookingByToken(await hashToken(token));
+		const page = booking ? await repo.get(booking.userId, booking.pageId) : null;
+		return booking && page ? { booking, page } : null;
+	}
+
+	function blockFor(booking: ManagedBooking, page: StoredPage, action: 'reschedule' | 'cancel') {
+		return guestChangeBlock({
+			start: new Date(booking.start),
+			now: now(),
+			cutoffHours: page.rescheduleCutoffHours,
+			rescheduleCount: booking.rescheduleCount,
+			action
+		});
 	}
 
 	/** Why a booking can't go ahead, or `null` if it can. The slot is re-checked here, not trusted from the page. */
@@ -261,14 +333,9 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		async slots(slug, fromKey) {
 			const page = await activePage(slug);
 			if (!page) return null;
-			const at = now();
-			const today = dateKeyIn(at, page.timeZone);
-			const requested = fromKey && /^\d{4}-\d{2}-\d{2}$/.test(fromKey) ? fromKey : today;
-			const start = [requested, today, page.startDate].sort((a, b) => a.localeCompare(b))[2];
 			// Not awaited: this visitor sees what is stored, and it is fresh a moment later.
 			refreshHost(page.userId);
-			const busy = await busyNear(page, start, SLOT_DAYS_PER_REQUEST);
-			return computeSlots(page, busy, { fromKey: start, days: SLOT_DAYS_PER_REQUEST, now: at });
+			return slotsFor(page, fromKey);
 		},
 
 		async book(slug, body, baseUrl) {
@@ -288,6 +355,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const end = new Date(start.getTime() + page.slotMinutes * 60_000);
 			const eventId = crypto.randomUUID();
 			const { name, email, note } = guest.value;
+			const manageToken = createLinkToken();
 			const room = await openRoom(page, name, baseUrl);
 			try {
 				await repo.insertBooking({
@@ -307,7 +375,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 						.join('\n\n'),
 					meetingCode: room?.code ?? null,
 					meetingUrl: room?.url ?? null,
-					eventLocation: page.location ?? room?.url ?? null
+					eventLocation: page.location ?? room?.url ?? null,
+					manageTokenHash: await hashToken(manageToken)
 				});
 			} catch (error) {
 				// The slot went to someone else; the room opened for this attempt has no use.
@@ -326,9 +395,16 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				end,
 				timeZone: page.timeZone,
 				meetingUrl: room?.url ?? null,
-				location: page.location
+				location: page.location,
+				manage: { url: manageLink(baseUrl, manageToken), until: changeDeadline(start, page) }
 			});
-			return { type: 'ok', start: start.toISOString(), end: end.toISOString(), meetingUrl: room?.url ?? null };
+			return {
+				type: 'ok',
+				start: start.toISOString(),
+				end: end.toISOString(),
+				meetingUrl: room?.url ?? null,
+				manageUrl: manageLink(baseUrl, manageToken)
+			};
 		},
 
 		async cancelBooking(userId, eventId) {
@@ -337,18 +413,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			if (!(await deps.calendar.deleteReservation(userId, eventId))) return false;
 			if (!booking) return true;
 			if (booking.meetingCode) await closeRoom(userId, booking.meetingCode);
-			await tellGuest(userId, 'cancel', {
-				uid: inviteUid(eventId),
-				pageTitle: booking.pageTitle,
-				guestName: booking.guestName,
-				guestEmail: booking.guestEmail,
-				note: booking.note ?? '',
-				start: new Date(booking.start),
-				end: new Date(booking.end),
-				timeZone: booking.timeZone,
-				meetingUrl: null,
-				sequence: booking.sequence + 1
-			});
+			await tellGuest(userId, 'cancel', detailsFor(eventId, booking, { meetingUrl: null }));
 			return true;
 		},
 
@@ -361,19 +426,76 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				if (isUniqueConstraintError(error)) return 'slot_taken';
 				throw error;
 			}
-			await tellGuest(userId, 'moved', {
-				uid: inviteUid(eventId),
-				pageTitle: booking.pageTitle,
-				guestName: booking.guestName,
-				guestEmail: booking.guestEmail,
-				note: booking.note ?? '',
-				start,
-				end,
-				timeZone: booking.timeZone,
-				meetingUrl: booking.meetingUrl,
-				sequence: booking.sequence + 1
-			});
+			await tellGuest(userId, 'moved', detailsFor(eventId, booking, { start, end }));
 			return 'ok';
+		},
+
+		async managedBooking(token) {
+			const loaded = await loadManaged(token);
+			if (!loaded) return null;
+			const { booking, page } = loaded;
+			const host = await deps.hostOf(booking.userId);
+			return {
+				pageTitle: booking.pageTitle,
+				host: host?.name ?? '',
+				location: booking.location,
+				meetingUrl: booking.meetingUrl,
+				start: booking.start,
+				end: booking.end,
+				timeZone: page.timeZone,
+				endDate: page.endDate,
+				rescheduleBlock: blockFor(booking, page, 'reschedule'),
+				cancelBlock: blockFor(booking, page, 'cancel'),
+				reschedulesLeft: Math.max(0, MAX_GUEST_RESCHEDULES - booking.rescheduleCount),
+				changeUntil: changeDeadline(new Date(booking.start), page).toISOString()
+			};
+		},
+
+		async rescheduleSlots(token, fromKey) {
+			const loaded = await loadManaged(token);
+			if (!loaded) return null;
+			const days = await slotsFor(loaded.page, fromKey, loaded.booking.eventId);
+			return days.map((day) => ({ ...day, slots: day.slots.filter((slot) => slot !== loaded.booking.start) }));
+		},
+
+		async rescheduleByGuest(token, body, baseUrl) {
+			const loaded = await loadManaged(token);
+			if (!loaded) return { type: 'not_found' };
+			const { booking, page } = loaded;
+			const block = blockFor(booking, page, 'reschedule');
+			if (block) return { type: block };
+
+			const start = new Date(typeof body.start === 'string' ? body.start : '');
+			if (Number.isNaN(start.getTime()) || start.toISOString() === booking.start) return { type: 'slot_taken' };
+			const dateKey = dateKeyIn(start, page.timeZone);
+			const busy = await busyNear(page, dateKey, 1, booking.eventId);
+			if (!isFreeSlot(page, busy, start, now(), dateKey)) return { type: 'slot_taken' };
+
+			const end = new Date(start.getTime() + page.slotMinutes * 60_000);
+			try {
+				const moved = await repo.moveBooking(booking.userId, booking.eventId, start.toISOString(), end.toISOString(), true);
+				if (!moved) return { type: 'not_found' };
+			} catch (error) {
+				if (isUniqueConstraintError(error)) return { type: 'slot_taken' };
+				throw error;
+			}
+			await tellGuest(booking.userId, 'guest-moved', {
+				...detailsFor(booking.eventId, booking, { start, end }),
+				manage: { url: manageLink(baseUrl, token), until: changeDeadline(start, page) }
+			});
+			return { type: 'ok', start: start.toISOString(), end: end.toISOString() };
+		},
+
+		async cancelByGuest(token) {
+			const loaded = await loadManaged(token);
+			if (!loaded) return { type: 'not_found' };
+			const { booking, page } = loaded;
+			const block = blockFor(booking, page, 'cancel');
+			if (block) return { type: block };
+			if (!(await deps.calendar.deleteReservation(booking.userId, booking.eventId))) return { type: 'not_found' };
+			if (booking.meetingCode) await closeRoom(booking.userId, booking.meetingCode);
+			await tellGuest(booking.userId, 'guest-cancel', detailsFor(booking.eventId, booking, { meetingUrl: null }));
+			return { type: 'ok', start: booking.start, end: booking.end };
 		}
 	};
 }

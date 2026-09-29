@@ -1,3 +1,5 @@
+import { trimTrailing } from '../../utils/text';
+
 const PBKDF2_ITERATIONS = 100_000;
 
 function toBase64(bytes: Uint8Array): string {
@@ -60,6 +62,12 @@ export async function verifyPassword(password: string, stored: string): Promise<
 export async function hashToken(token: string): Promise<string> {
 	const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
 	return toBase64(new Uint8Array(digest));
+}
+
+/** 32 random bytes as base64url, for a secret that travels in a link. Store only `hashToken` of it. */
+export function createLinkToken(): string {
+	const base64 = toBase64(crypto.getRandomValues(new Uint8Array(32)));
+	return trimTrailing(base64, '=').replaceAll('+', '-').replaceAll('/', '_');
 }
 
 export function createSessionToken(): string {

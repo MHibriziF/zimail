@@ -10,6 +10,8 @@
 	import {
 		MAX_PAGE_DESCRIPTION_LENGTH,
 		MAX_PAGE_LOCATION_LENGTH,
+		DEFAULT_RESCHEDULE_CUTOFF_HOURS,
+		RESCHEDULE_CUTOFF_HOURS,
 		MAX_PAGE_TITLE_LENGTH,
 		SLOT_LENGTHS,
 		minutesToTime,
@@ -79,7 +81,8 @@
 			bufferMinutes: 0,
 			noticeMinutes: 240,
 			active: true,
-			withMeeting: meetingsAvailable
+			withMeeting: meetingsAvailable,
+			rescheduleCutoffHours: DEFAULT_RESCHEDULE_CUTOFF_HOURS
 		};
 	}
 
@@ -248,6 +251,14 @@
 					</select>
 				</label>
 			</div>
+			<label class="resv-field">
+				<span>{t('calendar.reservations.rescheduleCutoff')}</span>
+				<select class="resv-input" bind:value={draft.rescheduleCutoffHours}>
+					{#each RESCHEDULE_CUTOFF_HOURS as hours (hours)}
+						<option value={hours}>{hours >= 24 ? t('calendar.reservations.noticeDays', { count: hours / 24 }) : t('calendar.reservations.noticeHours', { count: hours })}</option>
+					{/each}
+				</select>
+			</label>
 			<label class="resv-field">
 				<span>{t('calendar.reservations.slug')}</span>
 				<div class="resv-slug">

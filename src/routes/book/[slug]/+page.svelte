@@ -6,10 +6,8 @@
 	import { APP_NAME } from '$lib/constants';
 	import Icon from '$lib/components/Icon.svelte';
 	import { detectTimeZone } from '$lib/timezone';
-	import { addDays, dateKeyToUtc } from '$lib/calendar/events';
-	import { dateKeyIn } from '$lib/calendar/grid';
-	import { MAX_GUEST_NAME_LENGTH, MAX_GUEST_NOTE_LENGTH, SLOT_DAYS_PER_REQUEST } from '$lib/calendar/reservations';
-	import type { DaySlots } from '$lib/calendar/slots';
+	import { MAX_GUEST_NAME_LENGTH, MAX_GUEST_NOTE_LENGTH } from '$lib/calendar/reservations';
+	import SlotPicker from '$lib/components/booking/SlotPicker.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -21,67 +19,18 @@
 	const locale = $derived(intlLocale($page.data.locale ?? DEFAULT_LOCALE));
 	// Guests read times in their own zone; the page's zone only decides which hours exist.
 	const guestZone = $derived(browser ? detectTimeZone() : reservation.timeZone);
-	const timeFormat = $derived(new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: guestZone }));
-	const dayFormat = $derived(
-		new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })
-	);
 	const fullFormat = $derived(
 		new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: guestZone })
 	);
 
-	let fromKey = $state<string | null>(null);
-	let days = $state<DaySlots[]>([]);
-	let loading = $state(true);
-	let loadError = $state('');
+	let picker = $state<SlotPicker>();
 	let chosen = $state('');
 	let name = $state('');
 	let email = $state('');
 	let note = $state('');
 	let submitting = $state(false);
 	let submitError = $state('');
-	let booked = $state<{ start: string; end: string; meetingUrl: string | null } | null>(null);
-
-	/** The same free slots, regrouped by the guest's own dates. */
-	const groups = $derived.by(() => {
-		const byDay = new Map<string, string[]>();
-		for (const slot of days.flatMap((day) => day.slots)) {
-			const key = dateKeyIn(new Date(slot), guestZone);
-			byDay.set(key, [...(byDay.get(key) ?? []), slot]);
-		}
-		return [...byDay.entries()].map(([key, slots]) => ({ key, slots }));
-	});
-	const firstDay = $derived(days[0]?.date ?? null);
-	const lastDay = $derived(days.at(-1)?.date ?? null);
-	const hasPrevious = $derived(fromKey !== null && firstDay !== null && firstDay > dateKeyIn(new Date(), reservation.timeZone));
-	const hasNext = $derived(lastDay !== null && lastDay < reservation.endDate);
-
-	let request = 0;
-	$effect(() => {
-		const current = ++request;
-		const query = fromKey ? `?from=${fromKey}` : '';
-		loading = true;
-		loadError = '';
-		fetch(`/api/book/${encodeURIComponent(reservation.slug)}${query}`)
-			.then(async (response) => {
-				const body = (await response.json().catch(() => ({}))) as { days?: DaySlots[]; error?: string };
-				if (current !== request) return;
-				if (!response.ok || !body.days) loadError = body.error ?? t('book.couldNotLoad');
-				else days = body.days;
-			})
-			.catch(() => {
-				if (current === request) loadError = t('common.networkError');
-			})
-			.finally(() => {
-				if (current === request) loading = false;
-			});
-	});
-
-	function shift(direction: 1 | -1) {
-		const base = direction === 1 ? lastDay : firstDay;
-		if (!base) return;
-		chosen = '';
-		fromKey = addDays(base, direction === 1 ? 1 : -SLOT_DAYS_PER_REQUEST);
-	}
+	let booked = $state<{ start: string; end: string; meetingUrl: string | null; manageUrl: string | null } | null>(null);
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -98,18 +47,16 @@
 				start?: string;
 				end?: string;
 				meetingUrl?: string | null;
+				manageUrl?: string;
 				error?: string;
 				code?: string;
 			};
 			if (response.ok && body.start && body.end) {
-				booked = { start: body.start, end: body.end, meetingUrl: body.meetingUrl ?? null };
+				booked = { start: body.start, end: body.end, meetingUrl: body.meetingUrl ?? null, manageUrl: body.manageUrl ?? null };
 				return;
 			}
 			submitError = body.error ?? t('book.couldNotBook');
-			if (body.code === 'slot_taken') {
-				days = days.map((day) => ({ ...day, slots: day.slots.filter((slot) => slot !== chosen) }));
-				chosen = '';
-			}
+			if (body.code === 'slot_taken') picker?.drop(chosen);
 		} catch {
 			submitError = t('common.networkError');
 		} finally {
@@ -157,42 +104,20 @@
 					<p class="book-hint book-link">{booked.meetingUrl}</p>
 				{/if}
 				<p class="book-hint">{t('book.confirmationSent', { email })}</p>
+				{#if booked.manageUrl}
+					<a class="book-manage" href={booked.manageUrl}>{t('book.manageLink')}</a>
+				{/if}
 			</div>
 		{:else}
-			<div class="book-week">
-				<button type="button" class="icon-btn" aria-label={t('book.earlier')} disabled={!hasPrevious || loading} onclick={() => shift(-1)}>
-					<Icon name="arrow-left-s-line" size={20} />
-				</button>
-				<span>
-					{#if firstDay && lastDay}
-						{dayFormat.format(dateKeyToUtc(firstDay)!)} – {dayFormat.format(dateKeyToUtc(lastDay)!)}
-					{/if}
-				</span>
-				<button type="button" class="icon-btn" aria-label={t('book.later')} disabled={!hasNext || loading} onclick={() => shift(1)}>
-					<Icon name="arrow-right-s-line" size={20} />
-				</button>
-			</div>
-
-			{#if loadError}
-				<p class="book-error" role="alert">{loadError}</p>
-			{:else if !loading && groups.length === 0}
-				<p class="book-empty">{hasNext ? t('book.noneThisWeek') : t('book.noneLeft')}</p>
-			{/if}
-
-			<div class="book-days" aria-busy={loading}>
-				{#each groups as group (group.key)}
-					<div class="book-day">
-						<h2>{dayFormat.format(dateKeyToUtc(group.key)!)}</h2>
-						<div class="book-slots">
-							{#each group.slots as slot (slot)}
-								<button type="button" class="book-slot" aria-pressed={chosen === slot} onclick={() => (chosen = slot)}>
-									{timeFormat.format(new Date(slot))}
-								</button>
-							{/each}
-						</div>
-					</div>
-				{/each}
-			</div>
+			<SlotPicker
+				bind:this={picker}
+				bind:chosen
+				url="/api/book/{encodeURIComponent(reservation.slug)}"
+				pageZone={reservation.timeZone}
+				endDate={reservation.endDate}
+				{guestZone}
+				{locale}
+			/>
 
 			{#if chosen}
 				<form class="book-form" onsubmit={submit}>
@@ -274,55 +199,6 @@
 		white-space: pre-line;
 	}
 
-	.book-week {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		text-align: center;
-	}
-
-	.book-days {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.book-days[aria-busy='true'] {
-		opacity: 0.5;
-	}
-
-	.book-day h2 {
-		margin: 0 0 0.5rem;
-		font-size: 0.875rem;
-		font-weight: 600;
-	}
-
-	.book-slots {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
-		gap: 0.5rem;
-	}
-
-	.book-slot {
-		padding: 0.5rem;
-		border-radius: 0.625rem;
-		font-size: 0.875rem;
-		font-weight: 500;
-		font-variant-numeric: tabular-nums;
-		color: var(--color-accent-text);
-		background: var(--color-surface);
-		box-shadow: inset 0 0 0 1px var(--color-accent);
-	}
-
-	.book-slot:hover,
-	.book-slot[aria-pressed='true'] {
-		color: var(--color-on-accent);
-		background: var(--color-accent);
-	}
-
 	.book-form {
 		display: flex;
 		flex-direction: column;
@@ -367,7 +243,11 @@
 		color: var(--color-danger);
 	}
 
-	.book-empty,
+	.book-manage {
+		font-size: 0.875rem;
+		color: var(--color-accent-text);
+	}
+
 	.book-hint {
 		margin: 0;
 		font-size: 0.875rem;

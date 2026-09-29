@@ -17,6 +17,11 @@ export const MAX_GUEST_NOTE_LENGTH = 1000;
 export const MAX_PAGES_PER_USER = 20;
 /** How many days of slots one public request returns. */
 export const SLOT_DAYS_PER_REQUEST = 7;
+/** How close to the start a guest may still move or cancel, per page. */
+export const RESCHEDULE_CUTOFF_HOURS = [1, 4, 12, 24, 48, 72, 168] as const;
+export const DEFAULT_RESCHEDULE_CUTOFF_HOURS = 24;
+/** Moves one booking can take from its guest, so a slot can't be shuffled forever. */
+export const MAX_GUEST_RESCHEDULES = 3;
 
 const DAY_MS = 86_400_000;
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
@@ -41,6 +46,8 @@ export type ReservationPageSettings = {
 	active: boolean;
 	/** Give every booking its own Zimail meeting room. */
 	withMeeting: boolean;
+	/** Guests may move or cancel until this many hours before the start. */
+	rescheduleCutoffHours: number;
 };
 
 export type ReservationPage = ReservationPageSettings & { id: string };
@@ -57,9 +64,51 @@ export type ReservationPageError =
 	| 'invalid_time_zone'
 	| 'invalid_dates'
 	| 'invalid_hours'
-	| 'invalid_weekdays';
+	| 'invalid_weekdays'
+	| 'invalid_cutoff';
 
 export type GuestInput = { name: string; email: string; note: string };
+
+/** What a guest sees on the page for changing their own booking. */
+export type ManagedBookingView = {
+	pageTitle: string;
+	host: string;
+	location: string | null;
+	meetingUrl: string | null;
+	start: string;
+	end: string;
+	/** The page's zone and last date, for picking a new slot. */
+	timeZone: string;
+	endDate: string;
+	/** Why it can't be moved any more, or `null`. */
+	rescheduleBlock: GuestChangeBlock | null;
+	/** Why it can't be cancelled any more, or `null`. */
+	cancelBlock: GuestChangeBlock | null;
+	reschedulesLeft: number;
+	/** When changes stop being possible. */
+	changeUntil: string;
+};
+
+/** Why a guest can no longer change their booking, or `null` if they can. */
+export type GuestChangeBlock = 'past' | 'too_late' | 'limit_reached';
+
+/**
+ * The rules a guest's own change has to pass. Cancelling is only held to the
+ * cutoff; moving also to the per-booking limit.
+ */
+export function guestChangeBlock(booking: {
+	start: Date;
+	now: Date;
+	cutoffHours: number;
+	rescheduleCount: number;
+	action: 'reschedule' | 'cancel';
+}): GuestChangeBlock | null {
+	const lead = booking.start.getTime() - booking.now.getTime();
+	if (lead <= 0) return 'past';
+	if (lead < booking.cutoffHours * 3_600_000) return 'too_late';
+	if (booking.action === 'reschedule' && booking.rescheduleCount >= MAX_GUEST_RESCHEDULES) return 'limit_reached';
+	return null;
+}
 export type GuestError = 'invalid_name' | 'invalid_email';
 
 function clean(value: unknown, max: number): string {
@@ -132,6 +181,10 @@ export function validatePageSettings(
 			? input.description.trim().slice(0, MAX_PAGE_DESCRIPTION_LENGTH).trim() || null
 			: null;
 	const location = clean(input.location, MAX_PAGE_LOCATION_LENGTH) || null;
+	const rescheduleCutoffHours = input.rescheduleCutoffHours ?? DEFAULT_RESCHEDULE_CUTOFF_HOURS;
+	if (typeof rescheduleCutoffHours !== 'number' || !(RESCHEDULE_CUTOFF_HOURS as readonly number[]).includes(rescheduleCutoffHours)) {
+		return { ok: false, error: 'invalid_cutoff' };
+	}
 	return {
 		ok: true,
 		value: {
@@ -149,7 +202,8 @@ export function validatePageSettings(
 			bufferMinutes: input.bufferMinutes as number,
 			noticeMinutes: input.noticeMinutes as number,
 			active: input.active !== false,
-			withMeeting: input.withMeeting === true
+			withMeeting: input.withMeeting === true,
+			rescheduleCutoffHours: rescheduleCutoffHours as number
 		}
 	};
 }

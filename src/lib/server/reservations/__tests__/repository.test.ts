@@ -43,6 +43,7 @@ describe('ReservationsRepository', () => {
 			eventNotes: 'Booked by Ana',
 			meetingCode: 'abc-defg-hij',
 			meetingUrl: 'https://mail.example/meet/abc-defg-hij',
+			manageTokenHash: 'hash-1',
 			eventLocation: 'https://mail.test/meet/abc-defg-hij'
 		});
 		assert.equal(queries.length, 3);
@@ -70,6 +71,7 @@ describe('ReservationsRepository', () => {
 			eventNotes: 'Booked by Ana',
 			meetingCode: null,
 			meetingUrl: null,
+			manageTokenHash: 'hash-2',
 			eventLocation: null
 		});
 		assert.match(queries[2].sql, /INSERT INTO event_guests .*lower\(\?\)/s);
