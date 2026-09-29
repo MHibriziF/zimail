@@ -19,6 +19,38 @@ const DAY_MS = 86_400_000;
  * "Sync now" covers the case where a change has to show up at once.
  */
 export const FEED_REFRESH_MINUTES = 6 * 60;
+/**
+ * How stale a host's feeds may be when someone opens their booking page. A
+ * claim in D1 makes this a ceiling: however many visitors arrive, each feed is
+ * fetched at most once per window.
+ */
+export const BOOKING_REFRESH_MINUTES = 15;
+/** Feeds refreshed per booking-page request, the same bound the cron uses per tick. */
+const BOOKING_FEEDS_PER_REQUEST = 2;
+
+type SyncResult = 'synced' | 'failed' | 'skipped';
+
+/**
+ * Identifies what a full sync was computed from. The day is part of it so the
+ * expansion window still moves forward for a feed that never changes, and the
+ * zone because floating times are read in it.
+ */
+async function syncKeyOf(text: string, at: Date, timeZone: string): Promise<string> {
+	// Google stamps every event with the time of the fetch; hashing it would make
+	// every fetch look like a change. Nothing reads DTSTAMP when expanding.
+	const content = text
+		.split('\n')
+		// Property names are case-insensitive (RFC 5545).
+		.filter((line) => line.slice(0, 7).toUpperCase() !== 'DTSTAMP')
+		.join('\n');
+	const bytes = new TextEncoder().encode(`${at.toISOString().slice(0, 10)}|${timeZone}|${content}`);
+	const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+	return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function minutesBefore(at: Date, minutes: number): string {
+	return new Date(at.getTime() - minutes * 60_000).toISOString();
+}
 
 export type FeedWriteOutcome =
 	| { type: 'ok'; feed: CalendarFeed }
@@ -36,6 +68,8 @@ export type CalendarFeedsService = {
 	sync(userId: string, id: string): Promise<FeedWriteOutcome>;
 	/** For the cron: refreshes up to `limit` feeds that are due. */
 	syncDue(limit: number): Promise<{ synced: number; failed: number }>;
+	/** For the booking page: refreshes the host's feeds older than `BOOKING_REFRESH_MINUTES`. */
+	refreshStale(userId: string): Promise<void>;
 };
 
 export type CalendarFeedsServiceDeps = {
@@ -68,35 +102,40 @@ export function createCalendarFeedsService(deps: CalendarFeedsServiceDeps): Cale
 	const { repo } = deps;
 	const now = deps.now ?? (() => new Date());
 
-	async function runSync(feed: StoredFeed): Promise<boolean> {
+	/** Syncs one feed if the claim succeeds; `staleBefore` null claims unconditionally ("Sync now"). */
+	async function runSync(feed: StoredFeed, staleBefore: string | null): Promise<SyncResult> {
 		const at = now();
+		if (!(await repo.claim(feed.id, at.toISOString(), staleBefore))) return 'skipped';
+
 		try {
 			const text = await deps.fetchFeed(feed.url);
+			const timeZone = await deps.timeZoneOf(feed.userId);
+			const syncKey = await syncKeyOf(text, at, timeZone);
+			if (syncKey === feed.syncKey) {
+				await repo.recordSync(feed.id, { syncedAt: at.toISOString(), error: null, eventCount: null, syncKey: null });
+				return 'synced';
+			}
+
 			const events = expandCalendar(text, {
 				from: new Date(at.getTime() - SYNC_PAST_DAYS * DAY_MS),
 				to: new Date(at.getTime() + SYNC_FUTURE_DAYS * DAY_MS),
-				fallbackTimeZone: await deps.timeZoneOf(feed.userId)
+				fallbackTimeZone: timeZone
 			});
 			await repo.syncEvents(feed.userId, feed.id, events);
-			await repo.recordSync(feed.id, {
-				attemptedAt: at.toISOString(),
-				syncedAt: at.toISOString(),
-				error: null,
-				eventCount: events.length
-			});
-			return true;
+			await repo.recordSync(feed.id, { syncedAt: at.toISOString(), error: null, eventCount: events.length, syncKey });
+			return 'synced';
 		} catch (error) {
 			// Only our own messages reach the UI; anything else might carry internals.
 			const message = error instanceof FeedFetchError ? error.message : 'The calendar could not be read.';
-			await repo.recordSync(feed.id, { attemptedAt: at.toISOString(), syncedAt: null, error: message, eventCount: null });
-			return false;
+			await repo.recordSync(feed.id, { syncedAt: null, error: message, eventCount: null, syncKey: null });
+			return 'failed';
 		}
 	}
 
 	async function syncAndView(userId: string, id: string): Promise<FeedWriteOutcome> {
 		const feed = await repo.get(userId, id);
 		if (!feed) return { type: 'not_found' };
-		await runSync(feed);
+		await runSync(feed, null);
 		const updated = await repo.get(userId, id);
 		return updated ? { type: 'ok', feed: toFeedView(updated) } : { type: 'not_found' };
 	}
@@ -137,14 +176,22 @@ export function createCalendarFeedsService(deps: CalendarFeedsServiceDeps): Cale
 		sync: syncAndView,
 
 		async syncDue(limit) {
-			const before = new Date(now().getTime() - FEED_REFRESH_MINUTES * 60_000).toISOString();
+			const before = minutesBefore(now(), FEED_REFRESH_MINUTES);
 			let synced = 0;
 			let failed = 0;
 			for (const feed of await repo.listDue(before, limit)) {
-				if (await runSync(feed)) synced++;
-				else failed++;
+				const result = await runSync(feed, before);
+				if (result === 'synced') synced++;
+				else if (result === 'failed') failed++;
 			}
 			return { synced, failed };
+		},
+
+		async refreshStale(userId) {
+			const before = minutesBefore(now(), BOOKING_REFRESH_MINUTES);
+			for (const feed of await repo.listDueForUser(userId, before, BOOKING_FEEDS_PER_REQUEST)) {
+				await runSync(feed, before);
+			}
 		}
 	};
 }

@@ -20,6 +20,21 @@ const DAY_MS = 86_400_000;
 /** A page takes at most this many bookings a day, and one guest address this many upcoming ones. */
 export const MAX_BOOKINGS_PER_DAY = 30;
 export const MAX_UPCOMING_PER_GUEST = 3;
+/**
+ * How long a booking waits for the host's calendars to refresh before it is
+ * checked against what is stored. A slow or unreachable calendar server never
+ * blocks a booking; the refresh still finishes in the background.
+ */
+export const BOOKING_REFRESH_WAIT_MS = 5_000;
+
+async function settleWithin(work: Promise<void>, ms: number): Promise<void> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		await Promise.race([work, new Promise<void>((resolve) => (timer = setTimeout(resolve, ms)))]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
 
 export type PageWriteOutcome =
 	| { type: 'ok'; page: ReservationPage }
@@ -67,6 +82,10 @@ export type ReservationsServiceDeps = {
 	meetings: MeetingRooms | null;
 	/** Best effort; a failed email never undoes a booking or a cancellation. */
 	notify: (hostUserId: string, booking: BookingDetails, kind: InviteKind) => Promise<void>;
+	/** Brings the host's subscribed calendars up to date. Optional; failures are ignored. */
+	refreshCalendars?: (userId: string) => Promise<void>;
+	/** Keeps work running after the response is sent — the Worker's `waitUntil`. */
+	defer?: (work: Promise<unknown>) => void;
 	now?: () => Date;
 };
 
@@ -98,6 +117,16 @@ function randomSuffix(): string {
 export function createReservationsService(deps: ReservationsServiceDeps): ReservationsService {
 	const { repo } = deps;
 	const now = deps.now ?? (() => new Date());
+
+	/** Starts a background refresh of the host's calendars, or null when there is nothing to refresh with. */
+	function refreshHost(userId: string): Promise<void> | null {
+		if (!deps.refreshCalendars) return null;
+		const work = deps.refreshCalendars(userId).catch((error) => {
+			console.error('calendar refresh for booking page failed', error);
+		});
+		deps.defer?.(work);
+		return work;
+	}
 
 	async function activePage(slug: string): Promise<StoredPage | null> {
 		const page = await repo.getBySlug(slug.toLowerCase());
@@ -230,6 +259,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const today = dateKeyIn(at, page.timeZone);
 			const requested = fromKey && /^\d{4}-\d{2}-\d{2}$/.test(fromKey) ? fromKey : today;
 			const start = [requested, today, page.startDate].sort((a, b) => a.localeCompare(b))[2];
+			// Not awaited: this visitor sees what is stored, and it is fresh a moment later.
+			refreshHost(page.userId);
 			const busy = await busyNear(page, start, SLOT_DAYS_PER_REQUEST);
 			return computeSlots(page, busy, { fromKey: start, days: SLOT_DAYS_PER_REQUEST, now: at });
 		},
@@ -242,6 +273,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 
 			const start = new Date(typeof body.start === 'string' ? body.start : '');
 			if (Number.isNaN(start.getTime())) return { type: 'slot_taken' };
+			const refresh = refreshHost(page.userId);
+			if (refresh !== null) await settleWithin(refresh, BOOKING_REFRESH_WAIT_MS);
 			const at = now();
 			const refusal = await refuseBooking(page, start, at, guest.value.email);
 			if (refusal) return { type: refusal };

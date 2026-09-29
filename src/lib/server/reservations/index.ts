@@ -1,4 +1,5 @@
 import { createD1CalendarRepository } from '../calendar/repository';
+import { calendarFeedsServiceForDb } from '../calendar-feeds';
 import { getEmailProvider } from '../context';
 import { getMeetingsService } from '../meet/meetings';
 import { renderEmailHtml, renderEmailText } from '../outbound/email-template';
@@ -44,6 +45,8 @@ export function getReservationsService(platform: App.Platform | undefined | null
 		repo: createD1ReservationsRepository(db),
 		calendar: createD1CalendarRepository(db),
 		meetings: meetingRooms(platform),
+		refreshCalendars: (userId) => calendarFeedsServiceForDb(db).refreshStale(userId),
+		defer: (work) => platform?.ctx?.waitUntil(work),
 		async hostOf(userId) {
 			const found = await defaultSender(db, userId);
 			return found ? { name: found.name, email: found.address.address } : null;
