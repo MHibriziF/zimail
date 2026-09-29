@@ -939,6 +939,7 @@
 			"add": "Nouvelle page",
 			"title": "Titre",
 			"titlePlaceholder": "Appel de 30 minutes",
+			"locationPlaceholder": "Lieu du rendez-vous, s’il est en personne — ex. Pacil, salle 3.1",
 			"description": "Description",
 			"from": "Du",
 			"to": "Au",

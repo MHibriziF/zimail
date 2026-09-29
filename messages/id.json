@@ -939,6 +939,7 @@
 			"add": "Halaman baru",
 			"title": "Judul",
 			"titlePlaceholder": "Panggilan 30 menit",
+			"locationPlaceholder": "Tempat bertemu jika tatap muka — mis. Pacil, ruang 3.1",
 			"description": "Deskripsi",
 			"from": "Dari",
 			"to": "Sampai",

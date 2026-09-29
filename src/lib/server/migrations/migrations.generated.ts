@@ -180,5 +180,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0044_calendar_feed_sync_key.sql",
 		sql: "-- What the last full sync was computed from: a hash of the feed text, the day\n-- and the owner's time zone. A refresh that produces the same key skips parsing\n-- and the event diff, so an unchanged feed costs one row instead of a read of\n-- every stored event.\nALTER TABLE calendar_feeds ADD COLUMN sync_key TEXT;\n"
+	},
+	{
+		name: "0045_booking_location.sql",
+		sql: "-- Where a booking takes place, for pages that meet somewhere physical.\nALTER TABLE reservation_pages ADD COLUMN location TEXT;\n\n-- A booking's join link, kept on the booking itself. It used to live only in\n-- the calendar event's location, which now holds the physical place when the\n-- page has one.\nALTER TABLE reservations ADD COLUMN meeting_url TEXT;\n\nUPDATE reservations\nSET meeting_url = (SELECT e.location FROM calendar_events e WHERE e.id = reservations.event_id)\nWHERE meeting_code IS NOT NULL;\n"
 	}
 ];

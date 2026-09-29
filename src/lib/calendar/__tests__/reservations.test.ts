@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import { isPlausibleEmail } from '../events';
 import {
 	isValidSlug,
+	MAX_PAGE_LOCATION_LENGTH,
 	minutesToTime,
 	slugify,
 	timeToMinutes,
@@ -26,7 +27,7 @@ const settings = {
 	noticeMinutes: 0
 };
 
-const page: ReservationPageSettings = { ...settings, description: null, active: true, withMeeting: false };
+const page: ReservationPageSettings = { ...settings, description: null, location: null, active: true, withMeeting: false };
 const now = new Date('2026-09-24T00:00:00.000Z');
 
 describe('validatePageSettings', () => {
@@ -40,6 +41,18 @@ describe('validatePageSettings', () => {
 		assert.equal(withRoom.ok && withRoom.value.withMeeting, true);
 		const junk = validatePageSettings({ ...settings, withMeeting: 'yes' });
 		assert.equal(junk.ok && junk.value.withMeeting, false);
+	});
+
+	test('a location is trimmed and capped; blank or missing means none', () => {
+		const where = (location: unknown) => {
+			const result = validatePageSettings({ ...settings, location });
+			return result.ok ? result.value.location : 'invalid';
+		};
+		assert.equal(where('  Pacil,   room 3.1 '), 'Pacil, room 3.1');
+		assert.equal(where('   '), null);
+		assert.equal(where(undefined), null);
+		assert.equal(where(42), null);
+		assert.equal(String(where('x'.repeat(500))).length, MAX_PAGE_LOCATION_LENGTH);
 	});
 
 	test('rejects each broken field', () => {

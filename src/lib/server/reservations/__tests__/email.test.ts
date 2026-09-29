@@ -106,3 +106,36 @@ describe('booking confirmation', () => {
 		assert.equal(event.title, 'Office hours; weekly with Izi');
 	});
 });
+
+describe('where a booking takes place', () => {
+	const now = new Date('2026-09-24T00:00:00.000Z');
+	const link = 'https://mail.example/meet/abc-defg-hij';
+	/** ICS folds long lines as CRLF + space; undo it so a property reads whole. */
+	const unfold = (ics: string) => ics.replaceAll('\r\n ', '');
+	const property = (ics: string, name: string) =>
+		unfold(ics)
+			.split('\r\n')
+			.find((line) => line.startsWith(`${name}:`))
+			?.slice(name.length + 1);
+
+	test('a place shows as Where and is the calendar location; the link stays as URL', () => {
+		const booking = { ...details, location: 'Pacil, room 3.1', meetingUrl: link };
+		const rows = bookingEmailContent(booking).details!;
+		assert.ok(rows.some((row) => row.label === 'Where' && row.value === 'Pacil, room 3.1'));
+		assert.ok(rows.some((row) => row.label === 'Meeting' && row.value === link));
+		const ics = bookingIcs(booking, 'request', now);
+		assert.equal(property(ics, 'LOCATION'), 'Pacil\\, room 3.1');
+		assert.equal(property(ics, 'URL'), link);
+	});
+
+	test('without a place, the join link is the location, as before', () => {
+		const booking = { ...details, meetingUrl: link };
+		assert.equal(property(bookingIcs(booking, 'request', now), 'LOCATION'), link);
+		assert.ok(!bookingEmailContent(booking).details!.some((row) => row.label === 'Where'));
+	});
+
+	test('a cancellation still says where it was', () => {
+		const rows = bookingEmailContent({ ...details, location: 'Pacil' }, 'cancel').details!;
+		assert.ok(rows.some((row) => row.label === 'Where' && row.value === 'Pacil'));
+	});
+});

@@ -939,6 +939,7 @@
 			"add": "新建页面",
 			"title": "标题",
 			"titlePlaceholder": "30 分钟通话",
+			"locationPlaceholder": "线下见面的地点 — 例如 Pacil 3.1 室",
 			"description": "描述",
 			"from": "从",
 			"to": "到",

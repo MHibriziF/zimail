@@ -7,6 +7,7 @@ type PageRow = {
 	slug: string;
 	title: string;
 	description: string | null;
+	location: string | null;
 	time_zone: string;
 	start_date: string;
 	end_date: string;
@@ -29,6 +30,7 @@ function toPage(row: PageRow): StoredPage {
 		slug: row.slug,
 		title: row.title,
 		description: row.description,
+		location: row.location,
 		timeZone: row.time_zone,
 		startDate: row.start_date,
 		endDate: row.end_date,
@@ -46,7 +48,7 @@ function toPage(row: PageRow): StoredPage {
 	};
 }
 
-const COLUMNS = `id, user_id, slug, title, description, time_zone, start_date, end_date, weekdays,
+const COLUMNS = `id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
 	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting`;
 
 export type NewBooking = {
@@ -64,7 +66,9 @@ export type NewBooking = {
 	eventNotes: string;
 	/** The booking's own meeting room, when the page gives one. */
 	meetingCode: string | null;
-	/** The join link, shown as the calendar event's location. */
+	/** That room's join link. */
+	meetingUrl: string | null;
+	/** The page's place, or failing that the join link — what calendars show as the location. */
 	eventLocation: string | null;
 };
 
@@ -102,8 +106,10 @@ export type StoredBooking = {
 	pageTitle: string;
 	timeZone: string;
 	meetingCode: string | null;
-	/** The join link the guest was given, kept as the event's location. */
+	/** The join link the guest was given. */
 	meetingUrl: string | null;
+	/** The page's place, if it meets somewhere physical. */
+	location: string | null;
 	/** The invitation revision the guest last received. */
 	sequence: number;
 };
@@ -113,6 +119,7 @@ function settingsValues(page: ReservationPageSettings): unknown[] {
 		page.slug,
 		page.title,
 		page.description,
+		page.location,
 		page.timeZone,
 		page.startDate,
 		page.endDate,
@@ -165,9 +172,9 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 			await db
 				.prepare(
 					`INSERT INTO reservation_pages
-					 (id, user_id, slug, title, description, time_zone, start_date, end_date, weekdays,
+					 (id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
 					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(page.id, page.userId, ...settingsValues(page))
 				.run();
@@ -177,7 +184,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 			const result = await db
 				.prepare(
 					`UPDATE reservation_pages
-					 SET slug = ?, title = ?, description = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
+					 SET slug = ?, title = ?, description = ?, location = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
 					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?,
 					     with_meeting = ?
 					 WHERE id = ? AND user_id = ?`
@@ -217,8 +224,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 		async getBookingByEvent(userId, eventId) {
 			const row = await db
 				.prepare(
-					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, r.meeting_code, p.title, p.time_zone,
-					        e.location, COALESCE(e.sequence, 0) AS sequence
+					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, r.meeting_code, r.meeting_url,
+					        p.title, p.time_zone, p.location AS page_location, e.location, COALESCE(e.sequence, 0) AS sequence
 					 FROM reservations r JOIN reservation_pages p ON p.id = r.page_id
 					 LEFT JOIN calendar_events e ON e.id = r.event_id
 					 WHERE r.event_id = ? AND r.user_id = ?`
@@ -231,8 +238,10 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					starts_at: string;
 					ends_at: string;
 					meeting_code: string | null;
+					meeting_url: string | null;
 					title: string;
 					time_zone: string;
+					page_location: string | null;
 					location: string | null;
 					sequence: number;
 				}>();
@@ -246,7 +255,9 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				pageTitle: row.title,
 				timeZone: row.time_zone,
 				meetingCode: row.meeting_code,
-				meetingUrl: row.meeting_code ? row.location : null,
+				// Bookings from before meeting_url existed kept the link in the event's location.
+				meetingUrl: row.meeting_code ? (row.meeting_url ?? row.location) : null,
+				location: row.page_location,
 				sequence: row.sequence
 			};
 		},
@@ -256,8 +267,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				db
 					.prepare(
 						`INSERT INTO reservations
-						 (id, page_id, user_id, event_id, guest_name, guest_email, note, starts_at, ends_at, created_at, meeting_code)
-						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+						 (id, page_id, user_id, event_id, guest_name, guest_email, note, starts_at, ends_at, created_at, meeting_code, meeting_url)
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 					)
 					.bind(
 						booking.id,
@@ -270,7 +281,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 						booking.start,
 						booking.end,
 						booking.createdAt,
-						booking.meetingCode
+						booking.meetingCode,
+						booking.meetingUrl
 					),
 				db
 					.prepare(

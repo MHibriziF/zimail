@@ -247,6 +247,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				slug: page.slug,
 				title: page.title,
 				description: page.description,
+				location: page.location,
 				timeZone: page.timeZone,
 				startDate: page.startDate,
 				endDate: page.endDate,
@@ -305,7 +306,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 						.filter(Boolean)
 						.join('\n\n'),
 					meetingCode: room?.code ?? null,
-					eventLocation: room?.url ?? null
+					meetingUrl: room?.url ?? null,
+					eventLocation: page.location ?? room?.url ?? null
 				});
 			} catch (error) {
 				// The slot went to someone else; the room opened for this attempt has no use.
@@ -323,7 +325,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				start,
 				end,
 				timeZone: page.timeZone,
-				meetingUrl: room?.url ?? null
+				meetingUrl: room?.url ?? null,
+				location: page.location
 			});
 			return { type: 'ok', start: start.toISOString(), end: end.toISOString(), meetingUrl: room?.url ?? null };
 		},

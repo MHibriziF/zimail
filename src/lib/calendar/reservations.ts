@@ -11,6 +11,7 @@ export const MAX_BUFFER_MINUTES = 120;
 export const MAX_NOTICE_MINUTES = 14 * 24 * 60;
 export const MAX_PAGE_TITLE_LENGTH = 100;
 export const MAX_PAGE_DESCRIPTION_LENGTH = 1000;
+export const MAX_PAGE_LOCATION_LENGTH = 200;
 export const MAX_GUEST_NAME_LENGTH = 100;
 export const MAX_GUEST_NOTE_LENGTH = 1000;
 export const MAX_PAGES_PER_USER = 20;
@@ -23,6 +24,8 @@ const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 export type ReservationPageSettings = {
 	title: string;
 	description: string | null;
+	/** Where bookings take place, for a page that meets somewhere physical. */
+	location: string | null;
 	slug: string;
 	timeZone: string;
 	startDate: string;
@@ -45,7 +48,7 @@ export type ReservationPage = ReservationPageSettings & { id: string };
 /** What a guest sees: nothing about the owner's other events. */
 export type PublicReservationPage = Pick<
 	ReservationPageSettings,
-	'title' | 'description' | 'timeZone' | 'startDate' | 'endDate' | 'slotMinutes' | 'withMeeting'
+	'title' | 'description' | 'location' | 'timeZone' | 'startDate' | 'endDate' | 'slotMinutes' | 'withMeeting'
 > & { slug: string; host: string };
 
 export type ReservationPageError =
@@ -128,11 +131,13 @@ export function validatePageSettings(
 		typeof input.description === 'string'
 			? input.description.trim().slice(0, MAX_PAGE_DESCRIPTION_LENGTH).trim() || null
 			: null;
+	const location = clean(input.location, MAX_PAGE_LOCATION_LENGTH) || null;
 	return {
 		ok: true,
 		value: {
 			title,
 			description,
+			location,
 			slug,
 			timeZone,
 			startDate: text(input.startDate),

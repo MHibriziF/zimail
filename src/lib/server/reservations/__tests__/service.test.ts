@@ -88,7 +88,8 @@ function setup(options: SetupOptions = {}) {
 				pageTitle: page.title,
 				timeZone: page.timeZone,
 				meetingCode: booking.meetingCode,
-				meetingUrl: booking.eventLocation,
+				meetingUrl: booking.meetingUrl,
+				location: page.location,
 				sequence: sequences.get(booking.eventId) ?? 0
 			};
 		},
