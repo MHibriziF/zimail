@@ -80,7 +80,10 @@
 		return Number.isNaN(end.getTime()) || !start ? start : `${start} – ${timeFormat.format(end)}`;
 	}
 
-	const isHappening = (event: CalendarEvent) => new Date(event.start).getTime() <= Date.now();
+	function isHappening(event: CalendarEvent): boolean {
+		const now = Date.now();
+		return new Date(event.start).getTime() <= now && now < new Date(event.end).getTime();
+	}
 
 	function joinUrlFor(code: string): string {
 		return `${$page.url.origin}/meet/${code}`;
