@@ -282,7 +282,16 @@
 		"unavailable": "Asisten AI belum disiapkan di server ini.",
 		"limitReached": "Jatah AI gratis hari ini sudah habis. Direset pukul 07.00 WIB (00.00 UTC).",
 		"failed": "AI tidak bisa menulisnya. Coba lagi atau ubah permintaan Anda.",
-		"note": "Berjalan di Cloudflare Workers AI. Periksa draf sebelum mengirim."
+		"note": "Berjalan di Cloudflare Workers AI. Periksa draf sebelum mengirim.",
+		"askOpen": "Tanya AI",
+		"askTitle": "Tanya email Anda",
+		"askIntro": "Tanyakan misalnya “faktur dari Budi bulan lalu” atau “jam berapa pesawat saya mendarat?”. Jawabannya menautkan ke pesan yang dipakai.",
+		"askPlaceholder": "Tanyakan tentang email Anda…",
+		"askSend": "Tanya",
+		"askNew": "Percakapan baru",
+		"askThinking": "Mencari di email Anda…",
+		"askTo": "Kepada {name}",
+		"askNote": "Jawaban berasal dari email Anda sendiri lewat Cloudflare Workers AI dan bisa keliru. Buka pesannya untuk memastikan."
 	},
 	"compose": {
 		"title": "Tulis — {app}",

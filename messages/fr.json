@@ -282,7 +282,16 @@
 		"unavailable": "L’assistant IA n’est pas configuré sur ce serveur.",
 		"limitReached": "Le quota d’IA gratuit du jour est épuisé. Il se réinitialise à 00:00 UTC.",
 		"failed": "L’IA n’a pas pu l’écrire. Réessayez ou reformulez.",
-		"note": "Fonctionne avec Cloudflare Workers AI. Relisez le brouillon avant l’envoi."
+		"note": "Fonctionne avec Cloudflare Workers AI. Relisez le brouillon avant l’envoi.",
+		"askOpen": "Demander à l’IA",
+		"askTitle": "Interroger vos e-mails",
+		"askIntro": "Demandez par exemple « la facture envoyée par Budi le mois dernier » ou « à quelle heure atterrit mon vol ? ». La réponse renvoie aux messages utilisés.",
+		"askPlaceholder": "Posez une question sur vos e-mails…",
+		"askSend": "Demander",
+		"askNew": "Nouvelle conversation",
+		"askThinking": "Recherche dans vos e-mails…",
+		"askTo": "À {name}",
+		"askNote": "Les réponses viennent de vos propres e-mails via Cloudflare Workers AI et peuvent être fausses. Ouvrez le message pour vérifier."
 	},
 	"compose": {
 		"title": "Composer — {app}",

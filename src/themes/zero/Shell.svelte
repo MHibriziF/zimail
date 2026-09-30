@@ -11,6 +11,7 @@
 	import Icon from './icons/Icon.svelte';
 	import CommandPalette from './overlays/CommandPalette.svelte';
 	import ComposeDialog from './overlays/ComposeDialog.svelte';
+	import AskPanel from '$lib/components/mailbox/AskPanel.svelte';
 	import ShortcutsSheet from './overlays/ShortcutsSheet.svelte';
 	import './tokens.css';
 	import './shell.css';
@@ -20,6 +21,7 @@
 	let collapsed = $state(false);
 	let mobileOpen = $state(false);
 	let paletteOpen = $state(false);
+	let askOpen = $state(false);
 	let shortcutsOpen = $state(false);
 	let chord = $state('');
 
@@ -340,6 +342,21 @@
 
 		<div class="z-sidebar-foot">
 			{#if !settings}
+				<Tooltip text={t('ai.askOpen')} side="right" enabled={collapsed && !mobileOpen} stretch>
+					<button
+						type="button"
+						class="z-nav-link"
+						class:active={askOpen}
+						aria-label={collapsed && !mobileOpen ? t('ai.askOpen') : undefined}
+						onclick={() => {
+							mobileOpen = false;
+							askOpen = !askOpen;
+						}}
+					>
+						<Icon name="Sparkles" size={16} />
+						{#if !collapsed || mobileOpen}<span>{t('ai.askOpen')}</span>{/if}
+					</button>
+				</Tooltip>
 				<Tooltip text={t('nav.calendar')} side="right" enabled={collapsed && !mobileOpen} stretch>
 					<a
 						href="/calendar"
@@ -431,6 +448,7 @@
 {#if paletteOpen}
 	<CommandPalette onClose={() => (paletteOpen = false)} />
 {/if}
+<AskPanel bind:open={askOpen} shell="zero" />
 
 {#if shortcutsOpen}
 	<ShortcutsSheet onClose={() => (shortcutsOpen = false)} />

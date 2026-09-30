@@ -5,6 +5,7 @@
 	import { t } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import LocaleSwitcher from './LocaleSwitcher.svelte';
+	import AskPanel from './mailbox/AskPanel.svelte';
 	import type { MailAddress } from '$lib/types';
 
 	let {
@@ -27,6 +28,7 @@
 
 	let query = $state('');
 	let menuOpen = $state(false);
+	let askOpen = $state(false);
 
 	// Keep the field in step with the URL (back button, cleared search, …).
 	$effect(() => {
@@ -77,6 +79,11 @@
 	</form>
 
 	<div class="topbar-actions">
+		<button type="button" class="ask-trigger" aria-expanded={askOpen} onclick={() => (askOpen = !askOpen)}>
+			<Icon name="sparkling-line" size={16} />
+			<span>{t('ai.askOpen')}</span>
+		</button>
+		<AskPanel bind:open={askOpen} />
 		<div class="locale-chip">
 			<LocaleSwitcher />
 		</div>
@@ -132,6 +139,27 @@
 </header>
 
 <style>
+	.ask-trigger {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		height: 2.25rem;
+		padding: 0 0.75rem;
+		border-radius: 0.75rem;
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+		background: var(--color-surface-muted);
+		transition:
+			background 0.15s,
+			color 0.15s;
+	}
+
+	.ask-trigger:hover,
+	.ask-trigger[aria-expanded='true'] {
+		color: var(--color-text);
+		background: var(--color-surface-hover);
+	}
+
 	.topbar {
 		position: sticky;
 		top: 0;

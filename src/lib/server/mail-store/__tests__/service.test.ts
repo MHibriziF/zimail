@@ -112,6 +112,7 @@ function fakeRepo(overrides: Partial<MailStoreRepository> = {}) {
 		async listFlatRows() {
 			return [];
 		},
+		searchMessages: async () => [],
 		getCursorCounts: async () => ({ messageCount: 0, latestRowid: 0 }),
 		getMailboxCounts: async () => ({ inbox: 0, inbox_unread: 0, archive: 0, starred: 0, drafts: 0, sent: 0, trash: 0, spam: 0 }),
 		expandToThreads: async (userId, ids) => ids,
