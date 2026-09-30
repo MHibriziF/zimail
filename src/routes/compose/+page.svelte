@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import Icon from '$lib/components/Icon.svelte';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
+	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import AttachmentPicker from '$lib/components/mailbox/AttachmentPicker.svelte';
 	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
 	import SendButton from '$lib/components/mailbox/SendButton.svelte';
@@ -268,6 +269,7 @@
 	<div class="compose-editor">
 		<RichTextEditor bind:html fill minHeight={320}>
 			{#snippet toolbarEnd()}
+				<AiAssist bind:html bind:subject />
 				<AttachmentPicker bind:attachments mode="button" />
 				<button
 					type="button"
@@ -308,6 +310,7 @@
 
 	<div class="compose-desktop-foot">
 		<AttachmentPicker bind:attachments />
+		<AiAssist bind:html bind:subject pill placement="up" />
 	</div>
 </form>
 

@@ -98,3 +98,8 @@ reopening the PR or pushing a new SHA won't help.
 Keep it free. Prefer a local implementation over a paid service — labels, spam
 and inbox tabs were all built as local rules for exactly this reason. Never send
 mail content to a third party without asking first.
+
+AI features run on Workers AI (`src/lib/server/ai/`), on the same Cloudflare
+account as the mail, within the free 10,000 neurons a day. On the free plan it
+stops for the day rather than billing. Keep new AI work there, and user-triggered
+only: nothing that spends the allowance in the background.

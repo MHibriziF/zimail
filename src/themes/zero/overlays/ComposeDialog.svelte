@@ -2,6 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
+	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
@@ -265,6 +266,7 @@
 				onschedule={(iso) => void deliver(iso)}
 			>
 				{#snippet extra()}
+					<AiAssist bind:html bind:subject shell="zero" placement="up" />
 					<button
 						type="button"
 						class="z-text-btn"

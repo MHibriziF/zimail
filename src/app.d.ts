@@ -1,5 +1,6 @@
 import type { D1Database, ExecutionContext, R2Bucket } from '@cloudflare/workers-types';
 import type { ApiScope, AuthMethod } from '$lib/server/api-access';
+import type { AiBinding } from '$lib/server/ai/service';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
 import type { Domain, MailAddress, User } from '$lib/types';
 
@@ -12,6 +13,8 @@ declare global {
 				ATTACHMENTS: R2Bucket;
 				ASSETS: Fetcher;
 				EMAIL: CloudflareSendEmailBinding;
+				/** Workers AI — the mail assistant. Optional: without it the assistant says it's unavailable. */
+				AI?: AiBinding;
 				/** `resend` (default) or `cloudflare`. */
 				EMAIL_PROVIDER?: string;
 				/** Comma-separated domains when EMAIL_PROVIDER=cloudflare. */

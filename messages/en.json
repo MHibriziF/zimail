@@ -265,6 +265,25 @@
 		"download": "Download",
 		"pageTitle": "{folder} — {app}"
 	},
+	"ai": {
+		"assist": "Write with AI",
+		"assistShort": "AI",
+		"writePlaceholder": "What should the email say?",
+		"replyPlaceholder": "How do you want to reply?",
+		"write": "Write",
+		"rewrite": "Rewrite",
+		"working": "Writing…",
+		"undo": "Undo",
+		"improve": "Improve",
+		"shorter": "Shorter",
+		"formal": "More formal",
+		"friendly": "Friendlier",
+		"grammar": "Fix grammar",
+		"unavailable": "The AI assistant isn’t set up on this server.",
+		"limitReached": "Today’s free AI allowance is used up. It resets at 00:00 UTC.",
+		"failed": "The AI couldn’t write that. Try again or rephrase.",
+		"note": "Runs on Cloudflare Workers AI. Check the draft before sending."
+	},
 	"compose": {
 		"title": "Compose — {app}",
 		"draftTitle": "Draft — {app}",

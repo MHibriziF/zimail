@@ -265,6 +265,25 @@
 		"download": "Télécharger",
 		"pageTitle": "{folder} — {app}"
 	},
+	"ai": {
+		"assist": "Écrire avec l’IA",
+		"assistShort": "IA",
+		"writePlaceholder": "Que doit dire l’e-mail ?",
+		"replyPlaceholder": "Comment voulez-vous répondre ?",
+		"write": "Écrire",
+		"rewrite": "Réécrire",
+		"working": "Rédaction…",
+		"undo": "Annuler",
+		"improve": "Améliorer",
+		"shorter": "Plus court",
+		"formal": "Plus formel",
+		"friendly": "Plus chaleureux",
+		"grammar": "Corriger la grammaire",
+		"unavailable": "L’assistant IA n’est pas configuré sur ce serveur.",
+		"limitReached": "Le quota d’IA gratuit du jour est épuisé. Il se réinitialise à 00:00 UTC.",
+		"failed": "L’IA n’a pas pu l’écrire. Réessayez ou reformulez.",
+		"note": "Fonctionne avec Cloudflare Workers AI. Relisez le brouillon avant l’envoi."
+	},
 	"compose": {
 		"title": "Composer — {app}",
 		"draftTitle": "Brouillon — {app}",

@@ -3,6 +3,7 @@
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
+	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import AttachmentPicker from '$lib/components/mailbox/AttachmentPicker.svelte';
 	import ThreadMessage from '$lib/components/mailbox/ThreadMessage.svelte';
 	import SendButton from '$lib/components/mailbox/SendButton.svelte';
@@ -489,7 +490,10 @@
 			<RichTextEditor bind:html={replyHtml} embedded minHeight={160} placeholder={t('thread.replyPlaceholder')} />
 
 			<div class="reply-footer">
-				<AttachmentPicker bind:attachments={replyAttachments} />
+				<div class="reply-tools">
+					<AttachmentPicker bind:attachments={replyAttachments} />
+					<AiAssist bind:html={replyHtml} replyToId={latest?.id ?? null} pill placement="up" />
+				</div>
 				<div class="reply-actions">
 					<button type="button" class="btn-ghost" onclick={() => (replyOpen = false)}>
 						Cancel
@@ -662,6 +666,12 @@
 		gap: 1rem;
 		margin-top: 0.75rem;
 		flex-wrap: wrap;
+	}
+
+	.reply-tools {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
 	}
 
 	.reply-actions {
