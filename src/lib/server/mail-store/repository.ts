@@ -64,6 +64,16 @@ export type MailboxQuery = {
 	addressId?: string | null;
 	/** Free text matched against participants, subject and body. */
 	q?: string | null;
+	/** Words that must each match somewhere; takes the place of `q`. */
+	terms?: string[];
+	/** Any one of `terms` is enough. */
+	anyTerm?: boolean;
+	/** Sender address or display name contains this. */
+	from?: string | null;
+	/** `YYYY-MM-DD` (UTC), inclusive. */
+	after?: string | null;
+	/** `YYYY-MM-DD` (UTC), exclusive. */
+	before?: string | null;
 	unreadOnly?: boolean;
 	starredOnly?: boolean;
 	attachmentsOnly?: boolean;
@@ -105,6 +115,44 @@ export type MailboxRowsPage = {
 	pageSize: number;
 };
 
+function likePattern(term: string): string {
+	const escaped = term
+		.replaceAll('\\', String.raw`\\`)
+		.replaceAll('%', String.raw`\%`)
+		.replaceAll('_', String.raw`\_`);
+	return `%${escaped}%`;
+}
+
+/**
+ * Free text, sender and date range. Each of `terms` must match somewhere (or any one, with
+ * `anyTerm`); `q` matches as one phrase.
+ */
+function addTextFilters(query: MailboxQuery, filters: string[], bindings: unknown[]) {
+	const phrase = query.q?.trim();
+	const terms = query.terms ?? (phrase ? [phrase] : []);
+	const groups = terms.map((term) => {
+		const like = likePattern(term);
+		bindings.push(like, like, like, like);
+		return String.raw`(e.subject LIKE ? ESCAPE '\' OR e.from_addr LIKE ? ESCAPE '\'
+			  OR e.to_addr LIKE ? ESCAPE '\' OR e.body_text LIKE ? ESCAPE '\')`;
+	});
+	if (groups.length > 0) filters.push(query.anyTerm ? `(${groups.join(' OR ')})` : groups.join(' AND '));
+	const from = query.from?.trim();
+	if (from) {
+		filters.push(String.raw`(e.from_addr LIKE ? ESCAPE '\' OR e.from_name LIKE ? ESCAPE '\')`);
+		bindings.push(likePattern(from), likePattern(from));
+	}
+	// Stored stamps are `YYYY-MM-DD HH:MM:SS` UTC, so a bare date compares as the start of that day.
+	if (query.after) {
+		filters.push('e.created_at >= ?');
+		bindings.push(query.after);
+	}
+	if (query.before) {
+		filters.push('e.created_at < ?');
+		bindings.push(query.before);
+	}
+}
+
 /** Builds the WHERE clause and bindings shared by the count and the page query. */
 function buildScope(userId: string, query: MailboxQuery): { where: string; bindings: unknown[] } {
 	const filters = ['e.user_id = ?', viewFilter(query.view)];
@@ -120,19 +168,7 @@ function buildScope(userId: string, query: MailboxQuery): { where: string; bindi
 		bindings.push(query.addressId);
 	}
 
-	const term = query.q?.trim();
-	if (term) {
-		filters.push(
-			String.raw`(e.subject LIKE ? ESCAPE '\' OR e.from_addr LIKE ? ESCAPE '\'
-			  OR e.to_addr LIKE ? ESCAPE '\' OR e.body_text LIKE ? ESCAPE '\')`
-		);
-		const escaped = term
-			.replaceAll('\\', String.raw`\\`)
-			.replaceAll('%', String.raw`\%`)
-			.replaceAll('_', String.raw`\_`);
-		const like = `%${escaped}%`;
-		bindings.push(like, like, like, like);
-	}
+	addTextFilters(query, filters, bindings);
 
 	if (query.unreadOnly) filters.push('e.is_read = 0');
 	if (query.starredOnly) filters.push('e.is_starred = 1');
@@ -258,6 +294,8 @@ export type MailStoreRepository = {
 		userId: string,
 		options: { direction?: 'inbound' | 'outbound'; domainId?: string | null; limit?: number }
 	): Promise<ThreadMessageRow[]>;
+	/** Newest matching messages one by one, not grouped into conversations. */
+	searchMessages(userId: string, query: MailboxQuery, limit: number): Promise<ThreadMessageRow[]>;
 
 	getCursorCounts(
 		userId: string,
@@ -524,6 +562,24 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 				.bind(...bindings, options.limit ?? 100)
 				.all<ThreadMessageRow>();
 
+			return results;
+		},
+
+		async searchMessages(userId, query, limit) {
+			const { where, bindings } = buildScope(userId, query);
+			const { results } = await db
+				.prepare(
+					`SELECT e.id, COALESCE(e.thread_id, e.id) AS thread_id, e.direction, e.from_addr, e.from_name, e.to_addr,
+					        e.subject, e.is_read, e.is_starred, e.archived_at, e.created_at, e.domain_id, e.address_id, e.status,
+					        substr(COALESCE(e.body_text, ''), 1, 300) AS body_head,
+					        EXISTS(SELECT 1 FROM email_attachments a WHERE a.email_id = e.id) AS has_attachments
+					 FROM emails e
+					 WHERE ${where}
+					 ORDER BY datetime(e.created_at) DESC
+					 LIMIT ?`
+				)
+				.bind(...bindings, limit)
+				.all<ThreadMessageRow>();
 			return results;
 		},
 

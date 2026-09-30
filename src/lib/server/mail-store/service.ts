@@ -151,6 +151,8 @@ export type MailStoreService = {
 		userId: string,
 		options?: { direction?: 'inbound' | 'outbound'; domainId?: string | null; limit?: number }
 	): Promise<EmailSummary[]>;
+	/** Newest matching messages one by one, for the mail assistant's search. */
+	searchMessages(userId: string, query: MailboxQuery, limit: number): Promise<ThreadMessageRow[]>;
 
 	getMailboxCursor(userId: string, domainId?: string | null): Promise<string>;
 	getMailboxCounts(userId: string, domainId?: string | null): Promise<MailboxCounts>;
@@ -308,6 +310,7 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 			const rows = await repo.listFlatRows(userId, options);
 			return rows.map(toEmailSummary);
 		},
+		searchMessages: (userId, query, limit) => repo.searchMessages(userId, query, limit),
 
 		async getMailboxCursor(userId, domainId) {
 			const { messageCount, latestRowid } = await repo.getCursorCounts(userId, domainId);

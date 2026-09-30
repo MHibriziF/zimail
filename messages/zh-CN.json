@@ -282,7 +282,16 @@
 		"unavailable": "此服务器未配置 AI 助手。",
 		"limitReached": "今日免费 AI 额度已用完，将于 UTC 00:00 重置。",
 		"failed": "AI 无法完成，请重试或换个说法。",
-		"note": "由 Cloudflare Workers AI 提供。发送前请检查草稿。"
+		"note": "由 Cloudflare Workers AI 提供。发送前请检查草稿。",
+		"askOpen": "问 AI",
+		"askTitle": "查询你的邮件",
+		"askIntro": "可以问“Budi 上个月发的发票”或“我的航班几点落地？”。回答会链接到所用的邮件。",
+		"askPlaceholder": "询问你的邮件…",
+		"askSend": "提问",
+		"askNew": "新对话",
+		"askThinking": "正在搜索你的邮件…",
+		"askTo": "发给 {name}",
+		"askNote": "回答来自你自己的邮件，由 Cloudflare Workers AI 生成，可能有误。请打开邮件核实。"
 	},
 	"compose": {
 		"title": "撰写 — {app}",

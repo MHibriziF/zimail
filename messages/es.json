@@ -282,7 +282,16 @@
 		"unavailable": "El asistente de IA no está configurado en este servidor.",
 		"limitReached": "Se agotó la cuota gratuita de IA de hoy. Se renueva a las 00:00 UTC.",
 		"failed": "La IA no pudo escribirlo. Inténtalo de nuevo o reformúlalo.",
-		"note": "Funciona con Cloudflare Workers AI. Revisa el borrador antes de enviarlo."
+		"note": "Funciona con Cloudflare Workers AI. Revisa el borrador antes de enviarlo.",
+		"askOpen": "Preguntar a la IA",
+		"askTitle": "Pregunta a tu correo",
+		"askIntro": "Pregunta cosas como «la factura que envió Budi el mes pasado» o «¿a qué hora aterriza mi vuelo?». La respuesta enlaza a los mensajes que usó.",
+		"askPlaceholder": "Pregunta sobre tu correo…",
+		"askSend": "Preguntar",
+		"askNew": "Nueva conversación",
+		"askThinking": "Buscando en tu correo…",
+		"askTo": "Para {name}",
+		"askNote": "Las respuestas salen de tu propio correo mediante Cloudflare Workers AI y pueden equivocarse. Abre el mensaje para comprobarlo."
 	},
 	"compose": {
 		"title": "Redactar — {app}",

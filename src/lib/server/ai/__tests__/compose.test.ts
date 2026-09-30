@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { composeMessages, MAX_REPLY_SOURCE_CHARS, parseComposeReply, plainTextToHtml, type ComposeRequest } from '../prompt';
-import { createAiService, isDailyLimitError, responseText, type AiBinding, type ReplySource } from '../service';
+import { createAiService, isDailyLimitError, responseText, type AiBinding } from '../service';
 
 const request = (overrides: Partial<ComposeRequest> = {}): ComposeRequest => ({
 	action: 'write',
@@ -65,8 +65,8 @@ test('only the daily allowance error counts as the limit', () => {
 	assert.ok(!isDailyLimitError(new Error('3040: capacity temporarily exceeded')));
 });
 
-function service(ai: AiBinding | null, source: ReplySource | null = null) {
-	return createAiService({ ai, loadReplySource: async () => source });
+function service(ai: AiBinding | null) {
+	return createAiService({ ai, searchMail: async () => [], readMessage: async () => null });
 }
 
 const answering = (text: string): AiBinding => ({ run: async () => ({ response: text }) });

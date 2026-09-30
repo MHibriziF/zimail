@@ -319,6 +319,16 @@
 	--icon-color: #8f8f8f;
 }
 
+/* A nav entry that opens something rather than navigating, like Ask AI. */
+[data-ui-theme='zero'] button.z-nav-link {
+	width: 100%;
+	border: 0;
+	background: transparent;
+	font-family: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
 /* Sized to sit where a 16px nav icon would. */
 [data-ui-theme='zero'] .z-label-dot {
 	flex-shrink: 0;
