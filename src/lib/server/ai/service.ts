@@ -54,7 +54,7 @@ export function responseText(result: unknown): string {
 
 /** Error 4006 is Workers AI's "daily free allocation used up". */
 export function isDailyLimitError(error: unknown): boolean {
-	const message = error instanceof Error ? error.message : String(error);
+	const message = error instanceof Error ? error.message : JSON.stringify(error ?? '');
 	return message.includes('4006') || message.toLowerCase().includes('daily free allocation');
 }
 

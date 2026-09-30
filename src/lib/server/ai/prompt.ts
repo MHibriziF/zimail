@@ -48,19 +48,23 @@ function clip(text: string, max: number): string {
 }
 
 export function composeMessages(request: ComposeRequest): ChatMessage[] {
-	const parts = [`Task: ${ACTION_TASKS[request.action]}`, `Fallback language: ${request.language}`];
-	if (request.replyTo) {
-		parts.push(
-			`This is a reply to the message below from ${request.replyTo.from}.`,
-			`<message subject="${request.replyTo.subject.replaceAll('"', "'")}">\n${clip(request.replyTo.text, MAX_REPLY_SOURCE_CHARS)}\n</message>`
-		);
-	}
-	parts.push(`Current subject: ${request.subject.trim() || '(empty)'}`);
-	parts.push(`<draft>\n${clip(request.draft, MAX_DRAFT_CHARS) || '(empty)'}\n</draft>`);
+	const { replyTo } = request;
 	const instruction = clip(request.instruction, MAX_INSTRUCTION_CHARS);
-	if (instruction) parts.push(`<instruction>\n${instruction}\n</instruction>`);
-	// Qwen3's switch for skipping its reasoning pass: same answer, far fewer billed tokens.
-	parts.push('/no_think');
+	const parts = [
+		`Task: ${ACTION_TASKS[request.action]}`,
+		`Fallback language: ${request.language}`,
+		...(replyTo
+			? [
+					`This is a reply to the message below from ${replyTo.from}.`,
+					`<message subject="${replyTo.subject.replaceAll('"', "'")}">\n${clip(replyTo.text, MAX_REPLY_SOURCE_CHARS)}\n</message>`
+				]
+			: []),
+		`Current subject: ${request.subject.trim() || '(empty)'}`,
+		`<draft>\n${clip(request.draft, MAX_DRAFT_CHARS) || '(empty)'}\n</draft>`,
+		...(instruction ? [`<instruction>\n${instruction}\n</instruction>`] : []),
+		// Qwen3's switch for skipping its reasoning pass: same answer, far fewer billed tokens.
+		'/no_think'
+	];
 	return [
 		{ role: 'system', content: SYSTEM_PROMPT },
 		{ role: 'user', content: parts.join('\n\n') }
