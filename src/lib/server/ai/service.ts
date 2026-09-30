@@ -120,49 +120,63 @@ export function createAiService(deps: AiServiceDeps): AiService {
 		return { forModel: { error: `Unknown tool ${call.name}` }, found: [], loose: false, read: [] };
 	}
 
+	type FindRun = {
+		userId: string;
+		timeZone: string;
+		messages: AgentMessage[];
+		read: Map<string, FoundMessage>;
+		lastSearch: LastSearch;
+	};
+
+	/** Echoes the model's tool calls back into the conversation, each followed by its result. */
+	async function runRound(run: FindRun, calls: ToolCall[]) {
+		run.messages.push({
+			role: 'assistant',
+			content: '',
+			tool_calls: calls.map((call) => ({
+				id: call.id,
+				type: 'function',
+				function: { name: call.name, arguments: JSON.stringify(call.args) }
+			}))
+		});
+		for (const call of calls) {
+			const outcome = await runTool(run.userId, call, run.timeZone);
+			if (outcome.found.length > 0) run.lastSearch = { found: outcome.found, loose: outcome.loose };
+			for (const message of outcome.read) run.read.set(message.id, message);
+			run.messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(outcome.forModel) });
+		}
+	}
+
+	function finish(run: FindRun, result: unknown): FindOutcome {
+		const answer = plainAnswer(responseText(result));
+		if (!answer) return { kind: 'failed' };
+		const cards = pickCards([...run.read.values()], run.lastSearch, answer);
+		return { kind: 'ok', answer, messages: cards.slice(0, MAX_CARDS) };
+	}
+
 	async function find(userId: string, input: FindInput): Promise<FindOutcome> {
 		const timeZone = validTimeZone(input.timeZone);
-		const messages: AgentMessage[] = findMessages({
-			question: input.question,
-			history: input.history,
+		const run: FindRun = {
+			userId,
 			timeZone,
-			now: deps.now?.() ?? new Date()
-		});
-		const read = new Map<string, FoundMessage>();
-		let lastSearch: LastSearch = { found: [], loose: false };
+			messages: findMessages({ question: input.question, history: input.history, timeZone, now: deps.now?.() ?? new Date() }),
+			read: new Map(),
+			lastSearch: { found: [], loose: false }
+		};
 
 		for (let step = 0; step < MAX_FIND_STEPS; step++) {
 			// The last turn gets no tools, so the model has to answer with what it has.
 			const tools = step < MAX_FIND_STEPS - 1 ? FIND_TOOLS : undefined;
-			// Without this the model sometimes answers from nothing ("I can't see your mail").
-			const toolChoice = step === 0 ? 'required' : undefined;
 			const result = await ai().run(MODEL, {
-				messages,
+				messages: run.messages,
 				tools,
-				tool_choice: toolChoice,
+				// Without this the model sometimes answers from nothing ("I can't see your mail").
+				tool_choice: step === 0 ? 'required' : undefined,
 				max_tokens: MAX_OUTPUT_TOKENS
 			});
 			const calls = tools ? toolCalls(result).slice(0, MAX_CALLS_PER_STEP) : [];
-			if (calls.length === 0) {
-				const answer = plainAnswer(responseText(result));
-				if (!answer) return { kind: 'failed' };
-				return { kind: 'ok', answer, messages: pickCards([...read.values()], lastSearch, answer).slice(0, MAX_CARDS) };
-			}
-			messages.push({
-				role: 'assistant',
-				content: '',
-				tool_calls: calls.map((call) => ({
-					id: call.id,
-					type: 'function',
-					function: { name: call.name, arguments: JSON.stringify(call.args) }
-				}))
-			});
-			for (const call of calls) {
-				const outcome = await runTool(userId, call, timeZone);
-				if (outcome.found.length > 0) lastSearch = { found: outcome.found, loose: outcome.loose };
-				for (const message of outcome.read) read.set(message.id, message);
-				messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(outcome.forModel) });
-			}
+			if (calls.length === 0) return finish(run, result);
+			await runRound(run, calls);
 		}
 		return { kind: 'failed' };
 	}

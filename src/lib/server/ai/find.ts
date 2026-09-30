@@ -253,7 +253,7 @@ export function toolCalls(result: unknown): ToolCall[] {
 	return raw
 		.map((call, index) => ({
 			id: typeof call.id === 'string' ? call.id : `call_${index}`,
-			name: String(call.function?.name ?? call.name ?? ''),
+			name: [call.function?.name, call.name].find((name): name is string => typeof name === 'string') ?? '',
 			args: parseArguments(call.function?.arguments ?? call.arguments)
 		}))
 		.filter((call) => call.name);
