@@ -265,6 +265,25 @@
 		"download": "Descargar",
 		"pageTitle": "{folder} — {app}"
 	},
+	"ai": {
+		"assist": "Escribir con IA",
+		"assistShort": "IA",
+		"writePlaceholder": "¿Qué debe decir el correo?",
+		"replyPlaceholder": "¿Cómo quieres responder?",
+		"write": "Escribir",
+		"rewrite": "Reescribir",
+		"working": "Escribiendo…",
+		"undo": "Deshacer",
+		"improve": "Mejorar",
+		"shorter": "Más corto",
+		"formal": "Más formal",
+		"friendly": "Más cercano",
+		"grammar": "Corregir gramática",
+		"unavailable": "El asistente de IA no está configurado en este servidor.",
+		"limitReached": "Se agotó la cuota gratuita de IA de hoy. Se renueva a las 00:00 UTC.",
+		"failed": "La IA no pudo escribirlo. Inténtalo de nuevo o reformúlalo.",
+		"note": "Funciona con Cloudflare Workers AI. Revisa el borrador antes de enviarlo."
+	},
 	"compose": {
 		"title": "Redactar — {app}",
 		"draftTitle": "Borrador — {app}",

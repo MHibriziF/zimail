@@ -10,6 +10,7 @@
 	import type { Label } from '$lib/mail/labels';
 	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
+	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { formatMailDate, formatMailTime, shouldShowSeparateTime } from '$lib/utils/date';
@@ -812,7 +813,16 @@
 						originalAttachmentCount={forwardedAttachmentCount}
 						timeZone={($page.data.timeZone as string | null | undefined) ?? null}
 						onschedule={forwarding ? undefined : (iso) => void submitComposer(iso)}
-					/>
+					>
+						{#snippet extra()}
+							<AiAssist
+								bind:html={replyHtml}
+								replyToId={forwarding ? null : (replyTarget?.id ?? null)}
+								shell="zero"
+								placement="up"
+							/>
+						{/snippet}
+					</ComposerActions>
 				</form>
 			{/if}
 		</div>

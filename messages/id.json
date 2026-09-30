@@ -265,6 +265,25 @@
 		"download": "Unduh",
 		"pageTitle": "{folder} — {app}"
 	},
+	"ai": {
+		"assist": "Tulis dengan AI",
+		"assistShort": "AI",
+		"writePlaceholder": "Email ini harus berisi apa?",
+		"replyPlaceholder": "Ingin membalas seperti apa?",
+		"write": "Tulis",
+		"rewrite": "Tulis ulang",
+		"working": "Menulis…",
+		"undo": "Urungkan",
+		"improve": "Perbaiki",
+		"shorter": "Lebih singkat",
+		"formal": "Lebih formal",
+		"friendly": "Lebih ramah",
+		"grammar": "Perbaiki tata bahasa",
+		"unavailable": "Asisten AI belum disiapkan di server ini.",
+		"limitReached": "Jatah AI gratis hari ini sudah habis. Direset pukul 07.00 WIB (00.00 UTC).",
+		"failed": "AI tidak bisa menulisnya. Coba lagi atau ubah permintaan Anda.",
+		"note": "Berjalan di Cloudflare Workers AI. Periksa draf sebelum mengirim."
+	},
 	"compose": {
 		"title": "Tulis — {app}",
 		"draftTitle": "Draf — {app}",
