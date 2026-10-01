@@ -1,0 +1,68 @@
+# Keeps a copy of Zimail up to date with MHibriziF/zimail.
+#
+# For copies made with the Deploy to Cloudflare button, which have no fork link to sync
+# through. Once a week (or from Actions → "Sync from upstream" → Run workflow) it merges
+# upstream into a `sync/upstream` branch and opens a pull request. Nothing changes until
+# you merge it; merging redeploys through Workers Builds as usual. Your own edits stay,
+# including your Worker name and database IDs in wrangler.jsonc. See README "Staying up to date".
+#
+# It does nothing in MHibriziF/zimail itself, or in a fork, where GitHub's "Sync fork" does the job.
+name: Sync from upstream
+
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+
+jobs:
+  sync:
+    if: github.repository != 'MHibriziF/zimail' && github.event.repository.fork != true
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM: MHibriziF/zimail
+      BRANCH: sync/upstream
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream
+        id: sync
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add upstream "https://github.com/${UPSTREAM}.git"
+          git fetch --quiet upstream main
+          # Upstream's copy of the script, so a copy that only added this workflow file still
+          # gets the current logic.
+          git show upstream/main:scripts/sync-upstream.sh > "$RUNNER_TEMP/sync-upstream.sh"
+          SYNC_BRANCH="$BRANCH" bash "$RUNNER_TEMP/sync-upstream.sh"
+
+      - name: Open or update the pull request
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          git push --force origin "$BRANCH"
+          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
+            echo "The open sync pull request now has the latest upstream changes." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          body="Merges the latest [${UPSTREAM}](https://github.com/${UPSTREAM}) into this repository. Your own changes, including your Worker name and database IDs in wrangler.jsonc, are kept. Merging redeploys as usual; new database migrations apply themselves on the first request."
+          if ! gh pr create --head "$BRANCH" --base "$BASE" --title "Sync from ${UPSTREAM}" --body "$body"; then
+            # New repositories don't let Actions open pull requests until it's allowed in
+            # Settings → Actions → General. The branch is pushed either way.
+            {
+              echo "The \`$BRANCH\` branch is ready, but this repository doesn't let Actions open pull requests."
+              echo "Open one yourself: https://github.com/${GITHUB_REPOSITORY}/compare/${BASE}...${BRANCH}"
+              echo "Or allow it once in Settings → Actions → General → \"Allow GitHub Actions to create and approve pull requests\"."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

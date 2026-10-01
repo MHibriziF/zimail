@@ -44,7 +44,9 @@ On top of everything upstream ships:
 
 ## Quick start
 
-Click **Deploy this fork** above, or run the setup wizard locally:
+Click **Deploy this fork** above, or run the setup wizard locally. Either way,
+see [Staying up to date](#staying-up-to-date) for how updates reach you; a
+GitHub fork is the easiest to keep current.
 
 ```bash
 bun run setup
@@ -60,6 +62,52 @@ You need:
 1. A domain you control
 2. A [Cloudflare](https://dash.cloudflare.com) account
 3. Either a [Resend](https://resend.com) account, **or** the domain on Cloudflare DNS plus a Workers paid plan
+
+## Staying up to date
+
+How you get updates depends on how you installed.
+
+**Deploy to Cloudflare button.** The button copies this repository into a new
+repository of yours: a fresh copy with no link back here, so GitHub can't sync
+it. It includes a workflow that can:
+
+- **When:** once a week, or from **Actions → Sync from upstream → Run workflow**.
+- **What:** it merges this repository into a `sync/upstream` branch and opens a
+  pull request in yours. Nothing changes until you merge it, and merging
+  redeploys as usual.
+- **Your edits stay,** including your Worker name and the database and bucket
+  IDs the button wrote into `wrangler.jsonc`.
+  - The first sync works out which version of this repository your copy started
+    from (`scripts/sync-upstream.sh`), so it's an ordinary merge rather than a
+    conflict in every file.
+  - If you changed the same lines as an update, the run stops and lists the
+    files instead of guessing.
+- **Copy made before the workflow existed:** add
+  [`.github/workflows/sync-upstream.yml`](.github/workflows/sync-upstream.yml)
+  to your repository once. It fetches the rest from here.
+- **If the run says it can't open pull requests:** allow it once in
+  **Settings → Actions → General → "Allow GitHub Actions to create and approve
+  pull requests"**, or open the pull request from the link in the run summary.
+
+**Fork (the easiest to keep current).**
+
+1. **Fork** this repository on GitHub.
+2. Run `bun run setup` once against your fork. It creates the D1 database and
+   R2 bucket and writes their IDs into `wrangler.jsonc`; commit that.
+3. In Cloudflare, go to **Workers & Pages → Create → Import a repository**,
+   pick the fork, and set the deploy command to `bun run deploy`.
+4. From then on, GitHub's **Sync fork** button brings in updates, and Workers
+   Builds deploys them. Your IDs live on lines this repository never changes,
+   so syncing doesn't conflict with them.
+
+**Cloned and deployed by hand.** Add this repository as a remote and merge from
+it:
+
+```bash
+git remote add upstream https://github.com/MHibriziF/zimail.git
+git pull upstream main
+bun run deploy
+```
 
 ## Updating an existing install
 
