@@ -508,15 +508,15 @@
 							<Icon name="CurvedArrow" size={16} />
 						</button>
 					</Tooltip>
-					{@const deleteLabel = deleteForever.armed ? t('mailbox.deleteForeverConfirm') : t('mailbox.deletePermanently')}
+					{@const deleteLabel = deleteForever.armed === id ? t('mailbox.deleteForeverConfirm') : t('mailbox.deletePermanently')}
 					<Tooltip text={deleteLabel}>
 						<button
 							type="button"
 							class="z-thread-trash"
-							class:armed={deleteForever.armed !== null}
+							class:armed={deleteForever.armed === id}
 							aria-label={deleteLabel}
 							onclick={() => {
-								if (deleteForever.press('thread')) void act('delete');
+								if (id && deleteForever.press(id)) void act('delete');
 							}}
 						>
 							<Icon name="Trash" size={16} />
