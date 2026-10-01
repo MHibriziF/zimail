@@ -292,7 +292,11 @@
 		"askNew": "Percakapan baru",
 		"askThinking": "Memeriksa email dan kalender Anda…",
 		"askTo": "Kepada {name}",
-		"askNote": "Jawaban berasal dari email dan kalender Anda sendiri lewat Cloudflare Workers AI dan bisa keliru. Buka pesan atau acaranya untuk memastikan."
+		"askNote": "Jawaban berasal dari email dan kalender Anda sendiri lewat Cloudflare Workers AI dan bisa keliru. Buka pesan atau acaranya untuk memastikan.",
+		"history": "Riwayat",
+		"historyEmpty": "Belum ada percakapan tersimpan. Ajukan pertanyaan dan percakapannya akan muncul di sini.",
+		"historyHint": "50 percakapan terakhir Anda disimpan. Menghapus satu akan menghilangkannya selamanya.",
+		"deleteConversation": "Hapus percakapan"
 	},
 	"compose": {
 		"title": "Tulis — {app}",

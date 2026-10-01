@@ -30,7 +30,7 @@
 	import type { ZeroIconName } from '../icons/names';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
-	import { ConfirmTwice } from './confirm-twice.svelte';
+	import { ConfirmTwice } from '$lib/components/confirm-twice.svelte';
 
 	let {
 		id,

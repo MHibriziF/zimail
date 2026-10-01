@@ -3,7 +3,8 @@
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import ZeroIcon from '$themes/zero/icons/Icon.svelte';
-	import { formatMailDate } from '$lib/utils/date';
+	import { formatMailDate, formatRelativeDate } from '$lib/utils/date';
+	import { ConfirmTwice } from '$lib/components/confirm-twice.svelte';
 
 	type Found = {
 		id: string;
@@ -25,6 +26,7 @@
 		day: string;
 	};
 	type Turn = { role: 'user' | 'assistant'; content: string; messages?: Found[]; events?: FoundEvent[] };
+	type Saved = { id: string; title: string; updatedAt: string };
 
 	let {
 		open = $bindable(false),
@@ -39,8 +41,14 @@
 		limit_reached: 'ai.limitReached'
 	};
 
-	// Kept while the app is open, so a question survives opening one of the answers.
+	// Kept while the app is open, so a question survives opening one of the answers; saved on the
+	// server too, so it survives a reload and can be reopened from History.
 	let turns = $state<Turn[]>([]);
+	let conversationId = $state<string | null>(null);
+	let showHistory = $state(false);
+	let saved = $state<Saved[] | null>(null);
+	let historyError = $state('');
+	const deleteConversation = new ConfirmTwice();
 	let question = $state('');
 	let busy = $state(false);
 	let error = $state('');
@@ -64,9 +72,9 @@
 		event?.preventDefault();
 		const text = question.trim();
 		if (!text || busy) return;
-		const history = turns.map(({ role, content }) => ({ role, content }));
 		turns = [...turns, { role: 'user', content: text }];
 		question = '';
+		showHistory = false;
 		busy = true;
 		error = '';
 		scrollToEnd();
@@ -74,18 +82,21 @@
 			const response = await fetch('/api/ai/find', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ question: text, history, timeZone })
+				body: JSON.stringify({ question: text, conversationId, timeZone })
 			});
 			const body = (await response.json().catch(() => ({}))) as {
 				answer?: string;
 				messages?: Found[];
 				events?: FoundEvent[];
+				conversationId?: string;
 				error?: string;
 			};
 			if (!response.ok || !body.answer) {
 				error = t(ERRORS[body.error ?? ''] ?? 'ai.failed');
 				return;
 			}
+			conversationId = body.conversationId ?? conversationId;
+			saved = null;
 			turns = [
 				...turns,
 				{ role: 'assistant', content: body.answer, messages: body.messages ?? [], events: body.events ?? [] }
@@ -114,8 +125,53 @@
 
 	function restart() {
 		turns = [];
+		conversationId = null;
 		error = '';
-		inputEl?.focus();
+		showHistory = false;
+		queueMicrotask(() => inputEl?.focus());
+	}
+
+	async function toggleHistory() {
+		showHistory = !showHistory;
+		if (!showHistory || saved) return;
+		historyError = '';
+		try {
+			const response = await fetch('/api/ai/conversations');
+			if (!response.ok) throw new Error(String(response.status));
+			saved = ((await response.json()) as { conversations: Saved[] }).conversations;
+		} catch {
+			historyError = t('common.networkError');
+		}
+	}
+
+	async function reopen(id: string) {
+		historyError = '';
+		try {
+			const response = await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`);
+			if (!response.ok) throw new Error(String(response.status));
+			const conversation = (await response.json()) as { id: string; turns: Turn[] };
+			turns = conversation.turns;
+			conversationId = conversation.id;
+			error = '';
+			showHistory = false;
+			scrollToEnd();
+		} catch {
+			historyError = t('common.networkError');
+		}
+	}
+
+	async function remove(id: string) {
+		if (!deleteConversation.press(id)) return;
+		const response = await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null);
+		if (!response?.ok && response?.status !== 404) {
+			historyError = t('common.networkError');
+			return;
+		}
+		saved = (saved ?? []).filter((conversation) => conversation.id !== id);
+		if (conversationId === id) {
+			turns = [];
+			conversationId = null;
+		}
 	}
 
 	function href(message: Found): string {
@@ -148,8 +204,19 @@
 	<button type="button" class="ask-scrim" aria-label={t('common.close')} onclick={() => (open = false)}></button>
 	<div class="ask" class:zero={shell === 'zero'} role="dialog" aria-label={t('ai.askTitle')} tabindex="-1" onkeydown={onPanelKey}>
 		<header class="ask-head">
-			<h2>{t('ai.askTitle')}</h2>
-			{#if turns.length > 0}
+			<h2>{showHistory ? t('ai.history') : t('ai.askTitle')}</h2>
+			<button
+				type="button"
+				class="ask-icon"
+				class:active={showHistory}
+				aria-label={t('ai.history')}
+				aria-pressed={showHistory}
+				title={t('ai.history')}
+				onclick={toggleHistory}
+			>
+				{#if shell === 'zero'}<ZeroIcon name="Clock" size={14} />{:else}<Icon name="history-line" size={17} />{/if}
+			</button>
+			{#if turns.length > 0 || showHistory}
 				<button type="button" class="ask-icon" aria-label={t('ai.askNew')} title={t('ai.askNew')} onclick={restart}>
 					{#if shell === 'zero'}<ZeroIcon name="Plus" size={14} />{:else}<Icon name="chat-new-line" size={17} />{/if}
 				</button>
@@ -159,6 +226,36 @@
 			</button>
 		</header>
 
+		{#if showHistory}
+			<div class="ask-list">
+				{#if saved === null && !historyError}
+					<p class="ask-intro">{t('common.loading')}</p>
+				{:else if saved?.length === 0}
+					<p class="ask-intro">{t('ai.historyEmpty')}</p>
+				{/if}
+				{#each saved ?? [] as conversation (conversation.id)}
+					{@const armed = deleteConversation.armed === conversation.id}
+					<div class="ask-saved" class:current={conversation.id === conversationId}>
+						<button type="button" class="ask-saved-open" onclick={() => reopen(conversation.id)}>
+							<span class="ask-card-subject">{conversation.title}</span>
+							<span class="ask-card-date">{formatRelativeDate(conversation.updatedAt, locale, timeZone)}</span>
+						</button>
+						<button
+							type="button"
+							class="ask-icon danger"
+							class:armed
+							aria-label={armed ? t('mailbox.deleteForeverConfirm') : t('ai.deleteConversation')}
+							title={armed ? t('mailbox.deleteForeverConfirm') : t('ai.deleteConversation')}
+							onclick={() => remove(conversation.id)}
+						>
+							{#if shell === 'zero'}<ZeroIcon name="Trash" size={13} />{:else}<Icon name="delete-bin-line" size={15} />{/if}
+						</button>
+					</div>
+				{/each}
+				{#if historyError}<p class="ask-error" role="alert">{historyError}</p>{/if}
+				<p class="ask-note">{t('ai.historyHint')}</p>
+			</div>
+		{:else}
 		<div class="ask-list" bind:this={listEl} aria-live="polite">
 			{#if turns.length === 0}
 				<p class="ask-intro">{t('ai.askIntro')}</p>
@@ -194,6 +291,7 @@
 			{#if busy}<p class="ask-busy">{t('ai.askThinking')}</p>{/if}
 			{#if error}<p class="ask-error" role="alert">{error}</p>{/if}
 		</div>
+		{/if}
 
 		<form class="ask-form" onsubmit={ask}>
 			<textarea
@@ -281,6 +379,54 @@
 		color: var(--ask-muted);
 		--icon-color: var(--ask-muted);
 		cursor: pointer;
+	}
+
+	.ask-icon.active {
+		background: var(--ask-hover);
+		color: var(--ask-text);
+		--icon-color: var(--ask-text);
+	}
+
+	.ask-icon.danger.armed {
+		background: #be123c;
+		color: #ffffff;
+		--icon-color: #ffffff;
+	}
+
+	.ask-saved {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		border: 1px solid var(--ask-line);
+		border-radius: 0.625rem;
+	}
+
+	.ask-saved.current {
+		border-color: var(--ask-accent);
+	}
+
+	.ask-saved-open {
+		flex: 1;
+		display: grid;
+		gap: 0.125rem;
+		min-width: 0;
+		padding: 0.5rem 0.75rem;
+		border: none;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		text-align: start;
+		cursor: pointer;
+	}
+
+	.ask-saved-open .ask-card-date {
+		font-size: 0.75rem;
+		color: var(--ask-muted);
+	}
+
+	.ask-saved-open:hover {
+		background: var(--ask-hover);
+		border-radius: 0.625rem;
 	}
 
 	.ask-icon:hover {

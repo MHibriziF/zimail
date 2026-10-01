@@ -12,7 +12,7 @@
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
-	import { ConfirmTwice } from './confirm-twice.svelte';
+	import { ConfirmTwice } from '$lib/components/confirm-twice.svelte';
 
 	let {
 		view,

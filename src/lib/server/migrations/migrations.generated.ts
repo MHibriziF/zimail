@@ -188,5 +188,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0046_guest_reschedule.sql",
 		sql: "-- How close to the start a guest may still move or cancel their booking.\nALTER TABLE reservation_pages ADD COLUMN reschedule_cutoff_hours INTEGER NOT NULL DEFAULT 24;\n\n-- The guest's link to change their booking: only its SHA-256 is kept, so the\n-- database alone can't be used to act on a booking. Older bookings have none.\nALTER TABLE reservations ADD COLUMN manage_token_hash TEXT;\nALTER TABLE reservations ADD COLUMN reschedule_count INTEGER NOT NULL DEFAULT 0;\nCREATE UNIQUE INDEX reservations_manage_token_idx ON reservations(manage_token_hash) WHERE manage_token_hash IS NOT NULL;\n"
+	},
+	{
+		name: "0047_ai_conversations.sql",
+		sql: "-- Ask AI conversations, one row each with its turns as JSON: a follow-up question is one\n-- UPDATE, not a row per message. The index serves the history list newest first. See #118.\nCREATE TABLE ai_conversations (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\ttitle TEXT NOT NULL,\n\tturns TEXT NOT NULL,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now')),\n\tupdated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\nCREATE INDEX ai_conversations_user_idx ON ai_conversations(user_id, updated_at);\n"
 	}
 ];

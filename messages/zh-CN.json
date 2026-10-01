@@ -292,7 +292,11 @@
 		"askNew": "新对话",
 		"askThinking": "正在查看你的邮件和日历…",
 		"askTo": "发给 {name}",
-		"askNote": "回答来自你自己的邮件和日历，由 Cloudflare Workers AI 生成，可能有误。请打开邮件或日程核实。"
+		"askNote": "回答来自你自己的邮件和日历，由 Cloudflare Workers AI 生成，可能有误。请打开邮件或日程核实。",
+		"history": "历史记录",
+		"historyEmpty": "还没有保存的对话。提一个问题，它就会出现在这里。",
+		"historyHint": "会保留你最近的 50 个对话。删除后将永久移除。",
+		"deleteConversation": "删除对话"
 	},
 	"compose": {
 		"title": "撰写 — {app}",
