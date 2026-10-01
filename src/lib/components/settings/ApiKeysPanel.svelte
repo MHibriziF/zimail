@@ -4,6 +4,7 @@
 	import Check from '../Check.svelte';
 	import { t } from '$lib/i18n';
 	import { parseTimestamp } from '$lib/utils/date';
+	import { INSTALL_SCRIPT_URL } from '$lib/constants';
 	import type { ApiTokenSummary } from '$lib/types';
 
 	let {
@@ -23,8 +24,7 @@
 	let revealed = $state<{ summary: ApiTokenSummary; token: string } | null>(null);
 	let copied = $state(false);
 	let installCopied = $state(false);
-	const installCommand =
-		'curl -fsSL https://raw.githubusercontent.com/DivinPrince/quickinbox/main/scripts/install.sh | sh';
+	const installCommand = `curl -fsSL ${INSTALL_SCRIPT_URL} | sh`;
 
 	const canCreateKey = $derived(
 		Boolean(keyName.trim()) && (sendScope || readScope || (isAdmin && adminScope))

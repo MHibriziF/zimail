@@ -1,4 +1,7 @@
 export const APP_NAME = 'Zimail';
+/** This fork's GitHub repository; the CLI and MCP installer are served from it. */
+export const GITHUB_REPO = 'MHibriziF/zimail';
+export const INSTALL_SCRIPT_URL = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh`;
 /**
  * Mail domains are discovered from the configured provider during onboarding
  * and stored in the `domains` table.
