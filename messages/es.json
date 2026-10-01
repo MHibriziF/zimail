@@ -292,7 +292,11 @@
 		"askNew": "Nueva conversación",
 		"askThinking": "Buscando en tu correo y calendario…",
 		"askTo": "Para {name}",
-		"askNote": "Las respuestas salen de tu propio correo y calendario mediante Cloudflare Workers AI y pueden equivocarse. Abre el mensaje o evento para comprobarlo."
+		"askNote": "Las respuestas salen de tu propio correo y calendario mediante Cloudflare Workers AI y pueden equivocarse. Abre el mensaje o evento para comprobarlo.",
+		"history": "Historial",
+		"historyEmpty": "Aún no hay conversaciones guardadas. Pregunta algo y aparecerá aquí.",
+		"historyHint": "Se guardan tus últimas 50 conversaciones. Eliminar una la borra para siempre.",
+		"deleteConversation": "Eliminar conversación"
 	},
 	"compose": {
 		"title": "Redactar — {app}",

@@ -292,7 +292,11 @@
 		"askNew": "Nouvelle conversation",
 		"askThinking": "Recherche dans vos e-mails et votre agenda…",
 		"askTo": "À {name}",
-		"askNote": "Les réponses viennent de vos propres e-mails et agenda via Cloudflare Workers AI et peuvent être fausses. Ouvrez le message ou l’événement pour vérifier."
+		"askNote": "Les réponses viennent de vos propres e-mails et agenda via Cloudflare Workers AI et peuvent être fausses. Ouvrez le message ou l’événement pour vérifier.",
+		"history": "Historique",
+		"historyEmpty": "Aucune conversation enregistrée. Posez une question et elle apparaîtra ici.",
+		"historyHint": "Vos 50 dernières conversations sont conservées. En supprimer une l’efface définitivement.",
+		"deleteConversation": "Supprimer la conversation"
 	},
 	"compose": {
 		"title": "Composer — {app}",

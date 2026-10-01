@@ -292,7 +292,11 @@
 		"askNew": "New conversation",
 		"askThinking": "Looking through your mail and calendar…",
 		"askTo": "To {name}",
-		"askNote": "Answers come from your own mail and calendar via Cloudflare Workers AI and can be wrong. Open the message or event to check."
+		"askNote": "Answers come from your own mail and calendar via Cloudflare Workers AI and can be wrong. Open the message or event to check.",
+		"history": "History",
+		"historyEmpty": "No saved conversations yet. Ask something and it will appear here.",
+		"historyHint": "Your last 50 conversations are kept. Deleting one removes it for good.",
+		"deleteConversation": "Delete conversation"
 	},
 	"compose": {
 		"title": "Compose — {app}",

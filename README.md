@@ -445,7 +445,10 @@ browser ──POST /api/ai/find──▶ Worker ──env.AI.run()──▶ Qwen
    search finds nothing, the Worker retries it more loosely (any word, then any
    date), because the model rarely does.
 5. The answer and the message and event cards go back to the panel.
-   Conversations live in the browser for now, so reloading the page clears them.
+6. The question and answer are saved to the conversation, one D1 row per
+   conversation, so **History** in the panel can reopen it later, on any device,
+   or delete it for good. Follow-up questions read their context from the saved
+   conversation. The newest 50 conversations are kept.
 
 Writing is a single model call with the draft (and, on a reply, the original
 message) and no tools.
@@ -464,9 +467,13 @@ Everything is in `src/lib/server/ai/`:
   - A draft costs about 5–25 neurons.
   - A question costs about 10–20 neurons.
   - That's several hundred of either a day.
-- **Database:** nothing is written to D1. Each mail search is a scan of your
-  own messages, which is fine at personal-mailbox size. #113 tracks adding a
-  search index if that changes.
+- **Database:**
+  - Writing with AI writes nothing.
+  - An Ask AI question writes about 3 rows, for saving the conversation. Even
+    at the AI allowance's daily ceiling that's a few percent of D1's free
+    100,000 rows written a day.
+  - Each mail search is a scan of your own messages, which is fine at
+    personal-mailbox size. #113 tracks adding a search index if that changes.
 - **Privacy:** mail and calendar content goes only to Workers AI, on the same
   Cloudflare account that already stores it.
   [Cloudflare doesn't train on it](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
