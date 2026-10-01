@@ -248,6 +248,7 @@
 		"moveToTrash": "Mover a la papelera",
 		"delete": "Eliminar",
 		"deletePermanently": "Eliminar de forma permanente",
+		"deleteForeverConfirm": "Haz clic de nuevo para eliminar para siempre",
 		"restore": "Restaurar",
 		"previousPage": "Página anterior",
 		"nextPage": "Página siguiente",

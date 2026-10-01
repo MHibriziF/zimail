@@ -248,6 +248,7 @@
 		"moveToTrash": "Move to trash",
 		"delete": "Delete",
 		"deletePermanently": "Delete permanently",
+		"deleteForeverConfirm": "Click again to delete forever",
 		"restore": "Restore",
 		"previousPage": "Previous page",
 		"nextPage": "Next page",
