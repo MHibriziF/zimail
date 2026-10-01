@@ -31,6 +31,7 @@ On top of everything upstream ships:
 
 - **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat, and [recording](#recording-a-meeting) in the browser. **Compose → New meeting**, or the **Meetings** view.
 - **[Calendar](#calendar)** — month and agenda views next to the mailbox, with today's and tomorrow's events in the sidebar. Pull in [Google, Outlook or iCloud calendars](#other-calendars) by their iCal address, and share [reservation pages](#reservation-pages) where people book a free slot — checked against every calendar you have, sent as a real calendar invitation, and optionally with its own meeting room. **Calendar** in the sidebar.
+- **[AI assistant](#ai-assistant)**: **Write with AI** drafts and polishes emails and replies, and **Ask AI** answers questions about your mail and calendar with links to what it used. It runs on Cloudflare Workers AI's free tier, with no API key, and never sends anything by itself.
 - **Scheduled send** — pick any future date and time, or one of the presets, from the caret beside **Send**. The message waits in your own outbox and a [cron trigger](#scheduled-send) delivers it, so it works on either mail provider and is not capped at a provider's hold-until horizon. Recall it back to a draft any time before it goes.
 - **Two-factor authentication** — TOTP from any authenticator app, with single-use backup codes, asked for at sign-in. **Settings → Two-factor authentication**.
 - **Recovery address** — link a second mailbox you already own to the account. It is where security notices land and where forgotten-password links are sent, so losing access to this inbox does not lock you out of it. **Settings → Recovery address**.
@@ -396,6 +397,87 @@ sweeps the signed-in user's own due messages instead, which keeps scheduling
 testable locally. On a deployed Worker the trigger has already been round and
 that check costs one indexed query.
 
+## AI assistant
+
+*Added by this fork.*
+
+Two features run on [Workers AI](https://developers.cloudflare.com/workers-ai/),
+Cloudflare's own model hosting, through the `AI` binding in `wrangler.jsonc`.
+There's no API key, no other vendor, and nothing to configure: deploying
+creates the binding.
+
+- **Write with AI**: in the composer and the reply box, in both interfaces.
+  - Tell it what the email should say, or polish a draft: Improve, Shorter,
+    More formal, Friendlier, Fix grammar.
+  - On a reply it reads the message you're answering. It writes in the
+    language you use and leaves the sign-off name to your signature.
+  - It only ever fills the editor, and **Undo** puts back what was there. It
+    never sends.
+- **Ask AI**: a panel in Classic's top bar and Zero's sidebar.
+  - Ask about your mail and your calendar in plain words: "the invoice Budi
+    sent last month", "what's on my calendar tomorrow?", "am I free Friday
+    afternoon?".
+  - The answer links to the messages and events it used, and follow-up
+    questions work.
+
+### How Ask AI works
+
+```
+browser ──POST /api/ai/find──▶ Worker ──env.AI.run()──▶ Qwen3 30B on Workers AI
+                                  ▲                              │
+                                  └──── tool call: search_mail ──┘
+                                        read_message / list_events
+```
+
+1. The question and the last few turns go to `/api/ai/find`. It accepts a
+   signed-in session only, so API keys can't spend the allowance.
+2. The Worker asks the model, offering three tools:
+   - `search_mail`: keywords, sender, dates, folder.
+   - `read_message`: one message, up to 2,000 characters.
+   - `list_events`: the calendar for a date range, including subscribed
+     calendars, bookings and accepted invitations.
+3. **The Worker runs the tools itself** against D1. The model never touches
+   the database; it only sees the results the Worker hands back:
+   - snippets of up to 200 characters
+   - message bodies of up to 2,000
+   - at most 8 messages or 30 events per call
+4. The model gets up to three rounds of tools, then must answer. If a mail
+   search finds nothing, the Worker retries it more loosely (any word, then any
+   date), because the model rarely does.
+5. The answer and the message and event cards go back to the panel.
+   Conversations live in the browser for now, so reloading the page clears them.
+
+Writing is a single model call with the draft (and, on a reply, the original
+message) and no tools.
+
+Everything is in `src/lib/server/ai/`:
+- `prompt.ts`: the writing prompt.
+- `find.ts`: the tools, the prompt, and argument cleanup.
+- `service.ts`: the agent loop.
+- `index.ts`: wiring to the mail store and calendar.
+
+### Cost and privacy
+
+- **Free plan:** the Workers Free plan includes **10,000 neurons a day**. When
+  they're used up, the assistant says so until 00:00 UTC; it never bills.
+- **Usage:** measured on the model's own usage report:
+  - A draft costs about 5–25 neurons.
+  - A question costs about 10–20 neurons.
+  - That's several hundred of either a day.
+- **Database:** nothing is written to D1. Each mail search is a scan of your
+  own messages, which is fine at personal-mailbox size. #113 tracks adding a
+  search index if that changes.
+- **Privacy:** mail and calendar content goes only to Workers AI, on the same
+  Cloudflare account that already stores it.
+  [Cloudflare doesn't train on it](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
+  Text from emails is labelled to the model as data, never instructions.
+
+### Limits
+
+It's a small, fast model. It's good at finding things and drafting, and weak
+at date arithmetic: it repeats "Thursday" as an email says it rather than
+guessing the date. Answers can be wrong, so every answer links to its source.
+
 ## Development
 
 ```bash
@@ -491,7 +573,7 @@ src/
   routes/            inbox, compose, drafts, settings, admin, setup
   lib/
     components/      sidebar, mailbox, composer, thread view
-    server/          providers, inbound, D1, auth, calendar, calendar feeds, reservations
+    server/          providers, inbound, D1, auth, calendar, calendar feeds, reservations, ai
     calendar/        event rules, month grid, iCal parser, reservation slots
 scripts/
   setup.sh / setup.mjs         first-run wizard

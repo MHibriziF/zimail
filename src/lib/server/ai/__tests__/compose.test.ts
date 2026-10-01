@@ -66,7 +66,7 @@ test('only the daily allowance error counts as the limit', () => {
 });
 
 function service(ai: AiBinding | null) {
-	return createAiService({ ai, searchMail: async () => [], readMessage: async () => null });
+	return createAiService({ ai, searchMail: async () => [], readMessage: async () => null, listEvents: async () => [] });
 }
 
 const answering = (text: string): AiBinding => ({ run: async () => ({ response: text }) });

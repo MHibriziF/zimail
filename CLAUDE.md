@@ -103,3 +103,19 @@ AI features run on Workers AI (`src/lib/server/ai/`), on the same Cloudflare
 account as the mail, within the free 10,000 neurons a day. On the free plan it
 stops for the day rather than billing. Keep new AI work there, and user-triggered
 only: nothing that spends the allowance in the background.
+
+The Ask AI agent (`find.ts` + `service.ts`) gives the model tools, but **the
+Worker runs them**: the model only ever sees clipped results, never D1. A new
+tool means a definition in `FIND_TOOLS`, an entry in the service's `tools` table
+that cleans its arguments, and a prompt line on when to use it. The model is
+Qwen3 30B, small enough that it needs help, and every one of these was learned
+on the real model:
+- It must be forced to call a tool on the first turn, or it answers "I can't
+  see your mail".
+- Date ranges ("last month", "next week") must be spelled out in the prompt,
+  because it can't do date sums.
+- Empty searches are widened server-side, because it won't retry.
+
+Unit tests use a scripted model; real behaviour can only be checked in
+`wrangler dev`. The `AI` binding is always remote there, so that check spends
+real (free) neurons.

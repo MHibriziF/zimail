@@ -14,7 +14,17 @@
 		subject: string;
 		createdAt: string;
 	};
-	type Turn = { role: 'user' | 'assistant'; content: string; messages?: Found[] };
+	type FoundEvent = {
+		id: string;
+		title: string;
+		start: string;
+		end: string;
+		allDay: boolean;
+		location: string | null;
+		calendar: string | null;
+		day: string;
+	};
+	type Turn = { role: 'user' | 'assistant'; content: string; messages?: Found[]; events?: FoundEvent[] };
 
 	let {
 		open = $bindable(false),
@@ -66,12 +76,20 @@
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ question: text, history, timeZone })
 			});
-			const body = (await response.json().catch(() => ({}))) as { answer?: string; messages?: Found[]; error?: string };
+			const body = (await response.json().catch(() => ({}))) as {
+				answer?: string;
+				messages?: Found[];
+				events?: FoundEvent[];
+				error?: string;
+			};
 			if (!response.ok || !body.answer) {
 				error = t(ERRORS[body.error ?? ''] ?? 'ai.failed');
 				return;
 			}
-			turns = [...turns, { role: 'assistant', content: body.answer, messages: body.messages ?? [] }];
+			turns = [
+				...turns,
+				{ role: 'assistant', content: body.answer, messages: body.messages ?? [], events: body.events ?? [] }
+			];
 		} catch {
 			error = t('common.networkError');
 		} finally {
@@ -104,6 +122,17 @@
 		if (shell === 'classic') return `/mail/${message.id}`;
 		const folder = message.direction === 'outbound' ? '/sent' : '/inbox';
 		return `${folder}?thread=${encodeURIComponent(message.id)}`;
+	}
+
+	/** "Thu, Oct 1 · 09:00 – 09:30" in the reader's zone; all-day events are floating dates. */
+	function when(event: FoundEvent): string {
+		if (event.allDay) {
+			const day = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+			return `${day.format(new Date(event.start))} · ${t('calendar.allDay')}`;
+		}
+		const day = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', timeZone });
+		const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone });
+		return `${day.format(new Date(event.start))} · ${time.formatRange(new Date(event.start), new Date(event.end))}`;
 	}
 
 	/** "Budi Santoso <budi@x>" → "Budi Santoso"; sent mail shows who it went to. */
@@ -147,6 +176,16 @@
 									<span class="ask-card-date">{formatMailDate(message.createdAt, locale, timeZone)}</span>
 								</span>
 								<span class="ask-card-subject">{message.subject || t('mailbox.noSubject')}</span>
+							</a>
+						{/each}
+						{#each turn.events ?? [] as event (event.id)}
+							<a class="ask-card event" href="/calendar?day={event.day}" onclick={() => (open = false)}>
+								<span class="ask-card-top">
+									<span class="ask-card-who">{when(event)}</span>
+									{#if event.calendar}<span class="ask-card-date">{event.calendar}</span>{/if}
+								</span>
+								<span class="ask-card-subject">{event.title}</span>
+								{#if event.location}<span class="ask-card-place">{event.location}</span>{/if}
 							</a>
 						{/each}
 					</div>
@@ -321,6 +360,19 @@
 
 	.ask-card-subject {
 		font-weight: 500;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* An event reads as a calendar entry, not a message. */
+	.ask-card.event {
+		border-left: 3px solid var(--ask-accent);
+	}
+
+	.ask-card-place {
+		font-size: 0.75rem;
+		color: var(--ask-muted);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;

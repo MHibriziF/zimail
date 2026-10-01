@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+	eventRange,
+	eventsForModel,
+	filterEvents,
 	findMessages,
 	localStamp,
 	pickCards,
@@ -10,6 +13,8 @@ import {
 	toolCalls,
 	validTimeZone,
 	widenings,
+	type EventRange,
+	type FoundEvent,
 	type FoundMessage,
 	type MessageDetail
 } from '../find';
@@ -108,8 +113,9 @@ function scripted(steps: unknown[]) {
 
 const callTool = (name: string, args: object) => ({ tool_calls: [{ name, arguments: args }] });
 
-function service(ai: AiBinding | null, found: FoundMessage[] = [invoice]) {
+function service(ai: AiBinding | null, found: FoundMessage[] = [invoice], events: FoundEvent[] = []) {
 	const searched: unknown[] = [];
+	const listed: EventRange[] = [];
 	const detail: MessageDetail = { ...invoice, text: 'Total Rp 4.500.000, due 10 September.' };
 	const svc = createAiService({
 		ai,
@@ -118,9 +124,13 @@ function service(ai: AiBinding | null, found: FoundMessage[] = [invoice]) {
 			return found;
 		},
 		readMessage: async (_userId, id) => (id === 'e1' ? detail : null),
+		listEvents: async (_userId, range) => {
+			listed.push(range);
+			return events;
+		},
 		now: () => new Date('2026-09-30T02:00:00Z')
 	});
-	return { svc, searched };
+	return { svc, searched, listed };
 }
 
 test('find searches, reads, and answers with the message it read', async () => {
@@ -172,11 +182,107 @@ test('loosened matches are not shown as cards unless the model read them', async
 			searches.push(args.anyTerm);
 			return args.anyTerm ? [invoice] : [];
 		},
-		readMessage: async () => null
+		readMessage: async () => null,
+		listEvents: async () => []
 	});
 	const outcome = await svc.find('u1', { question: 'loan from my bank?', history: [], timeZone: 'UTC' });
 	assert.deepEqual(searches, [false, true]);
-	assert.deepEqual(outcome, { kind: 'ok', answer: 'Nothing about a loan.', messages: [] });
+	assert.deepEqual(outcome, { kind: 'ok', answer: 'Nothing about a loan.', messages: [], events: [] });
+});
+
+const standup: FoundEvent = {
+	id: 'ev1',
+	title: 'Standup',
+	start: '2026-10-01T02:00:00.000Z',
+	end: '2026-10-01T02:30:00.000Z',
+	allDay: false,
+	location: 'Room 3',
+	calendar: null,
+	busy: true,
+	day: '2026-10-01'
+};
+const holiday: FoundEvent = {
+	...standup,
+	id: 'ev2',
+	title: 'Holiday',
+	start: '2026-10-02T00:00:00.000Z',
+	end: '2026-10-04T00:00:00.000Z',
+	allDay: true,
+	location: null,
+	calendar: 'Google',
+	busy: false,
+	day: '2026-10-02'
+};
+
+test('calendar ranges default to the coming week, are put the right way round and capped at a month', () => {
+	assert.deepEqual(eventRange({}, '2026-09-30'), { after: '2026-09-30', before: '2026-10-07', text: null });
+	assert.deepEqual(eventRange({ after: '2026-10-05', before: '2026-10-01' }, '2026-09-30'), {
+		after: '2026-10-05',
+		before: '2026-10-06',
+		text: null
+	});
+	assert.equal(eventRange({ after: '2026-10-01', before: '2027-01-01' }, '2026-09-30').before, '2026-11-01');
+	assert.equal(eventRange({ after: 'tomorrow', text: ' dentist ' }, '2026-09-30').after, '2026-09-30');
+	assert.equal(eventRange({ text: ' dentist ' }, '2026-09-30').text, 'dentist');
+	assert.equal(eventRange({ text: 'dentist' }, '2026-09-30').before, '2026-10-31', 'a named event looks a month ahead');
+	assert.equal(eventRange({ text: 'dentist', before: '2026-10-02' }, '2026-09-30').before, '2026-10-02');
+});
+
+test('events reach the model in the reader’s zone; all-day ones as dates', () => {
+	const range = eventRange({}, '2026-09-30');
+	const shown = eventsForModel([standup, holiday], range, 'Asia/Jakarta');
+	assert.deepEqual(shown.events, [
+		{ title: 'Standup', start: 'Thu 2026-10-01 09:00', end: 'Thu 2026-10-01 09:30', location: 'Room 3', calendar: 'own', busy: true },
+		{ title: 'Holiday', start: 'Fri 2026-10-02', end: 'Sat 2026-10-03', all_day: true, location: null, calendar: 'Google', busy: false }
+	]);
+	assert.match(JSON.stringify(eventsForModel([], range, 'UTC')), /the time is free/);
+	assert.deepEqual(filterEvents([standup, holiday], { ...range, text: 'room 3' }), { events: [standup], note: null });
+	// A weekday passed as the name must not make a busy day look free.
+	const fallback = filterEvents([standup, holiday], { ...range, text: 'Tuesday' });
+	assert.deepEqual(fallback.events, [standup, holiday]);
+	assert.match(JSON.stringify(eventsForModel(fallback.events, range, 'UTC', fallback.note)), /No event is named \\"Tuesday\\"/);
+});
+
+test('the prompt spells out today, tomorrow and the weeks', () => {
+	const [system] = findMessages({ question: 'x', history: [], timeZone: 'Asia/Jakarta', now: new Date('2026-09-30T02:00:00Z') });
+	assert.match(system.content, /tomorrow is after 2026-10-01, before 2026-10-02/);
+	assert.match(system.content, /this week is after 2026-09-28, before 2026-10-05/);
+	assert.match(system.content, /next week is after 2026-10-05, before 2026-10-12/);
+	assert.match(system.content, /The next seven days are Thu 2026-10-01, Fri 2026-10-02, .*, Wed 2026-10-07\./);
+	assert.match(system.content, /list_events/);
+});
+
+test('a schedule question lists events and returns them as cards', async () => {
+	const { ai, calls } = scripted([
+		callTool('list_events', { after: '2026-10-01', before: '2026-10-02' }),
+		{ response: 'Tomorrow you have Standup at 09:00 in Room 3.' }
+	]);
+	const { svc, listed } = service(ai, [], [standup]);
+	const outcome = await svc.find('u1', { question: 'what do I have tomorrow?', history: [], timeZone: 'Asia/Jakarta' });
+	assert.deepEqual(listed, [{ after: '2026-10-01', before: '2026-10-02', text: null }]);
+	assert.deepEqual(outcome.kind === 'ok' && outcome.events, [standup]);
+	assert.match((calls[1].messages as { content: string }[]).at(-1)!.content, /Thu 2026-10-01 09:00/);
+});
+
+test('events from several calendar calls all become cards, once each', async () => {
+	const { ai } = scripted([
+		{
+			tool_calls: [
+				{ name: 'list_events', arguments: { after: '2026-10-01', before: '2026-10-02' } },
+				{ name: 'list_events', arguments: { after: '2026-10-02', before: '2026-10-03' } }
+			]
+		},
+		{ response: 'Standup on Thursday, a holiday on Friday.' }
+	]);
+	const calls = [[standup], [holiday, standup]];
+	const svc = createAiService({
+		ai,
+		searchMail: async () => [],
+		readMessage: async () => null,
+		listEvents: async () => calls.shift() ?? []
+	});
+	const outcome = await svc.find('u1', { question: 'Thursday and Friday?', history: [], timeZone: 'UTC' });
+	assert.deepEqual(outcome.kind === 'ok' && outcome.events.map((event) => event.id), ['ev1', 'ev2']);
 });
 
 test('find reports the daily limit and a missing binding', async () => {

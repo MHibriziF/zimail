@@ -284,14 +284,14 @@
 		"failed": "La IA no pudo escribirlo. Inténtalo de nuevo o reformúlalo.",
 		"note": "Funciona con Cloudflare Workers AI. Revisa el borrador antes de enviarlo.",
 		"askOpen": "Preguntar a la IA",
-		"askTitle": "Pregunta a tu correo",
-		"askIntro": "Pregunta cosas como «la factura que envió Budi el mes pasado» o «¿a qué hora aterriza mi vuelo?». La respuesta enlaza a los mensajes que usó.",
-		"askPlaceholder": "Pregunta sobre tu correo…",
+		"askTitle": "Pregunta a tu correo y calendario",
+		"askIntro": "Pregunta cosas como «la factura que envió Budi el mes pasado», «¿qué tengo mañana?» o «¿estoy libre el viernes por la tarde?». La respuesta enlaza a los mensajes y eventos que usó.",
+		"askPlaceholder": "Pregunta sobre tu correo o calendario…",
 		"askSend": "Preguntar",
 		"askNew": "Nueva conversación",
-		"askThinking": "Buscando en tu correo…",
+		"askThinking": "Buscando en tu correo y calendario…",
 		"askTo": "Para {name}",
-		"askNote": "Las respuestas salen de tu propio correo mediante Cloudflare Workers AI y pueden equivocarse. Abre el mensaje para comprobarlo."
+		"askNote": "Las respuestas salen de tu propio correo y calendario mediante Cloudflare Workers AI y pueden equivocarse. Abre el mensaje o evento para comprobarlo."
 	},
 	"compose": {
 		"title": "Redactar — {app}",
