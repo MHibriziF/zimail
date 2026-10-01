@@ -248,6 +248,7 @@
 		"moveToTrash": "Déplacer vers la corbeille",
 		"delete": "Supprimer",
 		"deletePermanently": "Supprimer définitivement",
+		"deleteForeverConfirm": "Cliquez à nouveau pour supprimer définitivement",
 		"restore": "Restaurer",
 		"previousPage": "Page précédente",
 		"nextPage": "Page suivante",

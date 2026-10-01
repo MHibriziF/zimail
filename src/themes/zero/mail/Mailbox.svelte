@@ -12,6 +12,7 @@
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
+	import { ConfirmTwice } from './confirm-twice.svelte';
 
 	let {
 		view,
@@ -24,6 +25,7 @@
 	} = $props();
 
 	let selected = $state<string[]>([]);
+	const deleteForever = new ConfirmTwice();
 	// Seeded from the prop, not left empty for an effect to fill: effects do not
 	// run during SSR, so an empty start renders the "nothing here" state on the
 	// server and the rows only appear once hydration catches up.
@@ -344,19 +346,52 @@
 									<Icon name="Archive2" size={14} />
 								</button>
 							</Tooltip>
-							<Tooltip text={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}>
-								<button
-									type="button"
-									class="danger"
-									aria-label={view === 'trash' ? t('mailbox.restore') : t('nav.bin')}
-									onclick={(event) => {
-										event.stopPropagation();
-										void act(view === 'trash' ? 'restore' : 'trash', [thread.latest_id]);
-									}}
-								>
-									<Icon name="Trash" size={14} />
-								</button>
-							</Tooltip>
+							{#if view === 'trash'}
+								<Tooltip text={t('mailbox.restore')}>
+									<button
+										type="button"
+										aria-label={t('mailbox.restore')}
+										onclick={(event) => {
+											event.stopPropagation();
+											void act('restore', [thread.latest_id]);
+										}}
+									>
+										<Icon name="CurvedArrow" size={14} />
+									</button>
+								</Tooltip>
+								{@const deleteLabel =
+									deleteForever.armed === thread.latest_id
+										? t('mailbox.deleteForeverConfirm')
+										: t('mailbox.deletePermanently')}
+								<Tooltip text={deleteLabel}>
+									<button
+										type="button"
+										class="danger"
+										class:armed={deleteForever.armed === thread.latest_id}
+										aria-label={deleteLabel}
+										onclick={(event) => {
+											event.stopPropagation();
+											if (deleteForever.press(thread.latest_id)) void act('delete', [thread.latest_id]);
+										}}
+									>
+										<Icon name="Trash" size={14} />
+									</button>
+								</Tooltip>
+							{:else}
+								<Tooltip text={t('nav.bin')}>
+									<button
+										type="button"
+										class="danger"
+										aria-label={t('nav.bin')}
+										onclick={(event) => {
+											event.stopPropagation();
+											void act('trash', [thread.latest_id]);
+										}}
+									>
+										<Icon name="Trash" size={14} />
+									</button>
+								</Tooltip>
+							{/if}
 						</div>
 						<span class="z-avatar">{initials(name)}</span>
 						<span class="z-row-main">

@@ -30,6 +30,7 @@
 	import type { ZeroIconName } from '../icons/names';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
+	import { ConfirmTwice } from './confirm-twice.svelte';
 
 	let {
 		id,
@@ -75,6 +76,7 @@
 	let dark = $state(false);
 	let detailsFor = $state<string | null>(null);
 	let menuFor = $state<string | null>(null);
+	const deleteForever = new ConfirmTwice();
 
 	const selfEmails = $derived(
 		new Set(
@@ -500,7 +502,27 @@
 						</button>
 					</Tooltip>
 				{/if}
-				{#if view !== 'trash'}
+				{#if view === 'trash'}
+					<Tooltip text={t('mailbox.restore')}>
+						<button type="button" class="z-thread-icon" aria-label={t('mailbox.restore')} onclick={() => act('restore')}>
+							<Icon name="CurvedArrow" size={16} />
+						</button>
+					</Tooltip>
+					{@const deleteLabel = deleteForever.armed === id ? t('mailbox.deleteForeverConfirm') : t('mailbox.deletePermanently')}
+					<Tooltip text={deleteLabel}>
+						<button
+							type="button"
+							class="z-thread-trash"
+							class:armed={deleteForever.armed === id}
+							aria-label={deleteLabel}
+							onclick={() => {
+								if (id && deleteForever.press(id)) void act('delete');
+							}}
+						>
+							<Icon name="Trash" size={16} />
+						</button>
+					</Tooltip>
+				{:else}
 					<Tooltip text={t('nav.bin')}>
 						<button type="button" class="z-thread-trash" aria-label={t('nav.bin')} onclick={() => act('trash')}>
 							<Icon name="Trash" size={16} />
