@@ -264,6 +264,27 @@ test('a schedule question lists events and returns them as cards', async () => {
 	assert.match((calls[1].messages as { content: string }[]).at(-1)!.content, /Thu 2026-10-01 09:00/);
 });
 
+test('events from several calendar calls all become cards, once each', async () => {
+	const { ai } = scripted([
+		{
+			tool_calls: [
+				{ name: 'list_events', arguments: { after: '2026-10-01', before: '2026-10-02' } },
+				{ name: 'list_events', arguments: { after: '2026-10-02', before: '2026-10-03' } }
+			]
+		},
+		{ response: 'Standup on Thursday, a holiday on Friday.' }
+	]);
+	const calls = [[standup], [holiday, standup]];
+	const svc = createAiService({
+		ai,
+		searchMail: async () => [],
+		readMessage: async () => null,
+		listEvents: async () => calls.shift() ?? []
+	});
+	const outcome = await svc.find('u1', { question: 'Thursday and Friday?', history: [], timeZone: 'UTC' });
+	assert.deepEqual(outcome.kind === 'ok' && outcome.events.map((event) => event.id), ['ev1', 'ev2']);
+});
+
 test('find reports the daily limit and a missing binding', async () => {
 	const exhausted: AiBinding = { run: async () => Promise.reject(new Error('4006: daily free allocation')) };
 	const input = { question: 'x', history: [], timeZone: 'UTC' };

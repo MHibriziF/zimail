@@ -118,7 +118,8 @@ export function createAiService(deps: AiServiceDeps): AiService {
 		messages: AgentMessage[];
 		read: Map<string, FoundMessage>;
 		lastSearch: LastSearch;
-		events: FoundEvent[];
+		/** Every event any list_events call returned, by id: "Monday and Tuesday" is two calls. */
+		events: Map<string, FoundEvent>;
 	};
 
 	/**
@@ -145,7 +146,7 @@ export function createAiService(deps: AiServiceDeps): AiService {
 		async list_events(run, raw) {
 			const range = eventRange(raw, run.today);
 			const { events, note } = filterEvents(await deps.listEvents(run.userId, range, run.timeZone), range);
-			run.events = events;
+			for (const event of events) run.events.set(event.id, event);
 			return eventsForModel(events, range, run.timeZone, note);
 		}
 	};
@@ -180,7 +181,7 @@ export function createAiService(deps: AiServiceDeps): AiService {
 			kind: 'ok',
 			answer,
 			messages: cards.slice(0, MAX_CARDS),
-			events: run.events.slice(0, MAX_CARDS)
+			events: [...run.events.values()].slice(0, MAX_CARDS)
 		};
 	}
 
@@ -194,7 +195,7 @@ export function createAiService(deps: AiServiceDeps): AiService {
 			messages: findMessages({ question: input.question, history: input.history, timeZone, now }),
 			read: new Map(),
 			lastSearch: { found: [], loose: false },
-			events: []
+			events: new Map()
 		};
 
 		for (let step = 0; step < MAX_FIND_STEPS; step++) {
