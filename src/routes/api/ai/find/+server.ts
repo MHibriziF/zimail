@@ -27,6 +27,6 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		history: history(body.history),
 		timeZone: typeof body.timeZone === 'string' ? body.timeZone : 'UTC'
 	});
-	if (outcome.kind === 'ok') return json({ answer: outcome.answer, messages: outcome.messages });
+	if (outcome.kind === 'ok') return json({ answer: outcome.answer, messages: outcome.messages, events: outcome.events });
 	return json({ error: outcome.kind }, { status: STATUS[outcome.kind] });
 };

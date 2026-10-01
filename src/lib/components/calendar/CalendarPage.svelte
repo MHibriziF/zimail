@@ -44,9 +44,16 @@
 		return { year, month };
 	};
 
-	let month = $state<YearMonth>(untrack(() => parseMonthParam($page.url.searchParams.get('month'), todayMonth())));
+	// `?day=YYYY-MM-DD` opens on that day, e.g. from an event the assistant found.
+	const linkedDay = untrack(() => {
+		const day = $page.url.searchParams.get('day') ?? '';
+		return dateKeyToUtc(day) ? day : '';
+	});
+	let month = $state<YearMonth>(
+		untrack(() => parseMonthParam($page.url.searchParams.get('month') ?? linkedDay.slice(0, 7), todayMonth()))
+	);
 	let view = $state<'month' | 'agenda'>('month');
-	let selected = $state('');
+	let selected = $state(linkedDay);
 	let events = $state<CalendarEvent[]>([]);
 	let meetingsAvailable = $state(false);
 	let loading = $state(false);

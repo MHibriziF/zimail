@@ -284,14 +284,14 @@
 		"failed": "AI tidak bisa menulisnya. Coba lagi atau ubah permintaan Anda.",
 		"note": "Berjalan di Cloudflare Workers AI. Periksa draf sebelum mengirim.",
 		"askOpen": "Tanya AI",
-		"askTitle": "Tanya email Anda",
-		"askIntro": "Tanyakan misalnya “faktur dari Budi bulan lalu” atau “jam berapa pesawat saya mendarat?”. Jawabannya menautkan ke pesan yang dipakai.",
-		"askPlaceholder": "Tanyakan tentang email Anda…",
+		"askTitle": "Tanya email dan kalender Anda",
+		"askIntro": "Tanyakan misalnya “faktur dari Budi bulan lalu”, “apa jadwal saya besok?” atau “apakah saya kosong Jumat sore?”. Jawabannya menautkan ke pesan dan acara yang dipakai.",
+		"askPlaceholder": "Tanyakan tentang email atau kalender Anda…",
 		"askSend": "Tanya",
 		"askNew": "Percakapan baru",
-		"askThinking": "Mencari di email Anda…",
+		"askThinking": "Memeriksa email dan kalender Anda…",
 		"askTo": "Kepada {name}",
-		"askNote": "Jawaban berasal dari email Anda sendiri lewat Cloudflare Workers AI dan bisa keliru. Buka pesannya untuk memastikan."
+		"askNote": "Jawaban berasal dari email dan kalender Anda sendiri lewat Cloudflare Workers AI dan bisa keliru. Buka pesan atau acaranya untuk memastikan."
 	},
 	"compose": {
 		"title": "Tulis — {app}",

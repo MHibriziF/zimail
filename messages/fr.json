@@ -284,14 +284,14 @@
 		"failed": "L’IA n’a pas pu l’écrire. Réessayez ou reformulez.",
 		"note": "Fonctionne avec Cloudflare Workers AI. Relisez le brouillon avant l’envoi.",
 		"askOpen": "Demander à l’IA",
-		"askTitle": "Interroger vos e-mails",
-		"askIntro": "Demandez par exemple « la facture envoyée par Budi le mois dernier » ou « à quelle heure atterrit mon vol ? ». La réponse renvoie aux messages utilisés.",
-		"askPlaceholder": "Posez une question sur vos e-mails…",
+		"askTitle": "Interroger vos e-mails et votre agenda",
+		"askIntro": "Demandez par exemple « la facture envoyée par Budi le mois dernier », « qu’ai-je demain ? » ou « suis-je libre vendredi après-midi ? ». La réponse renvoie aux messages et événements utilisés.",
+		"askPlaceholder": "Posez une question sur vos e-mails ou votre agenda…",
 		"askSend": "Demander",
 		"askNew": "Nouvelle conversation",
-		"askThinking": "Recherche dans vos e-mails…",
+		"askThinking": "Recherche dans vos e-mails et votre agenda…",
 		"askTo": "À {name}",
-		"askNote": "Les réponses viennent de vos propres e-mails via Cloudflare Workers AI et peuvent être fausses. Ouvrez le message pour vérifier."
+		"askNote": "Les réponses viennent de vos propres e-mails et agenda via Cloudflare Workers AI et peuvent être fausses. Ouvrez le message ou l’événement pour vérifier."
 	},
 	"compose": {
 		"title": "Composer — {app}",

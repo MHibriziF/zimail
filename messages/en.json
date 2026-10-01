@@ -284,14 +284,14 @@
 		"failed": "The AI couldn’t write that. Try again or rephrase.",
 		"note": "Runs on Cloudflare Workers AI. Check the draft before sending.",
 		"askOpen": "Ask AI",
-		"askTitle": "Ask your mail",
-		"askIntro": "Ask things like “the invoice Budi sent last month” or “when does my flight land?”. The answer links to the messages it used.",
-		"askPlaceholder": "Ask about your mail…",
+		"askTitle": "Ask your mail and calendar",
+		"askIntro": "Ask things like “the invoice Budi sent last month”, “what’s on my calendar tomorrow?” or “am I free Friday afternoon?”. The answer links to the messages and events it used.",
+		"askPlaceholder": "Ask about your mail or calendar…",
 		"askSend": "Ask",
 		"askNew": "New conversation",
-		"askThinking": "Searching your mail…",
+		"askThinking": "Looking through your mail and calendar…",
 		"askTo": "To {name}",
-		"askNote": "Answers come from your own mail via Cloudflare Workers AI and can be wrong. Open the message to check."
+		"askNote": "Answers come from your own mail and calendar via Cloudflare Workers AI and can be wrong. Open the message or event to check."
 	},
 	"compose": {
 		"title": "Compose — {app}",

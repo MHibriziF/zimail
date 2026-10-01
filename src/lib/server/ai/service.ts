@@ -6,8 +6,12 @@ import {
 	type ComposeRequest
 } from './prompt';
 import {
+	eventRange,
+	eventsForModel,
+	filterEvents,
 	FIND_TOOLS,
 	findMessages,
+	localStamp,
 	messageForModel,
 	pickCards,
 	plainAnswer,
@@ -17,6 +21,8 @@ import {
 	toolCalls,
 	widenings,
 	validTimeZone,
+	type EventRange,
+	type FoundEvent,
 	type FoundMessage,
 	type HistoryTurn,
 	type LastSearch,
@@ -38,6 +44,7 @@ const MAX_OUTPUT_TOKENS = 1024;
 /** Model turns per question: up to three rounds of tools, then an answer. */
 const MAX_FIND_STEPS = 4;
 const MAX_CALLS_PER_STEP = 3;
+const FIND_TEMPERATURE = 0.1;
 const MAX_CARDS = 5;
 
 export type ComposeInput = Omit<ComposeRequest, 'replyTo'> & { replyToId: string | null };
@@ -53,7 +60,7 @@ type Failure =
 export type ComposeOutcome = { kind: 'ok'; subject: string; html: string } | Failure;
 
 export type FindInput = { question: string; history: HistoryTurn[]; timeZone: string };
-export type FindOutcome = { kind: 'ok'; answer: string; messages: FoundMessage[] } | Failure;
+export type FindOutcome = { kind: 'ok'; answer: string; messages: FoundMessage[]; events: FoundEvent[] } | Failure;
 
 export type AiService = {
 	compose(userId: string, input: ComposeInput): Promise<ComposeOutcome>;
@@ -64,6 +71,8 @@ export type AiServiceDeps = {
 	ai: AiBinding | null;
 	searchMail(userId: string, args: SearchArgs, limit: number): Promise<FoundMessage[]>;
 	readMessage(userId: string, emailId: string): Promise<MessageDetail | null>;
+	/** Events overlapping the range's days in the reader's zone. */
+	listEvents(userId: string, range: EventRange, timeZone: string): Promise<FoundEvent[]>;
 	now?: () => Date;
 };
 
@@ -101,32 +110,50 @@ function failure(error: unknown, what: string): Failure {
 export function createAiService(deps: AiServiceDeps): AiService {
 	const ai = () => deps.ai as AiBinding;
 
-	/** Runs one tool call; returns what the model sees and what the panel may show. */
-	async function runTool(userId: string, call: ToolCall, timeZone: string) {
-		if (call.name === 'search_mail') {
-			for (const { args, note } of widenings(searchArgs(call.args))) {
-				const found = await deps.searchMail(userId, args, SEARCH_LIMIT);
-				if (found.length > 0) {
-					return { forModel: searchResultForModel(found, timeZone, note), found, loose: note !== null, read: [] };
-				}
-			}
-			return { forModel: searchResultForModel([], timeZone), found: [], loose: false, read: [] };
-		}
-		if (call.name === 'read_message') {
-			const id = typeof call.args.id === 'string' ? call.args.id : '';
-			const message = id ? await deps.readMessage(userId, id) : null;
-			return { forModel: messageForModel(message, timeZone), found: [], loose: false, read: message ? [message] : [] };
-		}
-		return { forModel: { error: `Unknown tool ${call.name}` }, found: [], loose: false, read: [] };
-	}
-
 	type FindRun = {
 		userId: string;
 		timeZone: string;
+		/** `YYYY-MM-DD` in the reader's zone, the default start of a calendar lookup. */
+		today: string;
 		messages: AgentMessage[];
 		read: Map<string, FoundMessage>;
 		lastSearch: LastSearch;
+		events: FoundEvent[];
 	};
+
+	/**
+	 * Each tool records on the run what the panel may show, and returns what the model sees.
+	 * An empty mail search is widened here, since the model rarely retries by itself.
+	 */
+	const tools: Record<string, (run: FindRun, args: Record<string, unknown>) => Promise<unknown>> = {
+		async search_mail(run, raw) {
+			for (const { args, note } of widenings(searchArgs(raw))) {
+				const found = await deps.searchMail(run.userId, args, SEARCH_LIMIT);
+				if (found.length > 0) {
+					run.lastSearch = { found, loose: note !== null };
+					return searchResultForModel(found, run.timeZone, note);
+				}
+			}
+			return searchResultForModel([], run.timeZone);
+		},
+		async read_message(run, raw) {
+			const id = typeof raw.id === 'string' ? raw.id : '';
+			const message = id ? await deps.readMessage(run.userId, id) : null;
+			if (message) run.read.set(message.id, message);
+			return messageForModel(message, run.timeZone);
+		},
+		async list_events(run, raw) {
+			const range = eventRange(raw, run.today);
+			const { events, note } = filterEvents(await deps.listEvents(run.userId, range, run.timeZone), range);
+			run.events = events;
+			return eventsForModel(events, range, run.timeZone, note);
+		}
+	};
+
+	async function runTool(run: FindRun, call: ToolCall): Promise<unknown> {
+		const tool = Object.hasOwn(tools, call.name) ? tools[call.name] : null;
+		return tool ? tool(run, call.args) : { error: `Unknown tool ${call.name}` };
+	}
 
 	/** Echoes the model's tool calls back into the conversation, each followed by its result. */
 	async function runRound(run: FindRun, calls: ToolCall[]) {
@@ -140,10 +167,8 @@ export function createAiService(deps: AiServiceDeps): AiService {
 			}))
 		});
 		for (const call of calls) {
-			const outcome = await runTool(run.userId, call, run.timeZone);
-			if (outcome.found.length > 0) run.lastSearch = { found: outcome.found, loose: outcome.loose };
-			for (const message of outcome.read) run.read.set(message.id, message);
-			run.messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(outcome.forModel) });
+			const forModel = await runTool(run, call);
+			run.messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(forModel) });
 		}
 	}
 
@@ -151,17 +176,25 @@ export function createAiService(deps: AiServiceDeps): AiService {
 		const answer = plainAnswer(responseText(result));
 		if (!answer) return { kind: 'failed' };
 		const cards = pickCards([...run.read.values()], run.lastSearch, answer);
-		return { kind: 'ok', answer, messages: cards.slice(0, MAX_CARDS) };
+		return {
+			kind: 'ok',
+			answer,
+			messages: cards.slice(0, MAX_CARDS),
+			events: run.events.slice(0, MAX_CARDS)
+		};
 	}
 
 	async function find(userId: string, input: FindInput): Promise<FindOutcome> {
 		const timeZone = validTimeZone(input.timeZone);
+		const now = deps.now?.() ?? new Date();
 		const run: FindRun = {
 			userId,
 			timeZone,
-			messages: findMessages({ question: input.question, history: input.history, timeZone, now: deps.now?.() ?? new Date() }),
+			today: localStamp(now.toISOString(), timeZone).split(' ')[1],
+			messages: findMessages({ question: input.question, history: input.history, timeZone, now }),
 			read: new Map(),
-			lastSearch: { found: [], loose: false }
+			lastSearch: { found: [], loose: false },
+			events: []
 		};
 
 		for (let step = 0; step < MAX_FIND_STEPS; step++) {
@@ -172,6 +205,8 @@ export function createAiService(deps: AiServiceDeps): AiService {
 				tools,
 				// Without this the model sometimes answers from nothing ("I can't see your mail").
 				tool_choice: step === 0 ? 'required' : undefined,
+				// Looking things up wants the same answer every time, not variety.
+				temperature: FIND_TEMPERATURE,
 				max_tokens: MAX_OUTPUT_TOKENS
 			});
 			const calls = tools ? toolCalls(result).slice(0, MAX_CALLS_PER_STEP) : [];

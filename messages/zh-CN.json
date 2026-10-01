@@ -284,14 +284,14 @@
 		"failed": "AI 无法完成，请重试或换个说法。",
 		"note": "由 Cloudflare Workers AI 提供。发送前请检查草稿。",
 		"askOpen": "问 AI",
-		"askTitle": "查询你的邮件",
-		"askIntro": "可以问“Budi 上个月发的发票”或“我的航班几点落地？”。回答会链接到所用的邮件。",
-		"askPlaceholder": "询问你的邮件…",
+		"askTitle": "查询你的邮件和日历",
+		"askIntro": "可以问“Budi 上个月发的发票”、“我明天有什么安排？”或“我周五下午有空吗？”。回答会链接到所用的邮件和日程。",
+		"askPlaceholder": "询问你的邮件或日历…",
 		"askSend": "提问",
 		"askNew": "新对话",
-		"askThinking": "正在搜索你的邮件…",
+		"askThinking": "正在查看你的邮件和日历…",
 		"askTo": "发给 {name}",
-		"askNote": "回答来自你自己的邮件，由 Cloudflare Workers AI 生成，可能有误。请打开邮件核实。"
+		"askNote": "回答来自你自己的邮件和日历，由 Cloudflare Workers AI 生成，可能有误。请打开邮件或日程核实。"
 	},
 	"compose": {
 		"title": "撰写 — {app}",
