@@ -47,7 +47,7 @@ if ! git merge-base HEAD "$UPSTREAM_REF" >/dev/null; then
 		if [ "$current" -eq 0 ]; then break; fi
 	done
 	echo "First sync: this repository starts from upstream $(git log -1 --format='%h %s' "$best") ($best_distance lines differ)."
-	git replace --graft "$root" "$best"
+	git replace -f --graft "$root" "$best"
 fi
 
 git checkout -B "$BRANCH"
