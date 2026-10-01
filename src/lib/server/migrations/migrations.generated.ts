@@ -192,5 +192,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0047_ai_conversations.sql",
 		sql: "-- Ask AI conversations, one row each with its turns as JSON: a follow-up question is one\n-- UPDATE, not a row per message. The index serves the history list newest first. See #118.\nCREATE TABLE ai_conversations (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\ttitle TEXT NOT NULL,\n\tturns TEXT NOT NULL,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now')),\n\tupdated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\nCREATE INDEX ai_conversations_user_idx ON ai_conversations(user_id, updated_at);\n"
+	},
+	{
+		name: "0048_auto_sweep.sql",
+		sql: "-- The \"move old mail to Trash\" filter, saved. With sweep_auto on, it runs by itself in the same\n-- once-a-day cleanup that empties the Trash (users.last_trash_purge_at). Off until turned on.\nALTER TABLE users ADD COLUMN sweep_auto INTEGER NOT NULL DEFAULT 0;\nALTER TABLE users ADD COLUMN sweep_days INTEGER NOT NULL DEFAULT 90;\nALTER TABLE users ADD COLUMN sweep_only_read INTEGER NOT NULL DEFAULT 1;\nALTER TABLE users ADD COLUMN sweep_keep_starred INTEGER NOT NULL DEFAULT 1;\n"
 	}
 ];

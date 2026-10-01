@@ -696,7 +696,18 @@
 		"afterYear": "After a year",
 		"afterDays": "After {days} days",
 		"movedOne": "Moved {count} message to Trash.",
-		"movedMany": "Moved {count} messages to Trash."
+		"movedMany": "Moved {count} messages to Trash.",
+		"autoSweep": "Do this automatically every day",
+		"autoSweepHint": "Once saved, mail matching this filter moves to Trash by itself, at most once a day when you open the mailbox. Off until you turn it on.",
+		"moveNowHint": "Or do it once, right now, with the filter above:",
+		"save": "Save",
+		"saving": "Saving…",
+		"saved": "Saved.",
+		"unsaved": "Unsaved changes",
+		"saveFirst": "Save first to use the new period.",
+		"nothingExpired": "Nothing in Trash is old enough yet.",
+		"removedOne": "Permanently deleted {count} message.",
+		"removedMany": "Permanently deleted {count} messages."
 	},
 	"twoFactor": {
 		"title": "Two-factor authentication",
