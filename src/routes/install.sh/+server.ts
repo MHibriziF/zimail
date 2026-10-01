@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 
-const GITHUB_REPO = 'DivinPrince/quickinbox';
+import { GITHUB_REPO } from '$lib/constants';
 /** Public installer lives on main; set QUICKINBOX_REF in the script to use another ref. */
 const GITHUB_REF = 'main';
 
