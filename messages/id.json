@@ -696,7 +696,18 @@
 		"afterYear": "Setelah satu tahun",
 		"afterDays": "Setelah {days} hari",
 		"movedOne": "{count} pesan dipindahkan ke Sampah.",
-		"movedMany": "{count} pesan dipindahkan ke Sampah."
+		"movedMany": "{count} pesan dipindahkan ke Sampah.",
+		"autoSweep": "Lakukan otomatis setiap hari",
+		"autoSweepHint": "Setelah disimpan, email yang cocok dengan filter ini dipindah ke Sampah dengan sendirinya, paling banyak sekali sehari saat Anda membuka kotak surat. Mati sampai Anda menyalakannya.",
+		"moveNowHint": "Atau lakukan sekali, sekarang juga, dengan filter di atas:",
+		"save": "Simpan",
+		"saving": "Menyimpan…",
+		"saved": "Tersimpan.",
+		"unsaved": "Ada perubahan yang belum disimpan",
+		"saveFirst": "Simpan dulu untuk memakai jangka waktu baru.",
+		"nothingExpired": "Belum ada yang cukup lama di Sampah.",
+		"removedOne": "{count} pesan dihapus selamanya.",
+		"removedMany": "{count} pesan dihapus selamanya."
 	},
 	"twoFactor": {
 		"title": "Autentikasi dua faktor",

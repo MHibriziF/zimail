@@ -63,7 +63,7 @@
 	{/if}
 
 	{#if show('cleanup')}
-		<CleanupPanel retentionDays={data.cleanup.trashRetentionDays} />
+		<CleanupPanel settings={data.cleanup} />
 	{/if}
 
 	{#if show('appearance')}

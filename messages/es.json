@@ -696,7 +696,18 @@
 		"afterYear": "Después de un año",
 		"afterDays": "Después de {days} días",
 		"movedOne": "{count} mensaje movido a la papelera.",
-		"movedMany": "{count} mensajes movidos a la papelera."
+		"movedMany": "{count} mensajes movidos a la papelera.",
+		"autoSweep": "Hacerlo automáticamente cada día",
+		"autoSweepHint": "Una vez guardado, el correo que coincida con este filtro pasa a la Papelera solo, como máximo una vez al día al abrir el buzón. Desactivado hasta que lo actives.",
+		"moveNowHint": "O hazlo una vez, ahora mismo, con el filtro de arriba:",
+		"save": "Guardar",
+		"saving": "Guardando…",
+		"saved": "Guardado.",
+		"unsaved": "Cambios sin guardar",
+		"saveFirst": "Guarda primero para usar el nuevo periodo.",
+		"nothingExpired": "Nada en la Papelera es lo bastante antiguo todavía.",
+		"removedOne": "{count} mensaje eliminado para siempre.",
+		"removedMany": "{count} mensajes eliminados para siempre."
 	},
 	"twoFactor": {
 		"title": "Autenticación en dos pasos",

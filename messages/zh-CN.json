@@ -696,7 +696,18 @@
 		"afterYear": "一年后",
 		"afterDays": "{days} 天后",
 		"movedOne": "已将 {count} 封邮件移到回收站。",
-		"movedMany": "已将 {count} 封邮件移到回收站。"
+		"movedMany": "已将 {count} 封邮件移到回收站。",
+		"autoSweep": "每天自动执行",
+		"autoSweepHint": "保存后，符合此筛选条件的邮件会自动移到废纸篓，每天最多一次，在你打开邮箱时进行。在你开启之前保持关闭。",
+		"moveNowHint": "或者现在就用上面的筛选条件执行一次：",
+		"save": "保存",
+		"saving": "正在保存…",
+		"saved": "已保存。",
+		"unsaved": "有未保存的更改",
+		"saveFirst": "请先保存，才能使用新的期限。",
+		"nothingExpired": "废纸篓中还没有足够旧的邮件。",
+		"removedOne": "已永久删除 {count} 封邮件。",
+		"removedMany": "已永久删除 {count} 封邮件。"
 	},
 	"twoFactor": {
 		"title": "两步验证",

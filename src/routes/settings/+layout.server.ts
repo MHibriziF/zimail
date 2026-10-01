@@ -2,7 +2,7 @@ import type { LayoutServerLoad } from './$types';
 import { getApiTokenService } from '$lib/server/api-tokens';
 import { getAuthService } from '$lib/server/auth';
 import { readVapidConfiguration } from '$lib/server/push-notifications';
-import { getCleanupSettings } from '$lib/server/cleanup';
+import { DEFAULT_CLEANUP_SETTINGS, getCleanupSettings } from '$lib/server/cleanup';
 
 export const load: LayoutServerLoad = async ({ locals, platform }) => {
 	const db = platform?.env.DB;
@@ -22,7 +22,7 @@ export const load: LayoutServerLoad = async ({ locals, platform }) => {
 	const cleanup =
 		locals.user && db
 			? await getCleanupSettings(db, locals.user.id)
-			: { trashRetentionDays: 0 };
+			: DEFAULT_CLEANUP_SETTINGS;
 
 	return {
 		domains: locals.domains,

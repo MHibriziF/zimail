@@ -2,7 +2,7 @@ import type { LayoutServerLoad } from './$types';
 import { getMailStoreService } from '$lib/server/mail-store';
 import { getLabelsService } from '$lib/server/labels';
 import { getCalendarService } from '$lib/server/calendar';
-import { runDueTrashPurge } from '$lib/server/cleanup';
+import { runDueCleanup } from '$lib/server/cleanup';
 import { getEmailProvider } from '$lib/server/context';
 import { runDueScheduledSends } from '$lib/server/scheduled-send';
 import { DEFAULT_UI_THEME } from '$lib/ui-theme/ids';
@@ -51,12 +51,12 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	depends('app:labels');
 	depends('app:calendar');
 
-	// Emptying old trash rides along with a page load rather than a timer. The
+	// Cleanup (emptying old trash, and the saved sweep when it is on) rides along with a page load rather than a timer. The
 	// claim inside is throttled to once a day, so this is a single cheap UPDATE
 	// on all but one request in twenty-four hours.
 	if (db && locals.user) {
 		try {
-			await runDueTrashPurge(db, platform?.env.ATTACHMENTS, locals.user.id);
+			await runDueCleanup(db, platform?.env.ATTACHMENTS, locals.user.id);
 		} catch {
 			// Never block the mailbox on housekeeping.
 		}

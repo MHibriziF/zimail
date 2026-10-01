@@ -696,7 +696,18 @@
 		"afterYear": "Après un an",
 		"afterDays": "Après {days} jours",
 		"movedOne": "{count} message déplacé vers la corbeille.",
-		"movedMany": "{count} messages déplacés vers la corbeille."
+		"movedMany": "{count} messages déplacés vers la corbeille.",
+		"autoSweep": "Le faire automatiquement chaque jour",
+		"autoSweepHint": "Une fois enregistré, le courrier correspondant à ce filtre va dans la Corbeille tout seul, au plus une fois par jour à l’ouverture de la boîte. Désactivé tant que vous ne l’activez pas.",
+		"moveNowHint": "Ou le faire une fois, maintenant, avec le filtre ci-dessus :",
+		"save": "Enregistrer",
+		"saving": "Enregistrement…",
+		"saved": "Enregistré.",
+		"unsaved": "Modifications non enregistrées",
+		"saveFirst": "Enregistrez d’abord pour utiliser la nouvelle durée.",
+		"nothingExpired": "Rien dans la Corbeille n’est encore assez ancien.",
+		"removedOne": "{count} message supprimé définitivement.",
+		"removedMany": "{count} messages supprimés définitivement."
 	},
 	"twoFactor": {
 		"title": "Authentification à deux facteurs",

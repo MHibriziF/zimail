@@ -101,58 +101,113 @@ export async function purgeExpiredTrash(
 	);
 }
 
-export type CleanupSettings = { trashRetentionDays: number };
+/** The saved sweep filter, and whether the daily cleanup applies it by itself. */
+export type SweepSettings = SweepFilter & { auto: boolean };
+export type CleanupSettings = { trashRetentionDays: number; sweep: SweepSettings };
+
+export const DEFAULT_CLEANUP_SETTINGS: CleanupSettings = {
+	trashRetentionDays: 0,
+	sweep: { auto: false, olderThanDays: 90, onlyRead: true, keepStarred: true }
+};
+
+type SettingsRow = {
+	trash_retention_days: number;
+	sweep_auto: number;
+	sweep_days: number;
+	sweep_only_read: number;
+	sweep_keep_starred: number;
+};
 
 export async function getCleanupSettings(
 	db: D1Database,
 	userId: string
 ): Promise<CleanupSettings> {
 	const row = await db
-		.prepare('SELECT trash_retention_days FROM users WHERE id = ?')
+		.prepare(
+			`SELECT trash_retention_days, sweep_auto, sweep_days, sweep_only_read, sweep_keep_starred
+			   FROM users WHERE id = ?`
+		)
 		.bind(userId)
-		.first<{ trash_retention_days: number }>();
+		.first<SettingsRow>();
+	if (!row) return DEFAULT_CLEANUP_SETTINGS;
 
-	return { trashRetentionDays: row?.trash_retention_days ?? 0 };
+	return {
+		trashRetentionDays: row.trash_retention_days,
+		sweep: {
+			auto: row.sweep_auto === 1,
+			olderThanDays: row.sweep_days,
+			onlyRead: row.sweep_only_read === 1,
+			keepStarred: row.sweep_keep_starred === 1
+		}
+	};
 }
 
-export async function setTrashRetention(
+export function isRetentionChoice(days: number): boolean {
+	return TRASH_RETENTION_CHOICES.includes(days as (typeof TRASH_RETENTION_CHOICES)[number]);
+}
+
+export function isSweepAgeChoice(days: number): boolean {
+	return SWEEP_AGE_CHOICES.includes(days as (typeof SWEEP_AGE_CHOICES)[number]);
+}
+
+/** Saves the whole form in one write. Only the offered periods are accepted. */
+export async function saveCleanupSettings(
 	db: D1Database,
 	userId: string,
-	days: number
+	settings: CleanupSettings
 ): Promise<void> {
-	if (!TRASH_RETENTION_CHOICES.includes(days as (typeof TRASH_RETENTION_CHOICES)[number])) {
+	if (!isRetentionChoice(settings.trashRetentionDays)) {
 		throw new Error('Pick one of the offered retention periods');
+	}
+	if (!isSweepAgeChoice(settings.sweep.olderThanDays)) {
+		throw new Error('Pick one of the offered ages');
 	}
 
 	await db
-		.prepare('UPDATE users SET trash_retention_days = ? WHERE id = ?')
-		.bind(days, userId)
+		.prepare(
+			`UPDATE users SET trash_retention_days = ?, sweep_auto = ?, sweep_days = ?,
+			                  sweep_only_read = ?, sweep_keep_starred = ?
+			  WHERE id = ?`
+		)
+		.bind(
+			settings.trashRetentionDays,
+			settings.sweep.auto ? 1 : 0,
+			settings.sweep.olderThanDays,
+			settings.sweep.onlyRead ? 1 : 0,
+			settings.sweep.keepStarred ? 1 : 0,
+			userId
+		)
 		.run();
 }
 
 /**
- * Runs the automatic purge, at most once a day.
+ * Runs the automatic cleanup, at most once a day: the saved sweep when it's switched on,
+ * then emptying Trash past its retention. Mail the sweep moves is stamped now, so it is
+ * never purged in the same run.
  *
  * The claim and the throttle are the same UPDATE, so two requests arriving
- * together cannot both decide it is their turn. Returns how many were removed.
+ * together cannot both decide it is their turn. A user with neither turned on
+ * matches nothing, so nothing is written.
  */
-export async function runDueTrashPurge(
+export async function runDueCleanup(
 	db: D1Database,
 	bucket: R2Bucket | undefined,
 	userId: string
-): Promise<number> {
+): Promise<{ moved: number; removed: number }> {
 	const claim = await db
 		.prepare(
 			`UPDATE users SET last_trash_purge_at = datetime('now')
-			  WHERE id = ? AND trash_retention_days > 0
+			  WHERE id = ? AND (trash_retention_days > 0 OR sweep_auto = 1)
 			    AND (last_trash_purge_at IS NULL
 			         OR last_trash_purge_at < datetime('now', '-1 day'))`
 		)
 		.bind(userId)
 		.run();
 
-	if ((claim.meta.changes ?? 0) !== 1) return 0;
+	if ((claim.meta.changes ?? 0) !== 1) return { moved: 0, removed: 0 };
 
-	const { trashRetentionDays } = await getCleanupSettings(db, userId);
-	return purgeExpiredTrash(db, bucket, userId, trashRetentionDays);
+	const { trashRetentionDays, sweep } = await getCleanupSettings(db, userId);
+	const moved = sweep.auto ? await sweepOldMail(db, userId, sweep) : 0;
+	const removed = await purgeExpiredTrash(db, bucket, userId, trashRetentionDays);
+	return { moved, removed };
 }

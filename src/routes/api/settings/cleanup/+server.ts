@@ -1,17 +1,17 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import {
-	SWEEP_AGE_CHOICES,
 	countSweepCandidates,
 	getCleanupSettings,
+	isSweepAgeChoice,
 	purgeExpiredTrash,
-	setTrashRetention,
+	saveCleanupSettings,
 	sweepOldMail,
 	type SweepFilter
 } from '$lib/server/cleanup';
 
 function readFilter(body: Record<string, unknown>): SweepFilter | null {
 	const days = Number(body.olderThanDays);
-	if (!SWEEP_AGE_CHOICES.includes(days as (typeof SWEEP_AGE_CHOICES)[number])) return null;
+	if (!isSweepAgeChoice(days)) return null;
 
 	return {
 		olderThanDays: days,
@@ -49,8 +49,14 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	}
 
 	try {
-		if (body.action === 'retention') {
-			await setTrashRetention(db, locals.user.id, Number(body.days));
+		// The whole form, saved by its Save button: retention plus the sweep and whether it runs daily.
+		if (body.action === 'settings') {
+			const sweep = readFilter((body.sweep ?? {}) as Record<string, unknown>);
+			if (!sweep) return json({ error: 'Pick an age to sweep' }, { status: 400 });
+			await saveCleanupSettings(db, locals.user.id, {
+				trashRetentionDays: Number(body.trashRetentionDays),
+				sweep: { ...sweep, auto: (body.sweep as { auto?: unknown }).auto === true }
+			});
 			return json({ ok: true, ...(await getCleanupSettings(db, locals.user.id)) });
 		}
 
@@ -65,6 +71,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 			return json({ ok: true, removed });
 		}
 
+		// The one-off: move now with whatever filter is on screen, saved or not.
 		if (body.action === 'sweep') {
 			const filter = readFilter(body);
 			if (!filter) return json({ error: 'Pick an age to sweep' }, { status: 400 });

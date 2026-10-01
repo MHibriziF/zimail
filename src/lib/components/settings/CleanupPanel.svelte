@@ -5,16 +5,33 @@
 	import { t } from '$lib/i18n';
 	import { SWEEP_AGE_CHOICES, TRASH_RETENTION_CHOICES } from '$lib/cleanup-options';
 
-	let { retentionDays: initialRetention }: { retentionDays: number } = $props();
+	type CleanupSettings = {
+		trashRetentionDays: number;
+		sweep: { auto: boolean; olderThanDays: number; onlyRead: boolean; keepStarred: boolean };
+	};
 
-	let retention = $state(untrack(() => initialRetention));
-	let olderThanDays = $state<number>(SWEEP_AGE_CHOICES[1]);
-	let onlyRead = $state(true);
-	let keepStarred = $state(true);
+	let { settings: initial }: { settings: CleanupSettings } = $props();
+
+	/** What's stored. The form edits copies, and nothing changes until Save. */
+	let saved = $state(untrack(() => $state.snapshot(initial)));
+	let retention = $state(untrack(() => initial.trashRetentionDays));
+	let autoSweep = $state(untrack(() => initial.sweep.auto));
+	let olderThanDays = $state(untrack(() => initial.sweep.olderThanDays));
+	let onlyRead = $state(untrack(() => initial.sweep.onlyRead));
+	let keepStarred = $state(untrack(() => initial.sweep.keepStarred));
+
+	const dirty = $derived(
+		retention !== saved.trashRetentionDays ||
+			autoSweep !== saved.sweep.auto ||
+			olderThanDays !== saved.sweep.olderThanDays ||
+			onlyRead !== saved.sweep.onlyRead ||
+			keepStarred !== saved.sweep.keepStarred
+	);
 
 	let count = $state<number | null>(null);
 	let counting = $state(false);
 	let busy = $state(false);
+	let saving = $state(false);
 	let error = $state('');
 	let notice = $state('');
 	/** Cleared whenever the filter changes, so a stale count is never acted on. */
@@ -86,12 +103,17 @@
 		await invalidateAll();
 	}
 
-	async function saveRetention(event: Event) {
-		const days = Number((event.currentTarget as HTMLSelectElement).value);
-		const body = await post({ action: 'retention', days });
+	async function save() {
+		saving = true;
+		const body = await post({
+			action: 'settings',
+			trashRetentionDays: retention,
+			sweep: { auto: autoSweep, olderThanDays, onlyRead, keepStarred }
+		});
+		saving = false;
 		if (!body) return;
-		retention = body.trashRetentionDays;
-		notice = days === 0 ? 'Trash will be kept until you empty it.' : `Trash empties ${describe(days).toLowerCase()}.`;
+		saved = { trashRetentionDays: body.trashRetentionDays, sweep: body.sweep };
+		notice = t('cleanup.saved');
 	}
 
 	async function emptyExpired() {
@@ -99,8 +121,8 @@
 		if (!body) return;
 		notice =
 			body.removed === 0
-				? 'Nothing in Trash is old enough yet.'
-				: `Permanently deleted ${body.removed} ${body.removed === 1 ? 'message' : 'messages'}.`;
+				? t('cleanup.nothingExpired')
+				: t(body.removed === 1 ? 'cleanup.removedOne' : 'cleanup.removedMany', { count: body.removed });
 		await invalidateAll();
 	}
 
@@ -118,14 +140,20 @@
 
 	<div class="block">
 		<label class="field-title" for="retention">{t('cleanup.autoEmpty')}</label>
-		<select id="retention" class="text-input" value={retention} onchange={saveRetention}>
+		<select id="retention" class="text-input" bind:value={retention}>
 			{#each TRASH_RETENTION_CHOICES as days (days)}
 				<option value={days}>{describe(days)}</option>
 			{/each}
 		</select>
 		<p class="hint">{t('cleanup.autoEmptyHint')}</p>
 		<div class="actions">
-			<button type="button" class="btn-ghost" disabled={busy} onclick={emptyExpired}>
+			{#if retention !== saved.trashRetentionDays}<span class="hint">{t('cleanup.saveFirst')}</span>{/if}
+			<button
+				type="button"
+				class="btn-ghost"
+				disabled={busy || retention !== saved.trashRetentionDays || saved.trashRetentionDays === 0}
+				onclick={emptyExpired}
+			>
 				{t('cleanup.emptyExpiredNow')}
 			</button>
 		</div>
@@ -156,6 +184,13 @@
 			<span>{t('cleanup.keepStarred')}</span>
 		</label>
 
+		<label class="check auto">
+			<input type="checkbox" bind:checked={autoSweep} />
+			<span>{t('cleanup.autoSweep')}</span>
+		</label>
+		<p class="hint">{t('cleanup.autoSweepHint')}</p>
+
+		<p class="hint once">{t('cleanup.moveNowHint')}</p>
 		{#if confirming && count !== null}
 			<p class="count">
 				{count === 0
@@ -180,6 +215,13 @@
 
 	{#if error}<p class="error">{error}</p>{/if}
 	{#if notice}<p class="saved">{notice}</p>{/if}
+
+	<div class="save-row">
+		{#if dirty}<span class="hint">{t('cleanup.unsaved')}</span>{/if}
+		<button type="button" class="btn-primary" disabled={!dirty || saving} onclick={save}>
+			{saving ? t('cleanup.saving') : t('cleanup.save')}
+		</button>
+	</div>
 </section>
 
 <style>
@@ -262,6 +304,30 @@
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		cursor: pointer;
+	}
+
+	.check.auto {
+		margin-top: 0.75rem;
+		font-weight: 500;
+		color: var(--color-text);
+	}
+
+	.hint.once {
+		margin-top: 0.75rem;
+	}
+
+	.save-row {
+		display: flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.75rem;
+		margin-top: 1.125rem;
+		padding-top: 1.125rem;
+		border-top: 1px solid var(--color-line);
+	}
+
+	.save-row .hint {
+		margin: 0;
 	}
 
 	.count {
