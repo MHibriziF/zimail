@@ -1,4 +1,4 @@
-import { trimTrailing } from '../../utils/text';
+import { trimTrailing } from "../../utils/text";
 
 /**
  * Minimal LiveKit access-token minting, implemented with Web Crypto so it
@@ -13,17 +13,29 @@ import { trimTrailing } from '../../utils/text';
  */
 
 export class LiveKitError extends Error {
-	constructor(message: string) {
-		super(message);
-		this.name = 'LiveKitError';
-	}
+  constructor(message: string) {
+    super(message);
+    this.name = "LiveKitError";
+  }
 }
 
 /** Lower-case names are what a token's `canPublishSources` grant takes. */
-export type TrackSourceName = 'camera' | 'microphone' | 'screen_share' | 'screen_share_audio';
+export type TrackSourceName =
+  | "camera"
+  | "microphone"
+  | "screen_share"
+  | "screen_share_audio";
 
-export const ALL_TRACK_SOURCES: TrackSourceName[] = ['camera', 'microphone', 'screen_share', 'screen_share_audio'];
-export const NON_SCREEN_TRACK_SOURCES: TrackSourceName[] = ['camera', 'microphone'];
+export const ALL_TRACK_SOURCES: TrackSourceName[] = [
+  "camera",
+  "microphone",
+  "screen_share",
+  "screen_share_audio",
+];
+export const NON_SCREEN_TRACK_SOURCES: TrackSourceName[] = [
+  "camera",
+  "microphone",
+];
 
 /**
  * LiveKit's TrackSource. Protobuf JSON may serialize an enum as its name or as
@@ -32,169 +44,230 @@ export const NON_SCREEN_TRACK_SOURCES: TrackSourceName[] = ['camera', 'microphon
  */
 export type RoomTrack = { sid: string; source: string | number };
 
-export type RoomParticipant = { identity: string; attributes: Record<string, string>; tracks: RoomTrack[] };
+export type RoomParticipant = {
+  identity: string;
+  attributes: Record<string, string>;
+  tracks: RoomTrack[];
+};
 
 /** A shared screen's picture and its sound, by enum name and by enum number. */
-const SCREEN_SHARE_SOURCE_NAMES = new Set(['SCREEN_SHARE', 'SCREEN_SHARE_AUDIO']);
+const SCREEN_SHARE_SOURCE_NAMES = new Set([
+  "SCREEN_SHARE",
+  "SCREEN_SHARE_AUDIO",
+]);
 const SCREEN_SHARE_SOURCE_NUMBERS = new Set([3, 4]);
 
 export function isScreenShareTrack(track: RoomTrack): boolean {
-	return typeof track.source === 'number'
-		? SCREEN_SHARE_SOURCE_NUMBERS.has(track.source)
-		: SCREEN_SHARE_SOURCE_NAMES.has(track.source.toUpperCase());
+  return typeof track.source === "number"
+    ? SCREEN_SHARE_SOURCE_NUMBERS.has(track.source)
+    : SCREEN_SHARE_SOURCE_NAMES.has(track.source.toUpperCase());
 }
 
 type AccessTokenOptions = {
-	identity: string;
-	name?: string;
-	room: string;
-	/** How long the token is valid to establish the *initial* connection. */
-	ttlSeconds?: number;
-	/** Initial participant attributes — a top-level JWT claim, not part of the `video` grant. Self-editable, so never trust them for authority. */
-	attributes?: Record<string, string>;
-	/** Omitted means every source is allowed. */
-	canPublishSources?: TrackSourceName[];
+  identity: string;
+  name?: string;
+  room: string;
+  /** How long the token is valid to establish the *initial* connection. */
+  ttlSeconds?: number;
+  /** Initial participant attributes — a top-level JWT claim, not part of the `video` grant. Self-editable, so never trust them for authority. */
+  attributes?: Record<string, string>;
+  /** Omitted means every source is allowed. */
+  canPublishSources?: TrackSourceName[];
 };
 
 export type LiveKitClient = {
-	/** wss:// URL the browser connects to directly. */
-	url: string;
-	createAccessToken(options: AccessTokenOptions): Promise<string>;
-	/** Everyone currently in the room; empty if the room doesn't exist (no one has joined yet). */
-	listParticipants(room: string): Promise<RoomParticipant[]>;
-	/** Replaces what one participant may publish, taking effect immediately in the live call. */
-	setPublishSources(room: string, identity: string, sources: TrackSourceName[]): Promise<void>;
-	/** Mutes one published track at the server, whatever the publisher's client does. */
-	muteTrack(room: string, identity: string, trackSid: string): Promise<void>;
+  /** wss:// URL the browser connects to directly. */
+  url: string;
+  createAccessToken(options: AccessTokenOptions): Promise<string>;
+  /** Everyone currently in the room; empty if the room doesn't exist (no one has joined yet). */
+  listParticipants(room: string): Promise<RoomParticipant[]>;
+  /** Replaces what one participant may publish, taking effect immediately in the live call. */
+  setPublishSources(
+    room: string,
+    identity: string,
+    sources: TrackSourceName[],
+  ): Promise<void>;
+  /** Mutes one published track at the server, whatever the publisher's client does. */
+  muteTrack(room: string, identity: string, trackSid: string): Promise<void>;
 };
 
 export function createLiveKitClient(
-	apiKey: string,
-	apiSecret: string,
-	url: string,
-	fetchImpl: typeof fetch = fetch
+  apiKey: string,
+  apiSecret: string,
+  url: string,
+  fetchImpl: typeof fetch = fetch,
 ): LiveKitClient {
-	if (!apiKey || !apiSecret || !url) {
-		throw new LiveKitError('LiveKit is not configured');
-	}
+  if (!apiKey || !apiSecret || !url) {
+    throw new LiveKitError("LiveKit is not configured");
+  }
 
-	async function signClaims(claims: Record<string, unknown>, ttlSeconds: number): Promise<string> {
-		const now = Math.floor(Date.now() / 1000);
-		const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-		const payload = base64url(JSON.stringify({ iss: apiKey, nbf: now, exp: now + ttlSeconds, ...claims }));
-		const signature = await sign(`${header}.${payload}`, apiSecret);
-		return `${header}.${payload}.${signature}`;
-	}
+  async function signClaims(
+    claims: Record<string, unknown>,
+    ttlSeconds: number,
+  ): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const payload = base64url(
+      JSON.stringify({
+        iss: apiKey,
+        nbf: now,
+        exp: now + ttlSeconds,
+        ...claims,
+      }),
+    );
+    const signature = await sign(`${header}.${payload}`, apiSecret);
+    return `${header}.${payload}.${signature}`;
+  }
 
-	/** One RoomService call. A room-scoped admin token, minted per call and valid for a minute. */
-	async function roomService<T>(method: string, room: string, body: Record<string, unknown>): Promise<T> {
-		const token = await signClaims({ video: { roomAdmin: true, room } }, 60);
-		const response = await fetchImpl(`${httpBaseUrl(url)}/twirp/livekit.RoomService/${method}`, {
-			method: 'POST',
-			headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-			body: JSON.stringify({ room, ...body })
-		});
-		if (!response.ok) {
-			const error = (await response.json().catch(() => ({}))) as { code?: string; msg?: string };
-			const detail = error.msg ? ` (${error.msg})` : '';
-			throw new LiveKitError(`RoomService.${method} failed: ${error.code ?? response.status}${detail}`);
-		}
-		return (await response.json()) as T;
-	}
+  /** One RoomService call. A room-scoped admin token, minted per call and valid for a minute. */
+  async function roomService<T>(
+    method: string,
+    room: string,
+    body: Record<string, unknown>,
+  ): Promise<T> {
+    const token = await signClaims({ video: { roomAdmin: true, room } }, 60);
+    const response = await fetchImpl(
+      `${httpBaseUrl(url)}/twirp/livekit.RoomService/${method}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ room, ...body }),
+      },
+    );
+    if (!response.ok) {
+      const error = (await response.json().catch(() => ({}))) as {
+        code?: string;
+        msg?: string;
+      };
+      const detail = error.msg ? ` (${error.msg})` : "";
+      throw new LiveKitError(
+        `RoomService.${method} failed: ${error.code ?? response.status}${detail}`,
+      );
+    }
+    return (await response.json()) as T;
+  }
 
-	return {
-		url,
-		createAccessToken({ identity, name, room, ttlSeconds = 900, attributes, canPublishSources }) {
-			return signClaims(
-				{
-					sub: identity,
-					name,
-					...(attributes ? { attributes } : {}),
-					video: {
-						roomJoin: true,
-						room,
-						canPublish: true,
-						canSubscribe: true,
-						canPublishData: true,
-						// Without this, a participant's own setAttributes()/setName() calls (deafened
-						// badge, renaming) are silently rejected by the server.
-						canUpdateOwnMetadata: true,
-						...(canPublishSources ? { canPublishSources } : {})
-					}
-				},
-				ttlSeconds
-			);
-		},
+  return {
+    url,
+    createAccessToken({
+      identity,
+      name,
+      room,
+      ttlSeconds = 900,
+      attributes,
+      canPublishSources,
+    }) {
+      return signClaims(
+        {
+          sub: identity,
+          name,
+          ...(attributes ? { attributes } : {}),
+          video: {
+            roomJoin: true,
+            room,
+            canPublish: true,
+            canSubscribe: true,
+            canPublishData: true,
+            // Without this, a participant's own setAttributes()/setName() calls (deafened
+            // badge, renaming) are silently rejected by the server.
+            canUpdateOwnMetadata: true,
+            ...(canPublishSources ? { canPublishSources } : {}),
+          },
+        },
+        ttlSeconds,
+      );
+    },
 
-		async listParticipants(room) {
-			try {
-				const body = await roomService<{
-					participants?: {
-						identity: string;
-						attributes?: Record<string, string>;
-						tracks?: { sid?: unknown; source?: unknown }[];
-					}[];
-				}>('ListParticipants', room, {});
-				return (body.participants ?? []).map((p) => ({
-					identity: p.identity,
-					attributes: p.attributes ?? {},
-					tracks: (p.tracks ?? [])
-						.filter((track) => typeof track.sid === 'string')
-						.map((track) => ({
-							sid: track.sid as string,
-							source: typeof track.source === 'string' || typeof track.source === 'number' ? track.source : ''
-						}))
-				}));
-			} catch (error) {
-				// A room only exists while someone is in it — no room just means no one to update.
-				if (error instanceof LiveKitError && /not_found/.test(error.message)) return [];
-				throw error;
-			}
-		},
+    async listParticipants(room) {
+      try {
+        const body = await roomService<{
+          participants?: {
+            identity: string;
+            attributes?: Record<string, string>;
+            tracks?: { sid?: unknown; source?: unknown }[];
+          }[];
+        }>("ListParticipants", room, {});
+        return (body.participants ?? []).map((p) => ({
+          identity: p.identity,
+          attributes: p.attributes ?? {},
+          tracks: (p.tracks ?? [])
+            .filter((track) => typeof track.sid === "string")
+            .map((track) => ({
+              sid: track.sid as string,
+              source:
+                typeof track.source === "string" ||
+                typeof track.source === "number"
+                  ? track.source
+                  : "",
+            })),
+        }));
+      } catch (error) {
+        // A room only exists while someone is in it — no room just means no one to update.
+        if (error instanceof LiveKitError && /not_found/.test(error.message))
+          return [];
+        throw error;
+      }
+    },
 
-		async setPublishSources(room, identity, sources) {
-			// UpdateParticipant replaces the whole permission object, so every grant the
-			// join token gave has to be restated here or it would be silently revoked.
-			await roomService('UpdateParticipant', room, {
-				identity,
-				permission: {
-					can_subscribe: true,
-					can_publish: true,
-					can_publish_data: true,
-					can_update_metadata: true,
-					can_publish_sources: sources.map((source) => source.toUpperCase())
-				}
-			});
-		},
+    async setPublishSources(room, identity, sources) {
+      // UpdateParticipant replaces the whole permission object, so every grant the
+      // join token gave has to be restated here or it would be silently revoked.
+      await roomService("UpdateParticipant", room, {
+        identity,
+        permission: {
+          can_subscribe: true,
+          can_publish: true,
+          can_publish_data: true,
+          can_update_metadata: true,
+          can_publish_sources: sources.map((source) => source.toUpperCase()),
+        },
+      });
+    },
 
-		async muteTrack(room, identity, trackSid) {
-			await roomService('MutePublishedTrack', room, { identity, track_sid: trackSid, muted: true });
-		}
-	};
+    async muteTrack(room, identity, trackSid) {
+      await roomService("MutePublishedTrack", room, {
+        identity,
+        track_sid: trackSid,
+        muted: true,
+      });
+    },
+  };
 }
 
 /** The browser connects over wss://, but RoomService is plain HTTPS on the same host. */
 function httpBaseUrl(url: string): string {
-	let base = url.replace(/^ws(s?):\/\//, 'http$1://');
-	while (base.endsWith('/')) base = base.slice(0, -1);
-	return base;
+  let base = url.replace(/^ws(s?):\/\//, "http$1://");
+  while (base.endsWith("/")) base = base.slice(0, -1);
+  return base;
 }
 
 async function sign(data: string, secret: string): Promise<string> {
-	const key = await crypto.subtle.importKey(
-		'raw',
-		new TextEncoder().encode(secret),
-		{ name: 'HMAC', hash: 'SHA-256' },
-		false,
-		['sign']
-	);
-	const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
-	return base64url(signature);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(data),
+  );
+  return base64url(signature);
 }
 
 function base64url(input: string | ArrayBuffer): string {
-	const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
-	let binary = '';
-	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return trimTrailing(btoa(binary), '=').replaceAll('+', '-').replaceAll('/', '_');
+  const bytes =
+    typeof input === "string"
+      ? new TextEncoder().encode(input)
+      : new Uint8Array(input);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCodePoint(byte);
+  return trimTrailing(btoa(binary), "=")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_");
 }
