@@ -35,12 +35,13 @@ a build existed. That import is suppressed with `@ts-ignore`, not
 both pass while the deploy is broken. Real verification is `wrangler dev` plus
 `wrangler d1 execute DB --local --command "..."` for new SQL.
 
-**Remote D1 commands take the database name, not `DB`.** `wrangler.jsonc` has
-no IDs (#130), and without one Wrangler resolves `DB` on the command line to a
-database named `<config name>-db` (`zimail-db`), which doesn't exist here.
-Production is the `izi-quickmail` Worker on the `izi-quickmail` database, so use
-`wrangler d1 execute izi-quickmail --remote`. Deploys are unaffected: they
-inherit the live Worker's bindings. `--local` keeps working with `DB`.
+**Remote D1 commands may need the database name, not `DB`.** `wrangler.jsonc`
+has no IDs (#130). Without one, Wrangler resolves `DB` on the command line to a
+database named `<worker name>-db`, which is what a fresh install gets. An install
+whose database has another name, such as one set up before #130, passes the
+name instead: `wrangler d1 execute <database name> --remote`. Deploys are
+unaffected, because they inherit the live Worker's bindings. `--local` always
+works with `DB`.
 
 **CRLF.** The working tree is CRLF. Any script that rewrites `messages/*.json`
 or a source file must detect and restore the original line endings, or the diff
@@ -55,7 +56,8 @@ and format in `$page.data.timeZone ?? undefined`.
 **Heredocs in Bash are unreliable here.** Multi-line content and regexes get
 mangled. Write the script with the Write tool and run it with node, or use Edit.
 
-**`gh` defaults to the upstream remote.** Always pass `--repo MHibriziF/zimail`.
+**`gh` may default to the parent repository**, since this repo is a fork. Pass
+`--repo <owner>/<repo>` for the repository you mean.
 
 ## Conventions
 

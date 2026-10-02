@@ -96,8 +96,8 @@ test('generates a distinct 32-character secret each time', () => {
 });
 
 test('builds an otpauth URI an authenticator can parse', () => {
-	const uri = otpauthUri(RFC_SECRET, 'izi@mhibrizif.com', 'Quickinbox');
-	assert.ok(uri.startsWith('otpauth://totp/Quickinbox%3Aizi%40mhibrizif.com?'));
+	const uri = otpauthUri(RFC_SECRET, 'you@example.com', 'Quickinbox');
+	assert.ok(uri.startsWith('otpauth://totp/Quickinbox%3Ayou%40example.com?'));
 
 	const params = new URL(uri).searchParams;
 	assert.equal(params.get('secret'), RFC_SECRET);

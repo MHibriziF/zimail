@@ -228,17 +228,17 @@ describe('a real Google Calendar proposal', () => {
 		'DTSTART:20260925T043000Z',
 		'DTEND:20260925T050000Z',
 		'DTSTAMP:20260924T183420Z',
-		'ORGANIZER;CN=Muhammad Hibrizi Farghana:mailto:izi@mhibrizif.com',
+		'ORGANIZER;CN=Mail Owner:mailto:owner@example.com',
 		'UID:45033627-a786-432e-8fa9-dbd0d1535083@zimail',
-		'ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=Muhamm',
-		' ad Hibrizi Farghana;X-NUM-GUESTS=0:mailto:hibrizifarghana@gmail.com',
+		'ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=Example Gue',
+		' st Person;X-NUM-GUESTS=0:mailto:guest@example.com',
 		'CREATED:20260924T124157Z',
 		'DESCRIPTION:',
 		'LAST-MODIFIED:20260924T183419Z',
 		'LOCATION:',
 		'SEQUENCE:0',
 		'STATUS:CONFIRMED',
-		'SUMMARY:Demo TI with Muhammad Hibrizi Farghana',
+		'SUMMARY:Demo with Example Guest Person',
 		'TRANSP:OPAQUE',
 		'END:VEVENT',
 		'END:VCALENDAR',
@@ -252,7 +252,7 @@ describe('a real Google Calendar proposal', () => {
 		);
 		const answer = await service.inspect('u1', 'm1');
 		assert.equal(answer?.method, 'COUNTER');
-		assert.deepEqual(answer?.from, { email: 'hibrizifarghana@gmail.com', name: 'Muhammad Hibrizi Farghana' });
+		assert.deepEqual(answer?.from, { email: 'guest@example.com', name: 'Example Guest Person' });
 		assert.deepEqual(answer?.proposed, { start: '2026-09-25T04:30:00.000Z', end: '2026-09-25T05:00:00.000Z', allDay: false });
 		assert.equal(answer?.comment, null);
 

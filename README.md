@@ -4,10 +4,12 @@
 
 [![Deploy this fork](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/MHibriziF/zimail)
 
+[![Set up syncing](https://img.shields.io/badge/Set%20up%20syncing-once-0969da)](../../new/main/.github/workflows?filename=sync-upstream.yml&value=name%3A%20Sync%20from%20upstream%0Aon%3A%0A%20%20schedule%3A%0A%20%20%20%20-%20cron%3A%20'23%204%20*%20*%201'%0A%20%20workflow_dispatch%3A%0Apermissions%3A%0A%20%20contents%3A%20write%0A%20%20pull-requests%3A%20write%0Ajobs%3A%0A%20%20sync%3A%0A%20%20%20%20if%3A%20github.repository%20!%3D%20'MHibriziF%2Fzimail'%20%26%26%20github.event.repository.fork%20!%3D%20true%0A%20%20%20%20runs-on%3A%20ubuntu-latest%0A%20%20%20%20steps%3A%0A%20%20%20%20%20%20-%20uses%3A%20actions%2Fcheckout%40v5%0A%20%20%20%20%20%20%20%20with%3A%0A%20%20%20%20%20%20%20%20%20%20fetch-depth%3A%200%0A%20%20%20%20%20%20-%20run%3A%20curl%20-fsSL%20https%3A%2F%2Fraw.githubusercontent.com%2FMHibriziF%2Fzimail%2Fmain%2Fscripts%2Fsync-upstream.sh%20%7C%20bash%0A%20%20%20%20%20%20%20%20env%3A%0A%20%20%20%20%20%20%20%20%20%20SYNC_PUBLISH%3A%20'1'%0A%20%20%20%20%20%20%20%20%20%20BASE%3A%20%24%7B%7B%20github.event.repository.default_branch%20%7D%7D%0A%20%20%20%20%20%20%20%20%20%20GH_TOKEN%3A%20%24%7B%7B%20github.token%20%7D%7D%0A)
+
 [![Sync now](https://img.shields.io/badge/Sync%20now-get%20the%20latest%20Zimail-2ea44f)](../../actions/workflows/sync-upstream.yml)
 
-Installed with the Deploy button? **Sync now** brings your copy up to date
-([how it works](#staying-up-to-date)).
+Installed with the Deploy button? Press **Set up syncing** once, then **Sync
+now** whenever you want the latest ([how it works](#staying-up-to-date)).
 
 Self-hosted email for your own domain, running on Cloudflare Workers.
 Get `you@yourdomain.com` with a full web client — no third-party mailbox,
@@ -70,14 +72,20 @@ You need:
 
 ## Staying up to date
 
-**Installed with the Deploy button?** Your repository gets updates from here
-once a week, as a pull request; merge it and your mail redeploys. To get them
-right away, press **Sync now** in your repository's README, then **Run
-workflow**:
+**Installed with the Deploy button?** The button can't copy GitHub workflows,
+so set up syncing once, from your repository's README:
+
+1. Press **Set up syncing**, then **Commit changes**. That adds the sync
+   workflow to your repository.
+2. From then on, updates arrive once a week as a pull request; merge it and
+   your mail redeploys. Press **Sync now**, then **Run workflow**, to get them
+   right away.
+
+[![Set up syncing](https://img.shields.io/badge/Set%20up%20syncing-once-0969da)](../../new/main/.github/workflows?filename=sync-upstream.yml&value=name%3A%20Sync%20from%20upstream%0Aon%3A%0A%20%20schedule%3A%0A%20%20%20%20-%20cron%3A%20'23%204%20*%20*%201'%0A%20%20workflow_dispatch%3A%0Apermissions%3A%0A%20%20contents%3A%20write%0A%20%20pull-requests%3A%20write%0Ajobs%3A%0A%20%20sync%3A%0A%20%20%20%20if%3A%20github.repository%20!%3D%20'MHibriziF%2Fzimail'%20%26%26%20github.event.repository.fork%20!%3D%20true%0A%20%20%20%20runs-on%3A%20ubuntu-latest%0A%20%20%20%20steps%3A%0A%20%20%20%20%20%20-%20uses%3A%20actions%2Fcheckout%40v5%0A%20%20%20%20%20%20%20%20with%3A%0A%20%20%20%20%20%20%20%20%20%20fetch-depth%3A%200%0A%20%20%20%20%20%20-%20run%3A%20curl%20-fsSL%20https%3A%2F%2Fraw.githubusercontent.com%2FMHibriziF%2Fzimail%2Fmain%2Fscripts%2Fsync-upstream.sh%20%7C%20bash%0A%20%20%20%20%20%20%20%20env%3A%0A%20%20%20%20%20%20%20%20%20%20SYNC_PUBLISH%3A%20'1'%0A%20%20%20%20%20%20%20%20%20%20BASE%3A%20%24%7B%7B%20github.event.repository.default_branch%20%7D%7D%0A%20%20%20%20%20%20%20%20%20%20GH_TOKEN%3A%20%24%7B%7B%20github.token%20%7D%7D%0A)
 
 [![Sync now](https://img.shields.io/badge/Sync%20now-get%20the%20latest%20Zimail-2ea44f)](../../actions/workflows/sync-upstream.yml)
 
-If the run says it can't open a pull request, turn on **Settings → Actions →
+If a sync says it can't open a pull request, turn on **Settings → Actions →
 General → Allow GitHub Actions to create and approve pull requests** once.
 
 **Forked it?** Use GitHub's **Sync fork** button. If Cloudflare deploys from
