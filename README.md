@@ -281,8 +281,9 @@ Users opt in under **Settings → Desktop notifications**. Don't rotate the key
 pair after users subscribe, or they'll have to re-enable.
 
 Skip this and notifications just don't show up — nothing else depends on it.
-The **Deploy this fork** button prompts for these three too, and they're
-optional there as well: leave them blank and add them later the same way.
+A Deploy-button install sets them the same way afterwards, or in the dashboard
+under **Workers → your Worker → Settings → Variables and Secrets**. The button
+doesn't ask for them, because it can't mark a field optional.
 
 ### Telegram notifications (optional)
 
@@ -325,9 +326,9 @@ bunx wrangler secret put LIVEKIT_API_SECRET
 bunx wrangler secret put LIVEKIT_URL
 ```
 
-Skip this and meetings just don't show up — nothing else depends on it. The
-**Deploy this fork** button prompts for these three too, and they're optional
-there as well: leave them blank and add them later the same way.
+Skip this and meetings just don't show up — nothing else depends on it. A
+Deploy-button install sets them the same way afterwards, or in the dashboard
+under **Workers → your Worker → Settings → Variables and Secrets**.
 
 #### Recording a meeting
 

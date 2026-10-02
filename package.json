@@ -72,24 +72,6 @@
 			},
 			"RESEND_WEBHOOK_SECRET": {
 				"description": "Only for `EMAIL_PROVIDER=resend`: shown once when you create the webhook at [Resend webhooks](https://resend.com/webhooks). Keep the placeholder if using Cloudflare Email."
-			},
-			"VAPID_PUBLIC_KEY": {
-				"description": "Optional, enables desktop notifications: generate a pair with `bunx web-push generate-vapid-keys`."
-			},
-			"VAPID_PRIVATE_KEY": {
-				"description": "Optional, enables desktop notifications: the private half of the same generated pair."
-			},
-			"VAPID_SUBJECT": {
-				"description": "Optional, enables desktop notifications: a contact URI for push services, e.g. `mailto:admin@example.com`."
-			},
-			"LIVEKIT_API_KEY": {
-				"description": "Optional, enables the meeting feature: API key from your project's Settings > Keys at [LiveKit Cloud](https://cloud.livekit.io)."
-			},
-			"LIVEKIT_API_SECRET": {
-				"description": "Optional, enables the meeting feature: API secret from the same LiveKit Cloud project."
-			},
-			"LIVEKIT_URL": {
-				"description": "Optional, enables the meeting feature: your LiveKit Cloud project's wss:// URL."
 			}
 		}
 	}
