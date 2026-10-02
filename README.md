@@ -1,8 +1,10 @@
 # Zimail
 
-[![Deploy this fork](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/MHibriziF/zimail)
-[![Sync now](https://img.shields.io/badge/Sync%20now-get%20the%20latest%20Zimail-2ea44f)](../../actions/workflows/sync-upstream.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
+
+[![Deploy this fork](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/MHibriziF/zimail)
+
+[![Sync now](https://img.shields.io/badge/Sync%20now-get%20the%20latest%20Zimail-2ea44f)](../../actions/workflows/sync-upstream.yml)
 
 Installed with the Deploy button? **Sync now** brings your copy up to date
 ([how it works](#staying-up-to-date)).
