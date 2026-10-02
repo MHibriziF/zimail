@@ -50,7 +50,7 @@ test("a Deploy-button copy's first sync brings upstream in and keeps its own IDs
 	git(copy, 'fetch', '-q', 'upstream', 'main');
 	const run = sync(copy);
 	assert.equal(run.status, 0, run.stderr);
-	assert.match(run.stdout, /First sync: this repository starts from upstream \w+ first \(0 lines differ\)/);
+	assert.match(run.stderr, /First sync: this repository starts from upstream \w+ first \(0 lines differ\)/);
 	assert.equal(git(copy, 'rev-parse', '--abbrev-ref', 'HEAD'), 'sync/upstream');
 	assert.equal(read(copy, 'app.txt'), 'version 2\n');
 	assert.equal(read(copy, 'new.txt'), 'a new feature\n');
@@ -74,12 +74,10 @@ test('a copy made from the newest upstream has nothing to sync, even the first t
 	git(fresh, 'commit', '-qm', 'Initial commit');
 	git(fresh, 'remote', 'add', 'upstream', upstream);
 	git(fresh, 'fetch', '-q', 'upstream', 'main');
-	const output = join(root, 'fresh-output');
-	writeFileSync(output, '');
-	const run = spawnSync('bash', [SCRIPT], { cwd: fresh, env: { ...env, GITHUB_OUTPUT: output }, encoding: 'utf8' });
+	const run = sync(fresh);
 	assert.equal(run.status, 0, run.stderr);
 	assert.match(run.stdout, /Already up to date/);
-	assert.match(read(fresh, '../fresh-output'), /changed=false/);
+	assert.equal(git(fresh, 'rev-parse', 'HEAD'), git(fresh, 'rev-parse', 'main'), 'no merge commit was made');
 	assert.equal(git(fresh, 'replace', '-l'), '');
 });
 
@@ -92,4 +90,17 @@ test('a real conflict stops the sync, names the file, and leaves no half-done me
 	assert.match(run.stderr, /wrangler\.jsonc/);
 	assert.equal(git(copy, 'status', '--porcelain'), '');
 	assert.equal(read(copy, 'wrangler.jsonc'), config('my-mail', 'theirs'));
+});
+
+// The Deploy button doesn't copy workflows, so the README's "Set up syncing" link carries the
+// whole workflow file for GitHub to prefill. It must stay the same file.
+test("the README's Set up syncing links add exactly the sync workflow", () => {
+	const workflow = readFileSync(resolve('.github/workflows/sync-upstream.yml'), 'utf8').replaceAll('\r\n', '\n');
+	const links = [...readFileSync(resolve('README.md'), 'utf8').matchAll(/\]\((\.\.\/\.\.\/new\/main\/\.github\/workflows\?[^)\s]+)\)/g)];
+	assert.ok(links.length >= 1, 'the README has a Set up syncing link');
+	for (const [, link] of links) {
+		const query = new URLSearchParams(link.slice(link.indexOf('?') + 1));
+		assert.equal(query.get('filename'), 'sync-upstream.yml');
+		assert.equal(query.get('value'), workflow);
+	}
 });
