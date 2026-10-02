@@ -54,9 +54,30 @@ starting_point() {
 	echo "$best"
 }
 
+# The pull request's branch: upstream's main with one commit putting `.github/workflows` back
+# to this copy's own. GitHub never lets Actions create or change a workflow, and upstream's
+# own workflows (its CI) need upstream's secrets, so a copy has no use for them anyway.
+build_sync_branch() {
+	local copy_head index tree
+	copy_head="$(git rev-parse HEAD)"
+	index="$(mktemp -d)/index"
+	GIT_INDEX_FILE="$index" git read-tree "$UPSTREAM_REF"
+	GIT_INDEX_FILE="$index" git rm -r -q --cached --ignore-unmatch .github/workflows
+	if git cat-file -e "$copy_head:.github/workflows" 2>/dev/null; then
+		GIT_INDEX_FILE="$index" git read-tree --prefix=.github/workflows/ "$copy_head:.github/workflows"
+	fi
+	tree="$(GIT_INDEX_FILE="$index" git write-tree)"
+	rm -rf "$(dirname "$index")"
+	if [ "$tree" = "$(git rev-parse "$UPSTREAM_REF^{tree}")" ]; then
+		git branch --force "$BRANCH" "$UPSTREAM_REF"
+	else
+		git branch --force "$BRANCH" "$(git commit-tree "$tree" -p "$UPSTREAM_REF" -m "chore: keep this copy's own workflows")"
+	fi
+}
+
 # Files GitHub will show as conflicting when the pull request is merged.
 conflicting_files() {
-	git merge-tree --write-tree --name-only --no-messages HEAD "$UPSTREAM_REF" | tail -n +2 || true
+	git merge-tree --write-tree --name-only --no-messages HEAD "$BRANCH" | tail -n +2 || true
 }
 
 publish() {
@@ -64,7 +85,7 @@ publish() {
 	# With an `upstream` remote, gh would otherwise target upstream, not this copy.
 	if [ -n "${GITHUB_REPOSITORY:-}" ]; then export GH_REPO="$GITHUB_REPOSITORY"; fi
 	if [ "$linked" = 1 ]; then git push --quiet origin "HEAD:$base"; fi
-	git push --force --quiet origin "$UPSTREAM_REF:refs/heads/$BRANCH"
+	git push --force --quiet origin "refs/heads/$BRANCH:refs/heads/$BRANCH"
 
 	local body="Brings in the latest [Zimail](https://github.com/${UPSTREAM_REPO}). Your own changes, such as your Worker name, are kept. Merging redeploys as usual."
 	if [ -n "$conflicts" ]; then
@@ -109,8 +130,8 @@ if ! git merge-base HEAD "$UPSTREAM_REF" >/dev/null; then
 	linked=1
 fi
 
+build_sync_branch
 conflicts="$(conflicting_files)"
-git branch --force "$BRANCH" "$UPSTREAM_REF"
 if [ -n "$conflicts" ]; then
 	summary "Ready, with overlapping changes to resolve on the pull request: $(echo "$conflicts" | tr '\n' ' ')"
 else
