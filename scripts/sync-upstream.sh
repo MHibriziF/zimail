@@ -88,6 +88,11 @@ publish() {
 	git push --force --quiet origin "refs/heads/$BRANCH:refs/heads/$BRANCH"
 
 	local body="Brings in the latest [Zimail](https://github.com/${UPSTREAM_REPO}). Your own changes, such as your Worker name, are kept. Merging redeploys as usual."
+	if [ "$linked" = 1 ]; then
+		body="${body}
+
+This first sync also lists Zimail's own CI workflows under \`.github/workflows\` as removed. Your copy never had them, so merging changes nothing there."
+	fi
 	if [ -n "$conflicts" ]; then
 		body="${body}
 
