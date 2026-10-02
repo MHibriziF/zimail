@@ -43,6 +43,12 @@ name instead: `wrangler d1 execute <database name> --remote`. Deploys are
 unaffected, because they inherit the live Worker's bindings. `--local` always
 works with `DB`.
 
+**Don't edit the `DB` and `ATTACHMENTS` binding lines in `wrangler.jsonc`.** The
+Deploy to Cloudflare button appends each install's database and bucket IDs to
+those exact lines in its copy. A change to them upstream conflicts with every
+such copy on its next sync (`scripts/sync-upstream.sh`). Add new keys on their
+own lines instead.
+
 **CRLF.** The working tree is CRLF. Any script that rewrites `messages/*.json`
 or a source file must detect and restore the original line endings, or the diff
 becomes the whole file. `generate-migrations.mjs` normalizes to LF on purpose —
