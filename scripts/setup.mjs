@@ -59,8 +59,9 @@ let rl = null;
 function printHelp() {
 	console.log(`Quickinbox setup
 
-Installs tools, logs you into Cloudflare, creates D1/R2, writes env and
-wrangler config, and onboards your mail domain.
+Installs tools, logs you into Cloudflare, writes env and wrangler config,
+and onboards your mail domain. The first deploy creates the D1 database and
+R2 bucket, named after the Worker.
 
   bun run setup
   bash scripts/setup.sh
@@ -69,8 +70,6 @@ wrangler config, and onboards your mail domain.
 Options:
   --domain <name>      Mail domain (e.g. example.com)
   --provider <name>    resend | cloudflare
-  --d1-name <name>     D1 database name (e.g. quickmail)
-  --r2-name <name>     R2 bucket name (e.g. quickmail-attachments)
   --yes                Accept defaults (still requires --domain)
   --skip-deploy        Do not deploy at the end
   --help               Show this help
@@ -83,9 +82,7 @@ function parseArgs(argv) {
 		yes: false,
 		skipDeploy: false,
 		domain: null,
-		provider: null,
-		d1Name: null,
-		r2Name: null
+		provider: null
 	};
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
@@ -107,17 +104,9 @@ function parseArgs(argv) {
 			case '--provider':
 				out.provider = argv[++i] ?? '';
 				break;
-			case '--d1-name':
-				out.d1Name = argv[++i] ?? '';
-				break;
-			case '--r2-name':
-				out.r2Name = argv[++i] ?? '';
-				break;
 			default:
 				if (arg.startsWith('--domain=')) out.domain = arg.slice('--domain='.length);
 				else if (arg.startsWith('--provider=')) out.provider = arg.slice('--provider='.length);
-				else if (arg.startsWith('--d1-name=')) out.d1Name = arg.slice('--d1-name='.length);
-				else if (arg.startsWith('--r2-name=')) out.r2Name = arg.slice('--r2-name='.length);
 				else {
 					console.error(`Unknown option: ${arg}`);
 					printHelp();
@@ -434,14 +423,6 @@ function isWorkerName(value) {
 	return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value);
 }
 
-function isR2BucketName(value) {
-	return (
-		value.length >= 3 &&
-		value.length <= 63 &&
-		/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value)
-	);
-}
-
 function nodeMajor() {
 	const path = which('node');
 	if (!path) return null;
@@ -665,123 +646,6 @@ async function askHostname(domain) {
 	return host;
 }
 
-async function askResourceName(question, fallback, flagValue, validate, invalidHint) {
-	if (flagValue) {
-		const name = flagValue.trim().toLowerCase();
-		if (!validate(name)) throw new Error(`Invalid ${question}: "${flagValue}". ${invalidHint}`);
-		return name;
-	}
-	if (args.yes) return fallback;
-	while (true) {
-		const raw = await prompt(question);
-		const name = (raw || fallback).toLowerCase();
-		if (validate(name)) return name;
-		warn(invalidHint);
-	}
-}
-
-function listD1() {
-	const result = wrangler(['d1', 'list', '--json'], { allowFail: true });
-	const parsed = parseJsonOutput(`${result.stdout}\n${result.stderr}`);
-	const rows = Array.isArray(parsed) ? parsed : parsed?.databases ?? parsed?.result ?? [];
-	const fromJson = rows
-		.map((row) => ({
-			name: row.name ?? row.database_name,
-			id: row.uuid ?? row.id ?? row.database_id
-		}))
-		.filter((row) => row.name && row.id);
-	if (fromJson.length > 0) return fromJson;
-
-	const table = wrangler(['d1', 'list'], { allowFail: true });
-	const text = `${table.stdout}\n${table.stderr}`;
-	const found = [];
-	for (const line of text.split('\n')) {
-		const id = line.match(/\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i)?.[1];
-		if (!id) continue;
-		const name = line.match(/\b(quickmail|quickinbox|[a-z0-9][a-z0-9-]{1,62})\b/i)?.[1];
-		if (name) found.push({ name, id });
-	}
-	return found;
-}
-
-function createD1(name) {
-	const result = wrangler(['d1', 'create', name], {
-		allowFail: true,
-		env: { CI: 'true' }
-	});
-	const text = `${result.stdout}\n${result.stderr}`;
-	const id =
-		text.match(/"database_id"\s*:\s*"([^"]+)"/)?.[1] ??
-		text.match(/database_id\s*=\s*"([^"]+)"/)?.[1];
-	if (result.status === 0 && id) return id;
-	if (/already exists/i.test(text)) {
-		const existing = listD1().find((row) => row.name === name);
-		if (existing) return existing.id;
-	}
-	throw new Error(text.trim() || `Failed to create D1 database "${name}".`);
-}
-
-async function ensureD1(databaseName) {
-	const existing = listD1().find((row) => row.name === databaseName);
-	if (existing) {
-		ok(`reusing D1 ${databaseName} (${existing.id})`);
-		return existing.id;
-	}
-
-	log(`  ${c.dim(`Creating D1 database ${databaseName}…`)}`);
-	const id = createD1(databaseName);
-	ok(`D1 ${databaseName} (${id})`);
-	return id;
-}
-
-function listR2Names() {
-	const result = wrangler(['r2', 'bucket', 'list', '--json'], { allowFail: true });
-	const parsed = parseJsonOutput(`${result.stdout}\n${result.stderr}`);
-	const rows = Array.isArray(parsed) ? parsed : parsed?.buckets ?? parsed?.result ?? [];
-	const fromJson = rows
-		.map((row) => (typeof row === 'string' ? row : row.name ?? row.Name))
-		.filter(Boolean);
-	if (fromJson.length > 0) return fromJson;
-
-	const table = wrangler(['r2', 'bucket', 'list'], { allowFail: true });
-	const text = `${table.stdout}\n${table.stderr}`;
-	const names = [];
-	for (const line of text.split('\n')) {
-		const match = line.match(/\b([a-z0-9][a-z0-9-]{1,61}[a-z0-9])\b/i);
-		if (match && !/^(name|creation|location|id)$/i.test(match[1])) names.push(match[1]);
-	}
-	return names;
-}
-
-function ensureR2(bucketName) {
-	if (listR2Names().includes(bucketName)) {
-		ok(`reusing R2 bucket ${bucketName}`);
-		return;
-	}
-
-	log(`  ${c.dim(`Creating R2 bucket ${bucketName}…`)}`);
-	const result = wrangler(['r2', 'bucket', 'create', bucketName], {
-		allowFail: true,
-		env: { CI: 'true' }
-	});
-	const text = `${result.stdout}\n${result.stderr}`;
-	if (result.status === 0 || /already exists/i.test(text)) {
-		ok(`R2 bucket ${bucketName}`);
-		return;
-	}
-	throw new Error(text.trim() || `Failed to create R2 bucket "${bucketName}".`);
-}
-
-function setPackageMigrateScripts(databaseName) {
-	const pkgPath = join(root, 'package.json');
-	if (!existsSync(pkgPath)) return;
-	const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-	if (!pkg.scripts) return;
-	pkg.scripts['db:migrate:local'] = `wrangler d1 migrations apply ${databaseName} --local`;
-	pkg.scripts['db:migrate:remote'] = `wrangler d1 migrations apply ${databaseName} --remote`;
-	writeFileSync(pkgPath, `${JSON.stringify(pkg, null, '\t')}\n`);
-}
-
 function putSecret(name, value) {
 	wrangler(['secret', 'put', name], {
 		input: value,
@@ -949,14 +813,14 @@ async function setupResend(domain) {
 	}
 }
 
+/** By binding: there is no database ID in wrangler.jsonc, and the deployed Worker knows which one it is. */
 function migrate(local, remote) {
-	const databaseName = jsoncString(readWrangler(), 'database_name') || 'quickmail';
 	if (local) {
-		wrangler(['d1', 'migrations', 'apply', databaseName, '--local'], { inherit: true });
+		wrangler(['d1', 'migrations', 'apply', 'DB', '--local'], { inherit: true });
 		ok('local D1 migrations applied');
 	}
 	if (remote) {
-		wrangler(['d1', 'migrations', 'apply', databaseName, '--remote'], { inherit: true });
+		wrangler(['d1', 'migrations', 'apply', 'DB', '--remote'], { inherit: true });
 		ok('remote D1 migrations applied');
 	}
 }
@@ -1076,39 +940,12 @@ async function chooseTarget() {
 	return { domain, provider, wranglerVer, workerName, hostname };
 }
 
-async function setupStorage() {
-	const source = readWrangler();
-	const databaseName = await askResourceName(
-		'D1 database name (e.g. quickmail)',
-		jsoncString(source, 'database_name') || 'quickmail',
-		args.d1Name,
-		isWorkerName,
-		'Use lowercase letters, numbers, and hyphens.'
-	);
-	const bucketName = await askResourceName(
-		'R2 bucket name (e.g. quickmail-attachments)',
-		jsoncString(source, 'bucket_name') || 'quickmail-attachments',
-		args.r2Name,
-		isR2BucketName,
-		'3–63 characters, lowercase letters, numbers, and hyphens.'
-	);
-	ok(`D1 ${databaseName}`);
-	ok(`R2 ${bucketName}`);
-	const databaseId = await ensureD1(databaseName);
-	ensureR2(bucketName);
-	return { databaseName, bucketName, databaseId };
-}
-
-function writeConfig(target, storage) {
+function writeConfig(target) {
 	const { domain, provider, wranglerVer, workerName, hostname } = target;
-	const { databaseName, bucketName, databaseId } = storage;
 	const cloudflare = provider === 'cloudflare';
 
 	let source = readWrangler();
 	source = setFirstString(source, 'name', workerName);
-	source = setFirstString(source, 'database_name', databaseName);
-	source = setFirstString(source, 'database_id', databaseId);
-	source = setFirstString(source, 'bucket_name', bucketName);
 	source = setVars(source, { provider, domains: cloudflare ? domain : '' });
 	if (hostname) source = setRoutes(source, hostname);
 	source =
@@ -1117,8 +954,6 @@ function writeConfig(target, storage) {
 			: removeAddresses(source);
 	writeWrangler(source);
 	ok('updated wrangler.jsonc');
-	setPackageMigrateScripts(databaseName);
-	if (databaseName !== 'quickmail') ok(`updated package.json migrate scripts for ${databaseName}`);
 
 	const devVars = { EMAIL_PROVIDER: provider };
 	if (cloudflare) devVars.CLOUDFLARE_MAIL_DOMAINS = domain;
@@ -1159,16 +994,20 @@ async function deployWorker(target, resend) {
 	let publicUrl = target.hostname ? `https://${target.hostname}` : null;
 	const shouldDeploy = args.skipDeploy ? false : await confirm('Deploy now?', true);
 	if (!shouldDeploy) {
-		log(`  ${c.dim('Skipped deploy. bun run db:migrate:remote && bun run deploy when you are ready.')}`);
+		log(`  ${c.dim('Skipped deploy. Run bun run deploy when you are ready; the Worker applies its migrations itself.')}`);
 		return { deployed: false, publicUrl };
 	}
 
-	migrate(false, true);
+	// The first deploy creates the database, so migrations run after it, not before.
 	const result = deployCaptured();
 	const deployed = result.ok;
 	publicUrl = parseDeployUrl(result.text) ?? publicUrl;
-	if (deployed) ok('deployed');
-	else warn('Deploy failed. Fix the error above, then bun run deploy.');
+	if (deployed) {
+		ok('deployed');
+		migrate(false, true);
+	} else {
+		warn('Deploy failed. Fix the error above, then bun run deploy.');
+	}
 
 	if (deployed && target.provider === 'resend' && resend.apiKey && publicUrl) {
 		await connectResendWebhook(resend, publicUrl);
@@ -1182,7 +1021,7 @@ async function main() {
 	log(`\n${c.bold('Quickinbox setup')}`);
 	log(c.dim('  A mailbox on your domain, on Cloudflare.\n'));
 
-	const total = 8;
+	const total = 7;
 
 	section(1, total, 'Tools');
 	await ensureRuntime();
@@ -1194,19 +1033,16 @@ async function main() {
 	section(3, total, 'Domain and provider');
 	const target = await chooseTarget();
 
-	section(4, total, 'D1 and R2');
-	const storage = await setupStorage();
+	section(4, total, 'Config');
+	writeConfig(target);
 
-	section(5, total, 'Config');
-	writeConfig(target, storage);
-
-	section(6, total, 'Provider');
+	section(5, total, 'Provider');
 	const { useAddresses, resend } = await setupProvider(target);
 
-	section(7, total, 'Database');
+	section(6, total, 'Database');
 	migrate(true, false);
 
-	section(8, total, 'Deploy');
+	section(7, total, 'Deploy');
 	const { deployed, publicUrl } = await deployWorker(target, resend);
 
 	printNextSteps({

@@ -67,12 +67,13 @@
     "binding": "AI",
   },
 
+  // No IDs or names on purpose. The first deploy creates the database and the
+  // bucket (named after the Worker), and every later deploy reuses whatever the
+  // deployed Worker is already bound to, so this file holds nothing specific to
+  // one account. Already set up with your own IDs here? Keep them; both work.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "izi-quickmail",
-      // `bun run setup` fills this in, or: wrangler d1 create <name>
-      "database_id": "79b5d000-0719-41b6-9931-34940115ac95",
       "migrations_dir": "migrations",
     },
   ],
@@ -80,9 +81,6 @@
   "r2_buckets": [
     {
       "binding": "ATTACHMENTS",
-      // `bun run setup` creates this, or: wrangler r2 bucket create <name>
-      "bucket_name": "quickmail-attachments",
-      "preview_bucket_name": "quickmail-attachments",
     },
   ],
 

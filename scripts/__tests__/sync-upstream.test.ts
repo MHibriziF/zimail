@@ -66,6 +66,23 @@ test('with nothing new upstream, it says so and changes nothing', () => {
 	assert.match(run.stdout, /Already up to date/);
 });
 
+test('a copy made from the newest upstream has nothing to sync, even the first time', () => {
+	const fresh = join(root, 'fresh');
+	execFileSync('git', ['init', '-q', '-b', 'main', fresh], { env });
+	for (const file of ['wrangler.jsonc', 'app.txt', 'new.txt']) write(fresh, file, read(upstream, file));
+	git(fresh, 'add', '-A');
+	git(fresh, 'commit', '-qm', 'Initial commit');
+	git(fresh, 'remote', 'add', 'upstream', upstream);
+	git(fresh, 'fetch', '-q', 'upstream', 'main');
+	const output = join(root, 'fresh-output');
+	writeFileSync(output, '');
+	const run = spawnSync('bash', [SCRIPT], { cwd: fresh, env: { ...env, GITHUB_OUTPUT: output }, encoding: 'utf8' });
+	assert.equal(run.status, 0, run.stderr);
+	assert.match(run.stdout, /Already up to date/);
+	assert.match(read(fresh, '../fresh-output'), /changed=false/);
+	assert.equal(git(fresh, 'replace', '-l'), '');
+});
+
 test('a real conflict stops the sync, names the file, and leaves no half-done merge', () => {
 	write(upstream, 'wrangler.jsonc', config('zimail-renamed', 'ours'));
 	git(upstream, 'commit', '-qam', 'rename');

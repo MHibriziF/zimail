@@ -51,6 +51,7 @@ if ! git merge-base HEAD "$UPSTREAM_REF" >/dev/null; then
 fi
 
 git checkout -B "$BRANCH"
+before="$(git rev-parse HEAD)"
 merged=true
 if ! git merge --no-edit -m "chore: sync from upstream" "$UPSTREAM_REF"; then
 	echo "Upstream changed the same lines as this repository:" >&2
@@ -61,4 +62,10 @@ fi
 # The graft only steered this merge; the merge commit itself has the real parents.
 if [ -n "${root:-}" ]; then git replace -d "$root" >/dev/null; fi
 if [ "$merged" = false ]; then exit 1; fi
+# A copy made from the newest upstream has nothing to take in, even on its first sync.
+if [ "$(git rev-parse HEAD)" = "$before" ]; then
+	echo "Already up to date with $UPSTREAM_REF."
+	output "changed=false"
+	exit 0
+fi
 output "changed=true"
