@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, test } from 'node:test';
@@ -103,6 +103,32 @@ test('overlapping changes still produce the pull request, naming the files to re
 	assert.match(run.stdout, /overlapping changes to resolve on the pull request: README\.md/);
 	assert.equal(git(copy, 'rev-parse', 'sync/upstream'), git(copy, 'rev-parse', 'upstream/main'));
 	assert.equal(read(copy, 'README.md'), 'My own mail\n', 'nothing in the copy changes until the pull request is merged');
+});
+
+test("upstream's own workflows never reach the copy, which keeps its own", () => {
+	const repo = join(root, 'workflows');
+	copyOf(repo, { ...first, 'app.txt': 'version 2\n', 'new.txt': 'a new feature\n', 'README.md': 'Zimail, now with more\n' });
+	mkdirSync(join(repo, '.github/workflows'), { recursive: true });
+	write(repo, '.github/workflows/sync.yml', 'copy workflow\n');
+	git(repo, 'add', '-A');
+	git(repo, 'commit', '-qm', 'set up syncing');
+	mkdirSync(join(upstream, '.github/workflows'), { recursive: true });
+	write(upstream, '.github/workflows/ci.yml', 'upstream ci\n');
+	write(upstream, 'app.txt', 'version 3\n');
+	git(upstream, 'add', '-A');
+	git(upstream, 'commit', '-qm', 'ci and v3');
+
+	const run = sync(repo);
+	assert.equal(run.status, 0, run.stderr);
+	const workflowsOn = (ref: string) => git(repo, 'ls-tree', '-r', '--name-only', ref, '.github/workflows');
+	assert.equal(workflowsOn('sync/upstream'), workflowsOn('main'), 'the branch adds or changes no workflow');
+	assert.equal(git(repo, 'log', '-1', '--format=%s', 'sync/upstream'), "chore: keep this copy's own workflows");
+
+	const merge = mergePullRequest(repo);
+	assert.equal(merge.status, 0, merge.stdout);
+	assert.equal(read(repo, 'app.txt'), 'version 3\n');
+	assert.equal(read(repo, '.github/workflows/sync.yml'), 'copy workflow\n');
+	assert.equal(spawnSync('git', ['cat-file', '-e', 'HEAD:.github/workflows/ci.yml'], { cwd: repo, env }).status, 128);
 });
 
 // The Deploy button doesn't copy workflows, so the README's "Set up syncing" link carries the
