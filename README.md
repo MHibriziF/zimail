@@ -161,21 +161,25 @@ bunx wrangler login
 Cloudflare Email Sending needs **Wrangler 4.123+** (older versions hit a
 removed API path and 404).
 
-### 2. Create D1 and R2
+### 2. D1 and R2
 
-```bash
-bunx wrangler d1 create quickmail
-bunx wrangler r2 bucket create quickmail-attachments
-```
+Nothing to create, and no IDs to copy. `wrangler.jsonc` lists the bindings
+without IDs, so the first `bun run deploy` creates the D1 database and R2 bucket
+(named after the Worker: `<name>-db`, `<name>-bucket`), and every later deploy
+reuses whatever the deployed Worker is bound to. Wrangler calls this
+[automatic resource provisioning](https://developers.cloudflare.com/changelog/post/2025-10-24-automatic-resource-provisioning/).
+It needs Wrangler 4.45 or newer.
 
-Copy the printed `database_id` into `wrangler.jsonc` (replacing
-`REPLACE_WITH_YOUR_D1_DATABASE_ID`). Migrations are applied by the Worker on
-its first request, so there is nothing else to run — but you can apply them up
-front if you prefer:
+Migrations are applied by the Worker on its first request. After the first
+deploy you can also apply them yourself:
 
 ```bash
 bun run db:migrate:remote
 ```
+
+An existing install with its own `database_id` and `bucket_name` in
+`wrangler.jsonc` keeps working as it is. Removing them is also safe: the next
+deploy reuses the same database and bucket.
 
 To serve from your own hostname, uncomment the `routes` block in
 `wrangler.jsonc` — the zone must be on the same Cloudflare account.
@@ -646,8 +650,8 @@ migrations/          D1 schema, applied in order
 | Mail never arrives (Cloudflare) | Apex MX must be Cloudflare Routing, catch-all must target this Worker, `EMAIL_PROVIDER=cloudflare`, Worker must be deployed |
 | Webhook 401 | `RESEND_WEBHOOK_SECRET` mismatch — secrets are shown once; recreate the webhook |
 | Webhook 500 | `bunx wrangler tail` |
-| Attachments missing | R2 bucket must exist and match `bucket_name` in `wrangler.jsonc` |
-| `database_id` errors on deploy | Paste the id from `wrangler d1 create` into `wrangler.jsonc` |
+| Attachments missing | The Worker's `ATTACHMENTS` binding must point at the bucket that holds them: check **Workers → your Worker → Bindings** |
+| `bun run db:migrate:remote` can't find the database | Deploy once first: without an ID in `wrangler.jsonc`, the database is found through the deployed Worker |
 | Setup shows no Cloudflare domains | Set `CLOUDFLARE_MAIL_DOMAINS` and `EMAIL_PROVIDER=cloudflare`, restart the dev server |
 | "The calendar address was refused" | Google answers 404 for a `/public/` address unless the calendar is public — use the **secret** address, or see [Workspace accounts](#other-calendars) |
 | Other calendar stuck at its last sync | Google republishes its iCal feed every few hours; **Sync now** fetches what it currently offers |

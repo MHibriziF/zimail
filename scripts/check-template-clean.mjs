@@ -82,10 +82,9 @@ if (!existsSync(wranglerPath)) {
 	fail('wrangler.jsonc is missing');
 } else {
 	const wrangler = readFileSync(wranglerPath, 'utf8');
-	if (!wrangler.includes('REPLACE_WITH_YOUR_D1_DATABASE_ID')) {
-		fail(
-			'wrangler.jsonc no longer has the database_id placeholder — a real D1 id was committed'
-		);
+	// Bindings carry no IDs: deploys create or reuse the resources (see the comment there).
+	if (/^[ \t]*"(database_id|bucket_name|preview_bucket_name)"[ \t]*:/m.test(wrangler)) {
+		fail('wrangler.jsonc names a D1 database or R2 bucket — an account-specific value was committed');
 	}
 	const route = wrangler.match(/^[ \t]*"pattern"[ \t]*:[ \t]*"([^"\n]+)"/m);
 	const routeHost = route?.[1].replace(/^https?:\/\//i, '').split('/')[0].toLowerCase() ?? '';
