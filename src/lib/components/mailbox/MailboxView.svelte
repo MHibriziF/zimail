@@ -3,6 +3,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page as currentPage } from '$app/stores';
 	import Icon from '../Icon.svelte';
+	import ConfirmDialog from '../ConfirmDialog.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import PullToRefresh from './PullToRefresh.svelte';
 	import MailboxRow from './MailboxRow.svelte';
@@ -89,8 +90,28 @@
 			: [...selected, id];
 	}
 
-	/** One entry point for every list action, so the UI always refreshes after. */
-	async function run(action: string, ids: string[] = selected) {
+	const IRREVERSIBLE = new Set(['delete', 'empty-trash']);
+	let confirming = $state<{ action: string; ids: string[] } | null>(null);
+
+	const confirmCopy = $derived.by(() => {
+		if (confirming?.action === 'empty-trash') {
+			return { title: t('mailbox.emptyTrashTitle'), message: t('mailbox.emptyTrashMessage'), label: t('mailbox.emptyTrash') };
+		}
+		const count = confirming?.ids.length ?? 0;
+		return {
+			title: t('mailbox.deleteForeverTitle'),
+			message: count > 1 ? t('mailbox.deleteForeverMany', { count }) : t('mailbox.deleteForeverOne'),
+			label: t('mailbox.deletePermanently')
+		};
+	});
+
+	/** One entry point for every list action; the irreversible ones ask first. */
+	function run(action: string, ids: string[] = selected) {
+		if (IRREVERSIBLE.has(action)) confirming = { action, ids };
+		else void perform(action, ids);
+	}
+
+	async function perform(action: string, ids: string[]) {
 		if (busy) return;
 		busy = true;
 		try {
@@ -355,6 +376,18 @@
 	{/if}
 </section>
 </PullToRefresh>
+
+<ConfirmDialog
+	open={confirming !== null}
+	title={confirmCopy.title}
+	message={confirmCopy.message}
+	confirmLabel={confirmCopy.label}
+	onCancel={() => (confirming = null)}
+	onConfirm={() => {
+		if (confirming) void perform(confirming.action, confirming.ids);
+		confirming = null;
+	}}
+/>
 
 <style>
 	.mailbox {

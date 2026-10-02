@@ -4,7 +4,7 @@
 	import Icon from '$lib/components/Icon.svelte';
 	import ZeroIcon from '$themes/zero/icons/Icon.svelte';
 	import { formatMailDate, formatRelativeDate } from '$lib/utils/date';
-	import { ConfirmTwice } from '$lib/components/confirm-twice.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	type Found = {
 		id: string;
@@ -48,7 +48,7 @@
 	let showHistory = $state(false);
 	let saved = $state<Saved[] | null>(null);
 	let historyError = $state('');
-	const deleteConversation = new ConfirmTwice();
+	let deleting = $state<string | null>(null);
 	let question = $state('');
 	let busy = $state(false);
 	let error = $state('');
@@ -161,7 +161,6 @@
 	}
 
 	async function remove(id: string) {
-		if (!deleteConversation.press(id)) return;
 		const response = await fetch(`/api/ai/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null);
 		if (!response?.ok && response?.status !== 404) {
 			historyError = t('common.networkError');
@@ -216,11 +215,16 @@
 			>
 				{#if shell === 'zero'}<ZeroIcon name="Clock" size={14} />{:else}<Icon name="history-line" size={17} />{/if}
 			</button>
-			{#if turns.length > 0 || showHistory}
-				<button type="button" class="ask-icon" aria-label={t('ai.askNew')} title={t('ai.askNew')} onclick={restart}>
-					{#if shell === 'zero'}<ZeroIcon name="Plus" size={14} />{:else}<Icon name="chat-new-line" size={17} />{/if}
-				</button>
-			{/if}
+			<button
+				type="button"
+				class="ask-icon"
+				class:active={turns.length === 0 && !showHistory}
+				aria-label={t('ai.askNew')}
+				title={t('ai.askNew')}
+				onclick={restart}
+			>
+				{#if shell === 'zero'}<ZeroIcon name="Plus" size={14} />{:else}<Icon name="chat-new-line" size={17} />{/if}
+			</button>
 			<button type="button" class="ask-icon" aria-label={t('common.close')} onclick={() => (open = false)}>
 				{#if shell === 'zero'}<ZeroIcon name="X" size={14} />{:else}<Icon name="close-line" size={18} />{/if}
 			</button>
@@ -234,7 +238,6 @@
 					<p class="ask-intro">{t('ai.historyEmpty')}</p>
 				{/if}
 				{#each saved ?? [] as conversation (conversation.id)}
-					{@const armed = deleteConversation.armed === conversation.id}
 					<div class="ask-saved" class:current={conversation.id === conversationId}>
 						<button type="button" class="ask-saved-open" onclick={() => reopen(conversation.id)}>
 							<span class="ask-card-subject">{conversation.title}</span>
@@ -242,11 +245,10 @@
 						</button>
 						<button
 							type="button"
-							class="ask-icon danger"
-							class:armed
-							aria-label={armed ? t('mailbox.deleteForeverConfirm') : t('ai.deleteConversation')}
-							title={armed ? t('mailbox.deleteForeverConfirm') : t('ai.deleteConversation')}
-							onclick={() => remove(conversation.id)}
+							class="ask-icon"
+							aria-label={t('ai.deleteConversation')}
+							title={t('ai.deleteConversation')}
+							onclick={() => (deleting = conversation.id)}
 						>
 							{#if shell === 'zero'}<ZeroIcon name="Trash" size={13} />{:else}<Icon name="delete-bin-line" size={15} />{/if}
 						</button>
@@ -310,6 +312,18 @@
 		<p class="ask-note">{t('ai.askNote')}</p>
 	</div>
 {/if}
+
+<ConfirmDialog
+	open={deleting !== null}
+	title={t('ai.deleteConversationTitle')}
+	message={t('ai.deleteConversationMessage')}
+	confirmLabel={t('ai.deleteConversation')}
+	onCancel={() => (deleting = null)}
+	onConfirm={() => {
+		if (deleting) void remove(deleting);
+		deleting = null;
+	}}
+/>
 
 <style>
 	.ask {
@@ -385,12 +399,6 @@
 		background: var(--ask-hover);
 		color: var(--ask-text);
 		--icon-color: var(--ask-text);
-	}
-
-	.ask-icon.danger.armed {
-		background: #be123c;
-		color: #ffffff;
-		--icon-color: #ffffff;
 	}
 
 	.ask-saved {

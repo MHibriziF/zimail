@@ -30,7 +30,7 @@
 	import type { ZeroIconName } from '../icons/names';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
-	import { ConfirmTwice } from '$lib/components/confirm-twice.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let {
 		id,
@@ -76,7 +76,7 @@
 	let dark = $state(false);
 	let detailsFor = $state<string | null>(null);
 	let menuFor = $state<string | null>(null);
-	const deleteForever = new ConfirmTwice();
+	let confirmingDelete = $state(false);
 
 	const selfEmails = $derived(
 		new Set(
@@ -508,16 +508,12 @@
 							<Icon name="CurvedArrow" size={16} />
 						</button>
 					</Tooltip>
-					{@const deleteLabel = deleteForever.armed === id ? t('mailbox.deleteForeverConfirm') : t('mailbox.deletePermanently')}
-					<Tooltip text={deleteLabel}>
+					<Tooltip text={t('mailbox.deletePermanently')}>
 						<button
 							type="button"
 							class="z-thread-trash"
-							class:armed={deleteForever.armed === id}
-							aria-label={deleteLabel}
-							onclick={() => {
-								if (id && deleteForever.press(id)) void act('delete');
-							}}
+							aria-label={t('mailbox.deletePermanently')}
+							onclick={() => (confirmingDelete = true)}
 						>
 							<Icon name="Trash" size={16} />
 						</button>
@@ -850,3 +846,15 @@
 		</div>
 	</div>
 {/if}
+
+<ConfirmDialog
+	open={confirmingDelete}
+	title={t('mailbox.deleteForeverTitle')}
+	message={t('mailbox.deleteForeverOne')}
+	confirmLabel={t('mailbox.deletePermanently')}
+	onCancel={() => (confirmingDelete = false)}
+	onConfirm={() => {
+		confirmingDelete = false;
+		void act('delete');
+	}}
+/>

@@ -2,6 +2,7 @@
 	import { goto, invalidate, invalidateAll } from '$app/navigation';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import AttachmentPicker from '$lib/components/mailbox/AttachmentPicker.svelte';
@@ -170,6 +171,8 @@
 		void goto(backHref);
 	}
 
+	let confirmingDelete = $state(false);
+
 	async function destroy() {
 		if (!latest) return;
 		await deleteMessage(latest.id);
@@ -289,7 +292,7 @@
 					type="button"
 					class="icon-btn danger"
 					aria-label={t('mailbox.deletePermanently')}
-					onclick={destroy}
+					onclick={() => (confirmingDelete = true)}
 				>
 					<Icon name="delete-bin-2-line" size={16} />
 				</button>
@@ -513,6 +516,18 @@
 		</button>
 	{/if}
 </div>
+
+<ConfirmDialog
+	open={confirmingDelete}
+	title={t('mailbox.deleteForeverTitle')}
+	message={t('mailbox.deleteForeverOne')}
+	confirmLabel={t('mailbox.deletePermanently')}
+	onCancel={() => (confirmingDelete = false)}
+	onConfirm={() => {
+		confirmingDelete = false;
+		void destroy();
+	}}
+/>
 
 <style>
 	.scheduled-bar {
