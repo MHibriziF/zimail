@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Brings upstream (MHibriziF/zimail) into a copy of Zimail as a pull request. Runs from
 # .github/workflows/sync-upstream.yml, which fetches this script from upstream each time, so
-# copies get fixes to it without editing anything. Run from the repository root.
+# copies get fixes to it without editing anything. Run from the repository root, on the
+# branch to update.
 #
-# A copy made by the Deploy to Cloudflare button is a fresh repository with no history in
-# common with upstream, so git would see every changed file as a conflict, wrangler.jsonc
-# included. The first sync therefore finds the upstream commit the copy was made from and
-# grafts the copy's first commit onto it. From there it is an ordinary three-way merge:
-# upstream's changes come in, and the copy's own edits, such as its Worker name, stay. The
-# merge commit records the real relationship, so later syncs need no graft.
+# The pull request is upstream's main itself, so GitHub's own three-way merge keeps the
+# copy's edits, brings in upstream's, and shows any conflict on the pull request.
 #
-# Without SYNC_PUBLISH=1 it only merges into the local `sync/upstream` branch.
+# A copy made by the Deploy to Cloudflare button shares no history with upstream, and GitHub
+# won't compare unrelated histories. So the first sync finds the upstream commit the copy
+# was made from and records it with one "ours" merge: a commit that changes no files. From
+# then on the copy and upstream are related, and every sync is an ordinary pull request.
+#
+# Without SYNC_PUBLISH=1 it prepares everything locally and pushes nothing.
 set -euo pipefail
 
 UPSTREAM_REPO="${UPSTREAM_REPO:-MHibriziF/zimail}"
@@ -18,6 +20,11 @@ BRANCH="${SYNC_BRANCH:-sync/upstream}"
 UPSTREAM_REF="upstream/main"
 # How far back to look for the commit a copy was made from.
 SEARCH_DEPTH="${SYNC_SEARCH_DEPTH:-400}"
+
+summary() {
+	if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then echo "$1" >>"$GITHUB_STEP_SUMMARY"; fi
+	echo "$1"
+}
 
 fetch_upstream() {
 	if ! git remote get-url upstream >/dev/null 2>&1; then
@@ -31,8 +38,8 @@ distance() {
 	git diff --numstat "$1" "$2" | awk '$1 != "-" { total += $1 + $2 } END { print total + 0 }'
 }
 
-# Prints the copy's first commit after grafting it onto the closest upstream commit.
-graft_onto_upstream() {
+# The upstream commit closest to this copy's first commit.
+starting_point() {
 	local root best="" best_distance="" commit current
 	root="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
 	for commit in $(git rev-list --max-count="$SEARCH_DEPTH" "$UPSTREAM_REF"); do
@@ -44,44 +51,33 @@ graft_onto_upstream() {
 		if [ "$current" -eq 0 ]; then break; fi
 	done
 	echo "First sync: this repository starts from upstream $(git log -1 --format='%h %s' "$best") ($best_distance lines differ)." >&2
-	git replace -f --graft "$root" "$best"
-	echo "$root"
+	echo "$best"
 }
 
-# Merges upstream into $BRANCH. Exit status: 0 merged something, 3 nothing new, 1 conflict.
-merge_upstream() {
-	if git merge-base --is-ancestor "$UPSTREAM_REF" HEAD; then return 3; fi
-	local root="" before status=0
-	if ! git merge-base HEAD "$UPSTREAM_REF" >/dev/null; then root="$(graft_onto_upstream)"; fi
-	git checkout -B "$BRANCH"
-	before="$(git rev-parse HEAD)"
-	if ! git merge --no-edit -m "chore: sync from upstream" "$UPSTREAM_REF"; then
-		echo "Upstream changed the same lines as this repository:" >&2
-		git diff --name-only --diff-filter=U >&2
-		git merge --abort
-		status=1
-	fi
-	# The graft only steered this merge; the merge commit itself has the real parents.
-	if [ -n "$root" ]; then git replace -d "$root" >/dev/null; fi
-	if [ "$status" -eq 0 ] && [ "$(git rev-parse HEAD)" = "$before" ]; then status=3; fi
-	return "$status"
-}
-
-summary() {
-	if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then echo "$1" >>"$GITHUB_STEP_SUMMARY"; fi
-	echo "$1"
+# Files GitHub will show as conflicting when the pull request is merged.
+conflicting_files() {
+	git merge-tree --write-tree --name-only --no-messages HEAD "$UPSTREAM_REF" | tail -n +2 || true
 }
 
 publish() {
-	local base="${BASE:-main}"
+	local linked="$1" base="${BASE:-main}" conflicts="$2"
 	# With an `upstream` remote, gh would otherwise target upstream, not this copy.
 	if [ -n "${GITHUB_REPOSITORY:-}" ]; then export GH_REPO="$GITHUB_REPOSITORY"; fi
-	git push --force --quiet origin "$BRANCH"
+	if [ "$linked" = 1 ]; then git push --quiet origin "HEAD:$base"; fi
+	git push --force --quiet origin "$UPSTREAM_REF:refs/heads/$BRANCH"
+
+	local body="Brings in the latest [Zimail](https://github.com/${UPSTREAM_REPO}). Your own changes, such as your Worker name, are kept. Merging redeploys as usual."
+	if [ -n "$conflicts" ]; then
+		body="${body}
+
+Some of your changes overlap with this update, so GitHub will ask you to resolve them before merging (**Resolve conflicts** below):
+
+$(printf '%s\n' "$conflicts" | sed 's/^/- `/; s/$/`/')"
+	fi
 	if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
 		summary "The open sync pull request now has the latest Zimail."
 		return
 	fi
-	local body="Brings in the latest [Zimail](https://github.com/${UPSTREAM_REPO}). Your own changes, such as your Worker name, are kept. Merging redeploys as usual."
 	if ! gh pr create --head "$BRANCH" --base "$base" --title "Sync from ${UPSTREAM_REPO}" --body "$body"; then
 		# New repositories don't let Actions open pull requests until it's allowed once.
 		summary "The \`$BRANCH\` branch is ready, but this repository doesn't let Actions open pull requests."
@@ -95,16 +91,29 @@ if [ "${SYNC_PUBLISH:-}" = "1" ]; then
 	git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 fi
 fetch_upstream
-status=0
-merge_upstream || status=$?
-case "$status" in
-	3)
+
+if git merge-base --is-ancestor "$UPSTREAM_REF" HEAD; then
+	summary "Already up to date with Zimail."
+	exit 0
+fi
+
+linked=0
+if ! git merge-base HEAD "$UPSTREAM_REF" >/dev/null; then
+	start="$(starting_point)"
+	if [ "$start" = "$(git rev-parse "$UPSTREAM_REF")" ]; then
 		summary "Already up to date with Zimail."
-		;;
-	0)
-		if [ "${SYNC_PUBLISH:-}" = "1" ]; then publish; fi
-		;;
-	*)
-		exit 1
-		;;
-esac
+		exit 0
+	fi
+	git merge --quiet -s ours --allow-unrelated-histories --no-edit \
+		-m "chore: record which Zimail version this copy started from" "$start"
+	linked=1
+fi
+
+conflicts="$(conflicting_files)"
+git branch --force "$BRANCH" "$UPSTREAM_REF"
+if [ -n "$conflicts" ]; then
+	summary "Ready, with overlapping changes to resolve on the pull request: $(echo "$conflicts" | tr '\n' ' ')"
+else
+	summary "Ready: the update merges cleanly."
+fi
+if [ "${SYNC_PUBLISH:-}" = "1" ]; then publish "$linked" "$conflicts"; fi
