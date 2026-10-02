@@ -1,7 +1,11 @@
 # Zimail
 
 [![Deploy this fork](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/MHibriziF/zimail)
+[![Sync now](https://img.shields.io/badge/Sync%20now-get%20the%20latest%20Zimail-2ea44f)](../../actions/workflows/sync-upstream.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
+
+Installed with the Deploy button? **Sync now** brings your copy up to date
+([how it works](#staying-up-to-date)).
 
 Self-hosted email for your own domain, running on Cloudflare Workers.
 Get `you@yourdomain.com` with a full web client — no third-party mailbox,
@@ -29,13 +33,13 @@ no servers to maintain.
 
 On top of everything upstream ships:
 
+- **[AI assistant](#ai-assistant)** — **Write with AI** drafts and polishes emails and replies, and **Ask AI** answers questions about your mail and calendar, with links to what it used. Free on Cloudflare Workers AI, no API key, and it never sends anything by itself.
 - **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat, and [recording](#recording-a-meeting) in the browser. **Compose → New meeting**, or the **Meetings** view.
 - **[Calendar](#calendar)** — month and agenda views next to the mailbox, with today's and tomorrow's events in the sidebar. Pull in [Google, Outlook or iCloud calendars](#other-calendars) by their iCal address, and share [reservation pages](#reservation-pages) where people book a free slot — checked against every calendar you have, sent as a real calendar invitation, and optionally with its own meeting room. **Calendar** in the sidebar.
-- **[AI assistant](#ai-assistant)**: **Write with AI** drafts and polishes emails and replies, and **Ask AI** answers questions about your mail and calendar with links to what it used. It runs on Cloudflare Workers AI's free tier, with no API key, and never sends anything by itself.
 - **Scheduled send** — pick any future date and time, or one of the presets, from the caret beside **Send**. The message waits in your own outbox and a [cron trigger](#scheduled-send) delivers it, so it works on either mail provider and is not capped at a provider's hold-until horizon. Recall it back to a draft any time before it goes.
 - **Two-factor authentication** — TOTP from any authenticator app, with single-use backup codes, asked for at sign-in. **Settings → Two-factor authentication**.
 - **Recovery address** — link a second mailbox you already own to the account. It is where security notices land and where forgotten-password links are sent, so losing access to this inbox does not lock you out of it. **Settings → Recovery address**.
-- **Broader deletion** — trash that empties itself on a retention period you choose, plus a sweep that moves mail older than a given age to the trash. Drafts and scheduled messages are never swept, and a count is always shown before anything moves. **Settings → Cleanup**.
+- **Broader deletion** — trash that empties itself on a retention period you choose, and moving mail older than a given age to the trash, once or automatically every day. Drafts and scheduled messages are never touched. **Settings → Cleanup**.
 - **Recipient chips** — To, Cc and Bcc turn what you have typed into a chip on space, comma, semicolon, <kbd>Enter</kbd> or <kbd>Tab</kbd>, so a mistyped address is visible before you send rather than after.
 - **Recipient suggestions** — the composer offers addresses you have written to before as you type.
 - **Time zone** — pick the zone your mail and your scheduled sends are read in, rather than trusting whatever the browser reports. **Settings → Time zone**.
@@ -44,9 +48,7 @@ On top of everything upstream ships:
 
 ## Quick start
 
-Click **Deploy this fork** above, or run the setup wizard locally. Either way,
-see [Staying up to date](#staying-up-to-date) for how updates reach you; a
-GitHub fork is the easiest to keep current.
+Click **Deploy this fork** above, or run the setup wizard locally:
 
 ```bash
 bun run setup
@@ -54,8 +56,9 @@ bun run setup
 bash scripts/setup.sh
 ```
 
-The wizard creates the D1 database and R2 bucket, writes config, and onboards
-your domain. Budget about 30 minutes — most of that is waiting on DNS.
+The wizard sets up your mail provider and domain, then deploys. Budget about 30
+minutes — most of that is waiting on DNS. Updates: see
+[Staying up to date](#staying-up-to-date).
 
 You need:
 
@@ -65,70 +68,28 @@ You need:
 
 ## Staying up to date
 
-How you get updates depends on how you installed.
+**Installed with the Deploy button?** Your repository gets updates from here
+once a week, as a pull request; merge it and your mail redeploys. To get them
+right away, press **Sync now** in your repository's README, then **Run
+workflow**:
 
-**Deploy to Cloudflare button.** The button copies this repository into a new
-repository of yours: a fresh copy with no link back here, so GitHub can't sync
-it. It includes a workflow that can:
+[![Sync now](https://img.shields.io/badge/Sync%20now-get%20the%20latest%20Zimail-2ea44f)](../../actions/workflows/sync-upstream.yml)
 
-- **When:** once a week, or from **Actions → Sync from upstream → Run workflow**.
-- **What:** it merges this repository into a `sync/upstream` branch and opens a
-  pull request in yours. Nothing changes until you merge it, and merging
-  redeploys as usual.
-- **Your edits stay,** including your Worker name and the database and bucket
-  IDs the button wrote into `wrangler.jsonc`.
-  - The first sync works out which version of this repository your copy started
-    from (`scripts/sync-upstream.sh`), so it's an ordinary merge rather than a
-    conflict in every file.
-  - If you changed the same lines as an update, the run stops and lists the
-    files instead of guessing.
-- **Copy made before the workflow existed:** add
-  [`.github/workflows/sync-upstream.yml`](.github/workflows/sync-upstream.yml)
-  to your repository once. It fetches the rest from here.
-- **If the run says it can't open pull requests:** allow it once in
-  **Settings → Actions → General → "Allow GitHub Actions to create and approve
-  pull requests"**, or open the pull request from the link in the run summary.
+If the run says it can't open a pull request, turn on **Settings → Actions →
+General → Allow GitHub Actions to create and approve pull requests** once.
 
-**Fork (the easiest to keep current).**
+**Forked it?** Use GitHub's **Sync fork** button. If Cloudflare deploys from
+your fork (**Workers & Pages → Create → Import a repository**), syncing
+redeploys it.
 
-1. **Fork** this repository on GitHub.
-2. Run `bun run setup` once against your fork. It creates the D1 database and
-   R2 bucket and writes their IDs into `wrangler.jsonc`; commit that.
-3. In Cloudflare, go to **Workers & Pages → Create → Import a repository**,
-   pick the fork, and set the deploy command to `bun run deploy`.
-4. From then on, GitHub's **Sync fork** button brings in updates, and Workers
-   Builds deploys them. Your IDs live on lines this repository never changes,
-   so syncing doesn't conflict with them.
-
-**Cloned and deployed by hand.** Add this repository as a remote and merge from
-it:
+**Cloned it?**
 
 ```bash
-git remote add upstream https://github.com/MHibriziF/zimail.git
-git pull upstream main
+git pull https://github.com/MHibriziF/zimail.git main
 bun run deploy
 ```
 
-## Updating an existing install
-
-Pulling updates does **not** rename your Worker, D1 database, or R2 bucket —
-leave those as they are (often `quickmail` / `quickmail-attachments`). Existing
-`qm_live_` API keys keep working, and `quickmail` remains a CLI alias.
-
-The Worker applies any pending migrations itself on the first request after a
-deploy, so `bun run deploy` is enough. To apply them ahead of time instead:
-
-```bash
-bun run db:migrate:remote
-```
-
-Both paths write to the same `d1_migrations` table, so it does not matter which
-runs first.
-
-**Coming from upstream, or from a build of this fork before scheduled send moved
-to cron:** migration `0019` moves any message Resend was already holding to
-`queued` and leaves Resend to release it, so nothing is sent twice. Those
-messages can no longer be recalled; anything scheduled after the update can.
+Updates take care of database changes by themselves.
 
 ## Choosing a mail provider
 
@@ -163,23 +124,8 @@ removed API path and 404).
 
 ### 2. D1 and R2
 
-Nothing to create, and no IDs to copy. `wrangler.jsonc` lists the bindings
-without IDs, so the first `bun run deploy` creates the D1 database and R2 bucket
-(named after the Worker: `<name>-db`, `<name>-bucket`), and every later deploy
-reuses whatever the deployed Worker is bound to. Wrangler calls this
-[automatic resource provisioning](https://developers.cloudflare.com/changelog/post/2025-10-24-automatic-resource-provisioning/).
-It needs Wrangler 4.45 or newer.
-
-Migrations are applied by the Worker on its first request. After the first
-deploy you can also apply them yourself:
-
-```bash
-bun run db:migrate:remote
-```
-
-An existing install with its own `database_id` and `bucket_name` in
-`wrangler.jsonc` keeps working as it is. Removing them is also safe: the next
-deploy reuses the same database and bucket.
+Nothing to create. The first `bun run deploy` creates the database and the
+attachment bucket, and sets up the database by itself.
 
 To serve from your own hostname, uncomment the `routes` block in
 `wrangler.jsonc` — the zone must be on the same Cloudflare account.
@@ -454,89 +400,28 @@ that check costs one indexed query.
 
 *Added by this fork.*
 
-Two features run on [Workers AI](https://developers.cloudflare.com/workers-ai/),
-Cloudflare's own model hosting, through the `AI` binding in `wrangler.jsonc`.
-There's no API key, no other vendor, and nothing to configure: deploying
-creates the binding.
+Runs on [Workers AI](https://developers.cloudflare.com/workers-ai/), on your own
+Cloudflare account. There's no API key and nothing to set up.
 
-- **Write with AI**: in the composer and the reply box, in both interfaces.
-  - Tell it what the email should say, or polish a draft: Improve, Shorter,
-    More formal, Friendlier, Fix grammar.
-  - On a reply it reads the message you're answering. It writes in the
-    language you use and leaves the sign-off name to your signature.
-  - It only ever fills the editor, and **Undo** puts back what was there. It
-    never sends.
-- **Ask AI**: a panel in Classic's top bar and Zero's sidebar.
-  - Ask about your mail and your calendar in plain words: "the invoice Budi
-    sent last month", "what's on my calendar tomorrow?", "am I free Friday
-    afternoon?".
-  - The answer links to the messages and events it used, and follow-up
-    questions work.
+- **Write with AI**, in the composer and the reply box. Tell it what the email
+  should say, or polish a draft: Improve, Shorter, More formal, Friendlier, Fix
+  grammar. It only fills the editor, and **Undo** puts back what was there. It
+  never sends.
+- **Ask AI**, from Classic's top bar or Zero's sidebar. Ask about your mail and
+  calendar in plain words: "the invoice Budi sent last month", "am I free Friday
+  afternoon?". Answers link to the messages and events they came from, and
+  **History** keeps your conversations to come back to or delete.
 
-### How Ask AI works
+**Free:** the Workers Free plan includes enough for several hundred questions
+or drafts a day. If that runs out, the assistant pauses until the next day and
+nothing is billed.
 
-```
-browser ──POST /api/ai/find──▶ Worker ──env.AI.run()──▶ Qwen3 30B on Workers AI
-                                  ▲                              │
-                                  └──── tool call: search_mail ──┘
-                                        read_message / list_events
-```
+**Private:** your mail and calendar go only to Workers AI, on the same account
+that already stores them, and
+[Cloudflare doesn't train on them](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
 
-1. The question and the last few turns go to `/api/ai/find`. It accepts a
-   signed-in session only, so API keys can't spend the allowance.
-2. The Worker asks the model, offering three tools:
-   - `search_mail`: keywords, sender, dates, folder.
-   - `read_message`: one message, up to 2,000 characters.
-   - `list_events`: the calendar for a date range, including subscribed
-     calendars, bookings and accepted invitations.
-3. **The Worker runs the tools itself** against D1. The model never touches
-   the database; it only sees the results the Worker hands back:
-   - snippets of up to 200 characters
-   - message bodies of up to 2,000
-   - at most 8 messages or 30 events per call
-4. The model gets up to three rounds of tools, then must answer. If a mail
-   search finds nothing, the Worker retries it more loosely (any word, then any
-   date), because the model rarely does.
-5. The answer and the message and event cards go back to the panel.
-6. The question and answer are saved to the conversation, one D1 row per
-   conversation, so **History** in the panel can reopen it later, on any device,
-   or delete it for good. Follow-up questions read their context from the saved
-   conversation. The newest 50 conversations are kept.
-
-Writing is a single model call with the draft (and, on a reply, the original
-message) and no tools.
-
-Everything is in `src/lib/server/ai/`:
-- `prompt.ts`: the writing prompt.
-- `find.ts`: the tools, the prompt, and argument cleanup.
-- `service.ts`: the agent loop.
-- `index.ts`: wiring to the mail store and calendar.
-
-### Cost and privacy
-
-- **Free plan:** the Workers Free plan includes **10,000 neurons a day**. When
-  they're used up, the assistant says so until 00:00 UTC; it never bills.
-- **Usage:** measured on the model's own usage report:
-  - A draft costs about 5–25 neurons.
-  - A question costs about 10–20 neurons.
-  - That's several hundred of either a day.
-- **Database:**
-  - Writing with AI writes nothing.
-  - An Ask AI question writes about 3 rows, for saving the conversation. Even
-    at the AI allowance's daily ceiling that's a few percent of D1's free
-    100,000 rows written a day.
-  - Each mail search is a scan of your own messages, which is fine at
-    personal-mailbox size. #113 tracks adding a search index if that changes.
-- **Privacy:** mail and calendar content goes only to Workers AI, on the same
-  Cloudflare account that already stores it.
-  [Cloudflare doesn't train on it](https://developers.cloudflare.com/workers-ai/platform/data-usage/).
-  Text from emails is labelled to the model as data, never instructions.
-
-### Limits
-
-It's a small, fast model. It's good at finding things and drafting, and weak
-at date arithmetic: it repeats "Thursday" as an email says it rather than
-guessing the date. Answers can be wrong, so every answer links to its source.
+It's a small, fast model, so an answer can be wrong. Open the linked message or
+event to check.
 
 ## Development
 
