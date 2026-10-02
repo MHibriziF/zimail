@@ -22,74 +22,87 @@ const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd,
 const write = (dir: string, file: string, text: string) => writeFileSync(join(dir, file), text);
 const read = (dir: string, file: string) => readFileSync(join(dir, file), 'utf8');
 const sync = (cwd: string) => spawnSync('bash', [SCRIPT], { cwd, env, encoding: 'utf8' });
+/** What GitHub does when the sync pull request is merged. */
+const mergePullRequest = (cwd: string) => spawnSync('git', ['merge', '--no-edit', 'sync/upstream'], { cwd, env, encoding: 'utf8' });
 
 const config = (name: string, id: string) => `{\n  "name": "${name}",\n  "ai": { "binding": "AI" },\n  "database_id": "${id}"\n}\n`;
 
-// Upstream: two commits. The copy is made from the first, the way the Deploy button makes one:
-// the same files as a single commit with no shared history, then that deployment's own IDs.
+function init(dir: string) {
+	execFileSync('git', ['init', '-q', '-b', 'main', dir], { env });
+}
+
+/** A Deploy-button copy: upstream's files as one unrelated commit, plus its own IDs. */
+function copyOf(dir: string, files: Record<string, string>) {
+	init(dir);
+	for (const [file, text] of Object.entries(files)) write(dir, file, text);
+	git(dir, 'add', '-A');
+	git(dir, 'commit', '-qm', 'Initial commit');
+	write(dir, 'wrangler.jsonc', config('my-mail', 'theirs'));
+	git(dir, 'commit', '-qam', 'deploy my own');
+	git(dir, 'remote', 'add', 'upstream', upstream);
+}
+
 const upstream = join(root, 'upstream');
-const copy = join(root, 'copy');
-for (const dir of [upstream, copy]) execFileSync('git', ['init', '-q', '-b', 'main', dir], { env });
+init(upstream);
 write(upstream, 'wrangler.jsonc', config('zimail', 'ours'));
 write(upstream, 'app.txt', 'version 1\n');
+write(upstream, 'README.md', 'Zimail\n');
 git(upstream, 'add', '-A');
 git(upstream, 'commit', '-qm', 'first');
-write(copy, 'wrangler.jsonc', config('zimail', 'ours'));
-write(copy, 'app.txt', 'version 1\n');
-git(copy, 'add', '-A');
-git(copy, 'commit', '-qm', 'Initial commit');
-write(copy, 'wrangler.jsonc', config('my-mail', 'theirs'));
-git(copy, 'commit', '-qam', 'deploy my own');
+const first = { 'wrangler.jsonc': config('zimail', 'ours'), 'app.txt': 'version 1\n', 'README.md': 'Zimail\n' };
 write(upstream, 'app.txt', 'version 2\n');
 write(upstream, 'new.txt', 'a new feature\n');
 git(upstream, 'add', '-A');
 git(upstream, 'commit', '-qm', 'second');
-git(copy, 'remote', 'add', 'upstream', upstream);
 
-test("a Deploy-button copy's first sync brings upstream in and keeps its own IDs", () => {
-	git(copy, 'fetch', '-q', 'upstream', 'main');
+const copy = join(root, 'copy');
+copyOf(copy, first);
+
+test("a Deploy-button copy's first sync links it to upstream without changing a file", () => {
+	const before = git(copy, 'rev-parse', 'HEAD^{tree}');
 	const run = sync(copy);
 	assert.equal(run.status, 0, run.stderr);
 	assert.match(run.stderr, /First sync: this repository starts from upstream \w+ first \(0 lines differ\)/);
-	assert.equal(git(copy, 'rev-parse', '--abbrev-ref', 'HEAD'), 'sync/upstream');
+	assert.match(run.stdout, /merges cleanly/);
+	assert.equal(git(copy, 'rev-parse', 'HEAD^{tree}'), before, 'the link commit changes no files');
+	assert.equal(git(copy, 'log', '-1', '--format=%s'), 'chore: record which Zimail version this copy started from');
+	assert.equal(git(copy, 'rev-parse', 'sync/upstream'), git(copy, 'rev-parse', 'upstream/main'));
+});
+
+test('merging the pull request brings upstream in and keeps the copy’s own IDs', () => {
+	const merge = mergePullRequest(copy);
+	assert.equal(merge.status, 0, merge.stdout);
 	assert.equal(read(copy, 'app.txt'), 'version 2\n');
 	assert.equal(read(copy, 'new.txt'), 'a new feature\n');
 	assert.equal(read(copy, 'wrangler.jsonc'), config('my-mail', 'theirs'));
-	assert.equal(git(copy, 'replace', '-l'), '', 'the graft is not left behind');
 });
 
-test('with nothing new upstream, it says so and changes nothing', () => {
-	git(copy, 'checkout', '-q', 'main');
-	git(copy, 'merge', '-q', '--ff-only', 'sync/upstream');
+test('with nothing new upstream, it says so', () => {
 	const run = sync(copy);
 	assert.equal(run.status, 0, run.stderr);
 	assert.match(run.stdout, /Already up to date/);
 });
 
-test('a copy made from the newest upstream has nothing to sync, even the first time', () => {
+test('a copy made from the newest upstream needs no link commit yet', () => {
 	const fresh = join(root, 'fresh');
-	execFileSync('git', ['init', '-q', '-b', 'main', fresh], { env });
-	for (const file of ['wrangler.jsonc', 'app.txt', 'new.txt']) write(fresh, file, read(upstream, file));
-	git(fresh, 'add', '-A');
-	git(fresh, 'commit', '-qm', 'Initial commit');
-	git(fresh, 'remote', 'add', 'upstream', upstream);
-	git(fresh, 'fetch', '-q', 'upstream', 'main');
+	copyOf(fresh, { ...first, 'app.txt': 'version 2\n', 'new.txt': 'a new feature\n' });
+	const head = git(fresh, 'rev-parse', 'HEAD');
 	const run = sync(fresh);
 	assert.equal(run.status, 0, run.stderr);
 	assert.match(run.stdout, /Already up to date/);
-	assert.equal(git(fresh, 'rev-parse', 'HEAD'), git(fresh, 'rev-parse', 'main'), 'no merge commit was made');
-	assert.equal(git(fresh, 'replace', '-l'), '');
+	assert.equal(git(fresh, 'rev-parse', 'HEAD'), head);
 });
 
-test('a real conflict stops the sync, names the file, and leaves no half-done merge', () => {
-	write(upstream, 'wrangler.jsonc', config('zimail-renamed', 'ours'));
-	git(upstream, 'commit', '-qam', 'rename');
-	git(copy, 'fetch', '-q', 'upstream', 'main');
+test('overlapping changes still produce the pull request, naming the files to resolve', () => {
+	write(copy, 'README.md', 'My own mail\n');
+	git(copy, 'commit', '-qam', 'my README');
+	write(upstream, 'README.md', 'Zimail, now with more\n');
+	git(upstream, 'commit', '-qam', 'readme');
 	const run = sync(copy);
-	assert.equal(run.status, 1);
-	assert.match(run.stderr, /wrangler\.jsonc/);
-	assert.equal(git(copy, 'status', '--porcelain'), '');
-	assert.equal(read(copy, 'wrangler.jsonc'), config('my-mail', 'theirs'));
+	assert.equal(run.status, 0, run.stderr);
+	assert.match(run.stdout, /overlapping changes to resolve on the pull request: README\.md/);
+	assert.equal(git(copy, 'rev-parse', 'sync/upstream'), git(copy, 'rev-parse', 'upstream/main'));
+	assert.equal(read(copy, 'README.md'), 'My own mail\n', 'nothing in the copy changes until the pull request is merged');
 });
 
 // The Deploy button doesn't copy workflows, so the README's "Set up syncing" link carries the

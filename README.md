@@ -85,8 +85,10 @@ so set up syncing once, from your repository's README:
 
 [![Sync now](https://img.shields.io/badge/Sync%20now-get%20the%20latest%20Zimail-2ea44f)](../../actions/workflows/sync-upstream.yml)
 
-If a sync says it can't open a pull request, turn on **Settings → Actions →
-General → Allow GitHub Actions to create and approve pull requests** once.
+If an update overlaps with changes you made yourself, the pull request says
+which files, and GitHub lets you **Resolve conflicts** right there. If a sync
+says it can't open a pull request, turn on **Settings → Actions → General →
+Allow GitHub Actions to create and approve pull requests** once.
 
 **Forked it?** Use GitHub's **Sync fork** button. If Cloudflare deploys from
 your fork (**Workers & Pages → Create → Import a repository**), syncing
