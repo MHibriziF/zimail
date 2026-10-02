@@ -74,6 +74,8 @@ summary() {
 
 publish() {
 	local base="${BASE:-main}"
+	# With an `upstream` remote, gh would otherwise target upstream, not this copy.
+	if [ -n "${GITHUB_REPOSITORY:-}" ]; then export GH_REPO="$GITHUB_REPOSITORY"; fi
 	git push --force --quiet origin "$BRANCH"
 	if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" != "0" ]; then
 		summary "The open sync pull request now has the latest Zimail."
