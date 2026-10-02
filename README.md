@@ -221,7 +221,6 @@ bunx web-push generate-vapid-keys
 bunx wrangler secret put VAPID_PUBLIC_KEY
 bunx wrangler secret put VAPID_PRIVATE_KEY
 bunx wrangler secret put VAPID_SUBJECT   # e.g. mailto:admin@example.com
-bun run db:migrate:remote
 bun run deploy
 ```
 
@@ -539,7 +538,7 @@ migrations/          D1 schema, applied in order
 | Webhook 401 | `RESEND_WEBHOOK_SECRET` mismatch — secrets are shown once; recreate the webhook |
 | Webhook 500 | `bunx wrangler tail` |
 | Attachments missing | The Worker's `ATTACHMENTS` binding must point at the bucket that holds them: check **Workers → your Worker → Bindings** |
-| `bun run db:migrate:remote` can't find the database | Deploy once first: without an ID in `wrangler.jsonc`, the database is found through the deployed Worker |
+| A `wrangler d1 … DB --remote` command can't find the database | Use the database's name instead of `DB`, e.g. `wrangler d1 execute <name> --remote` (Cloudflare dashboard → D1). A new install's database is `<worker>-db`, which `DB` finds by itself. |
 | Setup shows no Cloudflare domains | Set `CLOUDFLARE_MAIL_DOMAINS` and `EMAIL_PROVIDER=cloudflare`, restart the dev server |
 | "The calendar address was refused" | Google answers 404 for a `/public/` address unless the calendar is public — use the **secret** address, or see [Workspace accounts](#other-calendars) |
 | Other calendar stuck at its last sync | Google republishes its iCal feed every few hours; **Sync now** fetches what it currently offers |

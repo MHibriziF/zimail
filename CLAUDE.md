@@ -35,6 +35,13 @@ a build existed. That import is suppressed with `@ts-ignore`, not
 both pass while the deploy is broken. Real verification is `wrangler dev` plus
 `wrangler d1 execute DB --local --command "..."` for new SQL.
 
+**Remote D1 commands take the database name, not `DB`.** `wrangler.jsonc` has
+no IDs (#130), and without one Wrangler resolves `DB` on the command line to a
+database named `<config name>-db` (`zimail-db`), which doesn't exist here.
+Production is the `izi-quickmail` Worker on the `izi-quickmail` database, so use
+`wrangler d1 execute izi-quickmail --remote`. Deploys are unaffected: they
+inherit the live Worker's bindings. `--local` keeps working with `DB`.
+
 **CRLF.** The working tree is CRLF. Any script that rewrites `messages/*.json`
 or a source file must detect and restore the original line endings, or the diff
 becomes the whole file. `generate-migrations.mjs` normalizes to LF on purpose —
