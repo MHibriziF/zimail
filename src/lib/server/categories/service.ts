@@ -2,7 +2,7 @@ import type { MailCategory } from '../../mail/categories';
 import type { TabMessage, TabsOutcome } from '../ai/tabs';
 import { plainBody } from '../util/html';
 import { classifyMail, type ClassifyInput } from './classify';
-import type { CategoriesRepository, ResortCandidate, TabSettings } from './repository';
+import type { CategoriesRepository, ResortCandidate } from './repository';
 
 export type InboundTabInput = ClassifyInput & {
 	fromName?: string | null;
@@ -24,15 +24,13 @@ export type ResortOutcome =
 export type CategoriesService = {
 	/**
 	 * The tab for a new inbound message: a sender the user sorted before wins,
-	 * then Clef when the user turned it on, then the rules.
+	 * then Clef while tabs are on, then the rules when Clef can't answer.
 	 */
 	categorizeInbound(userId: string, input: InboundTabInput): Promise<MailCategory>;
 	/** Moves the conversations of `emailIds` to a tab and remembers their senders. */
 	moveToCategory(userId: string, emailIds: string[], category: MailCategory): Promise<number>;
 	tabsEnabled(userId: string): Promise<boolean>;
 	setTabsEnabled(userId: string, enabled: boolean): Promise<void>;
-	tabSettings(userId: string): Promise<TabSettings>;
-	setAiTabsEnabled(userId: string, enabled: boolean): Promise<void>;
 	/**
 	 * Sorts up to `limit` conversations that arrived before tabs existed, from
 	 * sender and subject only — their headers weren't stored. Call repeatedly
@@ -78,15 +76,10 @@ export function createCategoriesService(deps: CategoriesServiceDeps): Categories
 		return repo.senderCategory(userId, from.trim().toLowerCase());
 	}
 
-	async function aiSortingOn(userId: string): Promise<boolean> {
-		const settings = await repo.tabSettings(userId);
-		return settings.enabled && settings.ai;
-	}
-
 	async function categorizeInbound(userId: string, input: InboundTabInput): Promise<MailCategory> {
 		const known = await remembered(userId, input.from);
 		if (known) return known;
-		if (!sortTabs || !worthAsking(input) || !(await aiSortingOn(userId))) return classifyMail(input);
+		if (!sortTabs || !worthAsking(input) || !(await repo.tabsEnabled(userId))) return classifyMail(input);
 
 		const outcome = await sortTabs([input]);
 		return (outcome.kind === 'sorted' && outcome.tabs[0]) || classifyMail(input);
@@ -108,8 +101,6 @@ export function createCategoriesService(deps: CategoriesServiceDeps): Categories
 
 		tabsEnabled: (userId) => repo.tabsEnabled(userId),
 		setTabsEnabled: (userId, enabled) => repo.setTabsEnabled(userId, enabled),
-		tabSettings: (userId) => repo.tabSettings(userId),
-		setAiTabsEnabled: (userId, enabled) => repo.setAiTabsEnabled(userId, enabled),
 
 		async backfill(userId, limit = BACKFILL_BATCH) {
 			const pending = await repo.uncategorized(userId, limit);
@@ -126,7 +117,7 @@ export function createCategoriesService(deps: CategoriesServiceDeps): Categories
 
 		async resortWithAi(userId, limit = RESORT_BATCH) {
 			if (!sortTabs) return { kind: 'unavailable' };
-			if (!(await aiSortingOn(userId))) return { kind: 'disabled' };
+			if (!(await repo.tabsEnabled(userId))) return { kind: 'disabled' };
 
 			const candidates = await repo.resortCandidates(userId, limit);
 			const outcome = await sortTabs(candidates.map(resortMessage));

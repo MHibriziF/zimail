@@ -200,5 +200,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0049_ai_inbox_tabs.sql",
 		sql: "-- Sort inbox tabs with Clef on Workers AI instead of the header rules (#153). Off until turned on:\n-- it spends the account's Workers AI allowance on incoming mail.\nALTER TABLE users ADD COLUMN ai_inbox_tabs INTEGER NOT NULL DEFAULT 0;\n"
+	},
+	{
+		name: "0050_ai_inbox_tabs_always_on.sql",
+		sql: "-- Clef now sorts inbox tabs whenever tabs are on, like Gmail, with no separate switch, so the\n-- per-user flag from 0049 goes.\nALTER TABLE users DROP COLUMN ai_inbox_tabs;\n"
 	}
 ];

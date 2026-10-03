@@ -14,8 +14,6 @@ export type UncategorizedMessage = {
 	existingCategory: MailCategory | null;
 };
 
-export type TabSettings = { enabled: boolean; ai: boolean };
-
 /** The first message of an inbox conversation, with enough of it for the model to read. */
 export type ResortCandidate = {
 	id: string;
@@ -34,8 +32,6 @@ export type CategoriesRepository = {
 	inboundSenders(userId: string, emailIds: string[]): Promise<string[]>;
 	tabsEnabled(userId: string): Promise<boolean>;
 	setTabsEnabled(userId: string, enabled: boolean): Promise<void>;
-	tabSettings(userId: string): Promise<TabSettings>;
-	setAiTabsEnabled(userId: string, enabled: boolean): Promise<void>;
 	/** The newest inbox conversations whose sender the user never sorted by hand. */
 	resortCandidates(userId: string, limit: number): Promise<ResortCandidate[]>;
 	/** The oldest still-unsorted inbound message of each conversation that has one. */
@@ -90,18 +86,6 @@ export function createD1CategoriesRepository(db: D1Database): CategoriesReposito
 
 		async setTabsEnabled(userId, enabled) {
 			await db.prepare('UPDATE users SET inbox_tabs = ? WHERE id = ?').bind(enabled ? 1 : 0, userId).run();
-		},
-
-		async tabSettings(userId) {
-			const row = await db
-				.prepare('SELECT inbox_tabs, ai_inbox_tabs FROM users WHERE id = ?')
-				.bind(userId)
-				.first<{ inbox_tabs: number; ai_inbox_tabs: number }>();
-			return { enabled: row?.inbox_tabs !== 0, ai: row?.ai_inbox_tabs === 1 };
-		},
-
-		async setAiTabsEnabled(userId, enabled) {
-			await db.prepare('UPDATE users SET ai_inbox_tabs = ? WHERE id = ?').bind(enabled ? 1 : 0, userId).run();
 		},
 
 		async resortCandidates(userId, limit) {

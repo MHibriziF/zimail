@@ -10,9 +10,7 @@
 	let sorting = $state(false);
 	let sorted = $state(0);
 	let remaining = $state<number | null>(null);
-	let ai = $state(false);
 	let aiAvailable = $state(false);
-	let aiBusy = $state(false);
 	let resorting = $state(false);
 	let resorted = $state<{ sorted: number; moved: number } | null>(null);
 	let error = $state('');
@@ -36,9 +34,8 @@
 	onMount(async () => {
 		try {
 			const response = await fetch('/api/settings/inbox-tabs');
-			const body = (await response.json()) as { enabled?: boolean; ai?: boolean; aiAvailable?: boolean };
+			const body = (await response.json()) as { enabled?: boolean; aiAvailable?: boolean };
 			enabled = body.enabled !== false;
-			ai = body.ai === true;
 			aiAvailable = body.aiAvailable === true;
 		} catch {
 			// Keep the default; the switch still works.
@@ -59,21 +56,6 @@
 			error = failure instanceof Error ? failure.message : t('common.networkError');
 		} finally {
 			busy = false;
-		}
-	}
-
-	async function toggleAi() {
-		if (aiBusy) return;
-		aiBusy = true;
-		error = '';
-		try {
-			await post({ ai: !ai });
-			ai = !ai;
-			resorted = null;
-		} catch (failure) {
-			error = failure instanceof Error ? failure.message : t('common.networkError');
-		} finally {
-			aiBusy = false;
 		}
 	}
 
@@ -127,7 +109,7 @@
 
 <section class="surface-lg card" id="inbox-tabs">
 	<h2><Icon name="layout-top-line" size={18} /> {t('tabs.settingsTitle')}</h2>
-	<p class="card-hint">{t('tabs.settingsHint')}</p>
+	<p class="card-hint">{aiAvailable ? t('tabs.aiHint') : t('tabs.settingsHint')}</p>
 
 	<label class="switch-row">
 		<input type="checkbox" checked={enabled} disabled={!loaded || busy} onchange={toggle} />
@@ -147,24 +129,16 @@
 		<p class="card-hint">{t('tabs.sortHint')}</p>
 
 		{#if aiAvailable}
-			<label class="switch-row">
-				<input type="checkbox" checked={ai} disabled={!loaded || aiBusy} onchange={toggleAi} />
-				<span>{t('tabs.aiEnable')}</span>
-			</label>
-			<p class="card-hint">{t('tabs.aiHint')}</p>
-
-			{#if ai}
-				<div class="backfill">
-					<button type="button" class="btn-ghost" disabled={resorting} onclick={resort}>
-						<Icon name="sparkling-line" size={16} />
-						{resorting ? t('tabs.aiResorting') : t('tabs.aiResort')}
-					</button>
-					{#if resorted}
-						<span class="done">{t('tabs.aiResortDone', { count: resorted.sorted, moved: resorted.moved })}</span>
-					{/if}
-				</div>
-				<p class="card-hint">{t('tabs.aiResortHint')}</p>
-			{/if}
+			<div class="backfill">
+				<button type="button" class="btn-ghost" disabled={resorting} onclick={resort}>
+					<Icon name="sparkling-line" size={16} />
+					{resorting ? t('tabs.aiResorting') : t('tabs.aiResort')}
+				</button>
+				{#if resorted}
+					<span class="done">{t('tabs.aiResortDone', { count: resorted.sorted, moved: resorted.moved })}</span>
+				{/if}
+			</div>
+			<p class="card-hint">{t('tabs.aiResortHint')}</p>
 		{/if}
 	{/if}
 

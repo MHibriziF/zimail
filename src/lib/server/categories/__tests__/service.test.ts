@@ -10,7 +10,6 @@ type SetupOptions = {
 	senders?: string[];
 	/** Scripted Clef: answers each message, or `null` for a deploy without the AI binding. */
 	clef?: ((messages: TabMessage[]) => TabsOutcome) | null;
-	ai?: boolean;
 	candidates?: ResortCandidate[];
 };
 
@@ -19,7 +18,6 @@ function setup(options: SetupOptions = {}) {
 	const categoryOf = new Map<string, MailCategory>();
 	const asked: TabMessage[][] = [];
 	let tabs = true;
-	let ai = options.ai ?? false;
 	let pending = [...(options.uncategorized ?? [])];
 	const clef = options.clef === undefined ? () => ({ kind: 'sorted' as const, tabs: [] }) : options.clef;
 
@@ -41,10 +39,6 @@ function setup(options: SetupOptions = {}) {
 			return pending.slice(0, limit);
 		},
 		countUncategorized: async () => pending.length,
-		tabSettings: async () => ({ enabled: tabs, ai }),
-		async setAiTabsEnabled(_userId, enabled) {
-			ai = enabled;
-		},
 		resortCandidates: async (_userId, limit) => (options.candidates ?? []).slice(0, limit)
 	};
 
@@ -84,20 +78,14 @@ function candidate(id: string, category: MailCategory | null): ResortCandidate {
 }
 
 describe('categorizeInbound with Clef', () => {
-	test('stays on the rules, and never asks Clef, until the user turns it on', async () => {
+	test("Clef's tab wins over the rules by default, reading the body", async () => {
 		const { service, asked } = setup({ clef: always('primary') });
-		assert.equal(await service.categorizeInbound('user-1', signInLink), 'promotions');
-		assert.equal(asked.length, 0);
-	});
-
-	test("Clef's tab wins over the rules once it is on, reading the body", async () => {
-		const { service, asked } = setup({ clef: always('primary'), ai: true });
 		assert.equal(await service.categorizeInbound('user-1', signInLink), 'primary');
 		assert.equal(asked[0][0].body, 'Click to log in.');
 	});
 
 	test('replies, spam, invitations and remembered senders never reach Clef', async () => {
-		const { service, asked } = setup({ clef: always('social'), ai: true });
+		const { service, asked } = setup({ clef: always('social') });
 		await service.moveToCategory('user-1', ['m1'], 'updates');
 		assert.equal(await service.categorizeInbound('user-1', { ...signInLink, reply: true }), 'promotions');
 		assert.equal(await service.categorizeInbound('user-1', { ...signInLink, spam: true }), 'promotions');
@@ -108,20 +96,20 @@ describe('categorizeInbound with Clef', () => {
 
 	test('falls back to the rules when Clef fails, runs out, or has no answer', async () => {
 		for (const outcome of [{ kind: 'failed' }, { kind: 'limit_reached' }, { kind: 'sorted', tabs: [null] }] as TabsOutcome[]) {
-			const { service } = setup({ clef: () => outcome, ai: true });
+			const { service } = setup({ clef: () => outcome });
 			assert.equal(await service.categorizeInbound('user-1', signInLink), 'promotions');
 		}
 	});
 
 	test('switching tabs off stops Clef too', async () => {
-		const { service, asked } = setup({ clef: always('primary'), ai: true });
+		const { service, asked } = setup({ clef: always('primary') });
 		await service.setTabsEnabled('user-1', false);
 		await service.categorizeInbound('user-1', signInLink);
 		assert.equal(asked.length, 0);
 	});
 
 	test('a deploy without the AI binding uses the rules', async () => {
-		const { service } = setup({ clef: null, ai: true });
+		const { service } = setup({ clef: null });
 		assert.equal(await service.categorizeInbound('user-1', signInLink), 'promotions');
 	});
 });
@@ -130,7 +118,6 @@ describe('resortWithAi', () => {
 	test('writes only the conversations whose tab changed', async () => {
 		const { service, categoryOf, asked } = setup({
 			clef: always('updates'),
-			ai: true,
 			candidates: [candidate('a', 'promotions'), candidate('b', 'updates'), candidate('c', null)]
 		});
 		assert.deepEqual(await service.resortWithAi('user-1'), { kind: 'sorted', sorted: 3, moved: 2 });
@@ -139,7 +126,7 @@ describe('resortWithAi', () => {
 	});
 
 	test('an unsorted conversation Clef calls Primary needs no write', async () => {
-		const { service, categoryOf } = setup({ clef: always('primary'), ai: true, candidates: [candidate('a', null)] });
+		const { service, categoryOf } = setup({ clef: always('primary'), candidates: [candidate('a', null)] });
 		assert.deepEqual(await service.resortWithAi('user-1'), { kind: 'sorted', sorted: 1, moved: 0 });
 		assert.equal(categoryOf.size, 0);
 	});
@@ -147,17 +134,18 @@ describe('resortWithAi', () => {
 	test('reads at most the batch it was given', async () => {
 		const { service, asked } = setup({
 			clef: always('updates'),
-			ai: true,
 			candidates: ['a', 'b', 'c'].map((id) => candidate(id, null))
 		});
 		await service.resortWithAi('user-1', 2);
 		assert.equal(asked[0].length, 2);
 	});
 
-	test('refuses while off or unavailable, and passes the daily limit through', async () => {
-		assert.deepEqual(await setup({ clef: always('updates') }).service.resortWithAi('user-1'), { kind: 'disabled' });
-		assert.deepEqual(await setup({ clef: null, ai: true }).service.resortWithAi('user-1'), { kind: 'unavailable' });
-		const limited = setup({ clef: () => ({ kind: 'limit_reached' }), ai: true, candidates: [candidate('a', null)] });
+	test('refuses while tabs are off or AI is unavailable, and passes the daily limit through', async () => {
+		const off = setup({ clef: always('updates') });
+		await off.service.setTabsEnabled('user-1', false);
+		assert.deepEqual(await off.service.resortWithAi('user-1'), { kind: 'disabled' });
+		assert.deepEqual(await setup({ clef: null }).service.resortWithAi('user-1'), { kind: 'unavailable' });
+		const limited = setup({ clef: () => ({ kind: 'limit_reached' }), candidates: [candidate('a', null)] });
 		assert.deepEqual(await limited.service.resortWithAi('user-1'), { kind: 'limit_reached' });
 	});
 });
@@ -225,7 +213,6 @@ describe('backfill', () => {
 	test('never asks Clef, even when it is on', async () => {
 		const { service, asked } = setup({
 			clef: always('primary'),
-			ai: true,
 			uncategorized: [{ id: 'a', from: 'news@shop.test', subject: 'Sale', conversationId: 'a', existingCategory: null }]
 		});
 		await service.backfill('user-1');
@@ -248,12 +235,5 @@ describe('tabs setting', () => {
 		const { service } = setup();
 		await service.setTabsEnabled('user-1', false);
 		assert.equal(await service.tabsEnabled('user-1'), false);
-	});
-
-	test('AI sorting starts off and can be switched on', async () => {
-		const { service } = setup();
-		assert.deepEqual(await service.tabSettings('user-1'), { enabled: true, ai: false });
-		await service.setAiTabsEnabled('user-1', true);
-		assert.deepEqual(await service.tabSettings('user-1'), { enabled: true, ai: true });
 	});
 });
