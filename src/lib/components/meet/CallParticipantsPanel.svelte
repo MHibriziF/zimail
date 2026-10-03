@@ -2,6 +2,7 @@
 	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
 	import { MAX_DISPLAY_NAME_LENGTH } from '$lib/meet/display-name';
+	import { orderByRaisedHand } from '$lib/meet/raised-hands';
 	import type { ScreenSharePolicy } from '$lib/meet/screen-share';
 
 	let {
@@ -13,7 +14,14 @@
 		onSetScreenShareAllowed,
 		onClose
 	}: {
-		roster: { identity: string; name: string; isLocal: boolean; isHost: boolean; canShareScreen: boolean }[];
+		roster: {
+			identity: string;
+			name: string;
+			isLocal: boolean;
+			isHost: boolean;
+			canShareScreen: boolean;
+			handRaisedAt: number | null;
+		}[];
 		isHost: boolean;
 		screenSharePolicy: ScreenSharePolicy;
 		screenShareBusyIdentity: string;
@@ -22,6 +30,8 @@
 		onSetScreenShareAllowed: (identity: string, allowed: boolean) => void;
 		onClose: () => void;
 	} = $props();
+
+	const ordered = $derived(orderByRaisedHand(roster));
 
 	let renaming = $state(false);
 	let draftName = $state('');
@@ -79,7 +89,7 @@
 		</button>
 	</div>
 	<ul class="call-panel-list">
-		{#each roster as person (person.identity)}
+		{#each ordered as person (person.identity)}
 			<li class="call-participant-row">
 				<span class="call-participant-avatar" style="background: {colorFor(person.identity)}">
 					{initialsFor(person.name)}
@@ -104,6 +114,11 @@
 				{:else}
 					<span class="call-participant-name">{person.name}{person.isLocal ? ` · ${t('meet.you')}` : ''}</span>
 					{#if person.isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
+					{#if person.handRaisedAt !== null}
+						<span class="call-participant-hand" title={t('meet.handRaised')} role="img" aria-label={t('meet.handRaised')}>
+							<Icon name="hand" size={14} />
+						</span>
+					{/if}
 					{#if person.isLocal}
 						<button
 							type="button"
@@ -197,6 +212,18 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.call-participant-hand {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.375rem;
+		height: 1.375rem;
+		flex-shrink: 0;
+		border-radius: 999px;
+		color: #0b0b0d;
+		background: #fbbf24;
 	}
 
 	.call-rename-trigger {

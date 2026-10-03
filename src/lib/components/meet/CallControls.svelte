@@ -3,6 +3,7 @@
 	import DeviceSelect from './DeviceSelect.svelte';
 	import { t } from '$lib/i18n';
 	import type { RecordingKind } from '$lib/meet/recording-kind';
+	import { REACTIONS, type Reaction } from '$lib/meet/reactions';
 
 	let {
 		deafened,
@@ -27,6 +28,8 @@
 		recordingSaving,
 		panel,
 		rosterCount,
+		handRaised,
+		raisedHandCount,
 		unread,
 		isHost,
 		pendingAdmissionsCount,
@@ -42,6 +45,8 @@
 		onRecord,
 		onStopRecording,
 		onTogglePanel,
+		onToggleHand,
+		onSendReaction,
 		onLeave
 	}: {
 		deafened: boolean;
@@ -69,6 +74,8 @@
 		recordingSaving: boolean;
 		panel: 'none' | 'participants' | 'chat' | 'settings';
 		rosterCount: number;
+		handRaised: boolean;
+		raisedHandCount: number;
 		unread: number;
 		isHost: boolean;
 		pendingAdmissionsCount: number;
@@ -84,10 +91,21 @@
 		onRecord: (kind: RecordingKind) => void;
 		onStopRecording: () => void;
 		onTogglePanel: (next: 'participants' | 'chat' | 'settings') => void;
+		onToggleHand: () => void;
+		onSendReaction: (emoji: Reaction) => void;
 		onLeave: () => void;
 	} = $props();
 
 	let recordMenuOpen = $state(false);
+	let reactionMenuOpen = $state(false);
+	let reactionEl = $state<HTMLDivElement>();
+
+	/** The picker stays open for a burst of reactions; a click elsewhere or Escape closes it. */
+	function closeReactionMenuOutside(event: PointerEvent) {
+		if (reactionMenuOpen && !reactionEl?.contains(event.target as Node)) reactionMenuOpen = false;
+	}
+
+	const handLabel = $derived(`${handRaised ? t('meet.lowerHand') : t('meet.raiseHand')} (Ctrl+Alt+H)`);
 
 	/** One choice starts straight away; two (the host's) ask which. */
 	function pressRecord() {
@@ -108,6 +126,11 @@
 		return canShareScreen ? t('meet.screenShareOn') : t('meet.screenShareAsk');
 	});
 </script>
+
+<svelte:window
+	onpointerdown={closeReactionMenuOutside}
+	onkeydown={(event) => event.key === 'Escape' && (reactionMenuOpen = false)}
+/>
 
 <div class="call-controls">
 	<button
@@ -226,6 +249,38 @@
 			{/if}
 		</div>
 	{/if}
+	<button
+		type="button"
+		class="call-btn"
+		class:call-btn-hand={handRaised}
+		onclick={onToggleHand}
+		aria-label={handLabel}
+		aria-pressed={handRaised}
+		title={handLabel}
+	>
+		<Icon name="hand" size={20} />
+	</button>
+	<div class="call-reaction-picker" bind:this={reactionEl}>
+		<button
+			type="button"
+			class="call-btn"
+			class:call-btn-active={reactionMenuOpen}
+			onclick={() => (reactionMenuOpen = !reactionMenuOpen)}
+			aria-label={t('meet.react')}
+			aria-haspopup="menu"
+			aria-expanded={reactionMenuOpen}
+			title={t('meet.react')}
+		>
+			<Icon name="emotion-line" size={20} />
+		</button>
+		{#if reactionMenuOpen}
+			<div class="call-reaction-menu" role="menu">
+				{#each REACTIONS as emoji (emoji)}
+					<button type="button" role="menuitem" onclick={() => onSendReaction(emoji)}>{emoji}</button>
+				{/each}
+			</div>
+		{/if}
+	</div>
 	{#if pipSupported}
 		<button
 			type="button"
@@ -246,6 +301,11 @@
 	>
 		<Icon name="group-line" size={20} />
 		{#if rosterCount > 0}<span class="call-btn-badge">{rosterCount}</span>{/if}
+		{#if raisedHandCount > 0}
+			<span class="call-btn-badge call-btn-badge-hand" title={t('meet.raisedHandsCount', { count: raisedHandCount })}>
+				<Icon name="hand" size={10} />{raisedHandCount}
+			</span>
+		{/if}
 	</button>
 	<button
 		type="button"
@@ -276,7 +336,9 @@
 
 <style>
 	.call-controls {
+		position: relative;
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: center;
 		gap: 0.75rem;
 		padding-bottom: 0.5rem;
@@ -390,6 +452,63 @@
 		color: #a1a1aa;
 	}
 
+	.call-btn-hand {
+		color: #0b0b0d;
+		background: #fbbf24;
+	}
+
+	.call-btn-hand:hover {
+		background: #fcd34d;
+	}
+
+	.call-reaction-picker {
+		position: relative;
+	}
+
+	.call-reaction-menu {
+		position: absolute;
+		bottom: calc(100% + 0.5rem);
+		left: 50%;
+		z-index: 20;
+		display: flex;
+		gap: 0.125rem;
+		padding: 0.375rem;
+		border-radius: 999px;
+		background: #1f1f23;
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+		transform: translateX(-50%);
+	}
+
+	.call-reaction-menu button {
+		width: 2.5rem;
+		height: 2.5rem;
+		border: none;
+		border-radius: 999px;
+		font-size: 1.375rem;
+		line-height: 1;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.call-reaction-menu button:hover,
+	.call-reaction-menu button:focus-visible {
+		background: #34343a;
+	}
+
+	/* The button can sit near either edge once the bar wraps, so center the picker on the bar instead. */
+	@media (max-width: 640px) {
+		.call-reaction-picker {
+			position: static;
+		}
+
+		.call-reaction-menu {
+			flex-wrap: wrap;
+			justify-content: center;
+			width: 11.5rem;
+			border-radius: 1.25rem;
+		}
+	}
+
 	.call-btn-recording {
 		color: #fff;
 		background: #dc2626;
@@ -440,6 +559,14 @@
 		background: #52525b;
 		font-size: 0.625rem;
 		font-weight: 600;
+	}
+
+	.call-btn-badge-hand {
+		right: auto;
+		left: -2px;
+		gap: 0.125rem;
+		color: #0b0b0d;
+		background: #fbbf24;
 	}
 
 	.call-btn-badge-alert {
