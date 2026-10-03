@@ -939,7 +939,14 @@
 		"sortExisting": "整理较早的邮件",
 		"sorting": "正在整理…已完成 {count} 个",
 		"sortDone": "已整理 {count} 个会话。",
-		"sortHint": "启用标签页之前的邮件会留在“主要”，直到整理；整理只依据发件人和主题。"
+		"sortHint": "启用标签页之前的邮件会留在“主要”，直到整理；整理只依据发件人和主题。",
+		"aiEnable": "用 AI 分类标签页",
+		"aiHint": "Clef 是 Cloudflare 自己的模型，会读取每个新会话的发件人、主题和正文开头，按照 Gmail 的定义选择标签页。它在你自己的 Cloudflare 账户中的 Workers AI 上运行，邮件不会发送到其他任何地方，每个会话大约消耗每日 10,000 个免费神经元中的 5 个。回复、垃圾邮件以及你自己移动过的发件人不会经过它。额度用完后，将由规则分类邮件，直到额度重置。",
+		"aiResort": "用 AI 重新分类最近的邮件",
+		"aiResorting": "正在重新分类…",
+		"aiResortDone": "已检查 {count} 个会话，移动了 {moved} 个。",
+		"aiResortHint": "重新分类收件箱中最新的 50 个会话，跳过你自己移动过的发件人。每次点击约 300 个神经元。",
+		"aiResortFailed": "AI 无法分类你的邮件，请稍后再试。"
 	},
 	"calendar": {
 		"title": "日历 — {app}",

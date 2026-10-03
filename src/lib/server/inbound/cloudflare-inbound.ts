@@ -12,10 +12,11 @@ import {
 	type StoredAttachment,
 	type TelegramNotificationEnv
 } from '../telegram-notify';
-import { stripHtml } from '../util/html';
+import { plainBody } from '../util/html';
 import { isCalendarAttachment } from '../../utils/attachments';
 import { applyArrivedInvitation, hasBytes } from '../invitations';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
+import type { AiBinding } from '../ai/service';
 import { categoriesServiceForDb, pickClassifyHeaders } from '../categories';
 
 export type CloudflareInboundMessage = {
@@ -29,6 +30,8 @@ export type CloudflareInboundMessage = {
 export type CloudflareInboundEnv = PushNotificationEnv &
 	TelegramNotificationEnv & {
 		ATTACHMENTS: R2Bucket;
+		/** Sorts inbox tabs with Clef when the user turned that on. */
+		AI?: AiBinding;
 	};
 
 /**
@@ -84,7 +87,7 @@ export async function handleCloudflareInbound(
 				from,
 				to: recipients.join(', ') || envelopeTo || '(unknown)',
 				subject,
-				body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+				body: plainBody(parsed.text, parsed.html),
 				unrouted: true
 			});
 		}
@@ -96,11 +99,15 @@ export async function handleCloudflareInbound(
 		message.headers.get('arc-authentication-results')
 	]);
 
-	const category = await categoriesServiceForDb(env.DB).categorizeInbound(route.userId, {
+	const category = await categoriesServiceForDb(env.DB, env.AI).categorizeInbound(route.userId, {
 		from,
+		fromName: sender?.name ?? null,
 		subject,
+		body: plainBody(parsed.text, parsed.html),
 		headers: pickClassifyHeaders((name) => message.headers.get(name)),
-		calendar: parsed.attachments.some((attachment) => isCalendarAttachment(attachment.mimeType, attachment.filename ?? ''))
+		calendar: parsed.attachments.some((attachment) => isCalendarAttachment(attachment.mimeType, attachment.filename ?? '')),
+		reply: Boolean(inReplyTo || references),
+		spam
 	});
 
 	const emailId = await insertEmail(env.DB, {
@@ -137,7 +144,7 @@ export async function handleCloudflareInbound(
 		from: sender?.name ? `${sender.name} <${from}>` : from,
 		to: route.address,
 		subject,
-		body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+		body: plainBody(parsed.text, parsed.html),
 		attachments: storedAttachments,
 		emailId
 	});

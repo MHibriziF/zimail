@@ -57,6 +57,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			{
 				DB: db,
 				ATTACHMENTS: bucket,
+				AI: platform?.env.AI,
 				VAPID_PUBLIC_KEY: platform?.env.VAPID_PUBLIC_KEY,
 				VAPID_PRIVATE_KEY: platform?.env.VAPID_PRIVATE_KEY,
 				VAPID_SUBJECT: platform?.env.VAPID_SUBJECT,

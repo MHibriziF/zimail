@@ -939,7 +939,14 @@
 		"sortExisting": "Ordenar correo anterior",
 		"sorting": "Ordenando… {count} listos",
 		"sortDone": "{count} conversaciones ordenadas.",
-		"sortHint": "El correo anterior a las pestañas queda en Principal hasta ordenarlo; solo se usan el remitente y el asunto."
+		"sortHint": "El correo anterior a las pestañas queda en Principal hasta ordenarlo; solo se usan el remitente y el asunto.",
+		"aiEnable": "Ordenar pestañas con IA",
+		"aiHint": "Clef, el modelo propio de Cloudflare, lee el remitente, el asunto y el inicio de cada conversación nueva para elegir su pestaña, según las definiciones de Gmail. Se ejecuta en Workers AI dentro de tu propia cuenta de Cloudflare, así que el correo no se envía a ningún otro sitio, y usa unas 5 de las 10.000 neuronas gratuitas diarias por conversación. Las respuestas, el spam y los remitentes que moviste tú no pasan por él. Si se agota la cuota, las reglas ordenan el correo hasta que se restablezca.",
+		"aiResort": "Reordenar el correo reciente con IA",
+		"aiResorting": "Reordenando…",
+		"aiResortDone": "{count} conversaciones revisadas, {moved} movidas.",
+		"aiResortHint": "Reordena las 50 conversaciones más recientes de la bandeja de entrada, salvo los remitentes que moviste tú. Unas 300 neuronas por clic.",
+		"aiResortFailed": "La IA no pudo ordenar tu correo. Inténtalo más tarde."
 	},
 	"calendar": {
 		"title": "Calendario — {app}",

@@ -1,4 +1,5 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { AiBinding } from '$lib/server/ai/service';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
 
 declare global {
@@ -7,6 +8,7 @@ declare global {
 		ATTACHMENTS: R2Bucket;
 		ASSETS: Fetcher;
 		EMAIL: CloudflareSendEmailBinding;
+		AI?: AiBinding;
 		EMAIL_PROVIDER?: string;
 		CLOUDFLARE_MAIL_DOMAINS?: string;
 		RESEND_API_KEY: string;

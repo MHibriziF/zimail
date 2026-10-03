@@ -1,5 +1,9 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { MAIL_CATEGORIES, type MailCategory } from '../../mail/categories';
+import { MAIL_CATEGORIES, parseMailCategory, type MailCategory } from '../../mail/categories';
+
+/** The model reads 2,000 characters; HTML needs room for its markup before it is stripped. */
+const RESORT_TEXT_CHARS = 2_000;
+const RESORT_HTML_CHARS = 20_000;
 
 export type UncategorizedMessage = {
 	id: string;
@@ -10,12 +14,30 @@ export type UncategorizedMessage = {
 	existingCategory: MailCategory | null;
 };
 
+export type TabSettings = { enabled: boolean; ai: boolean };
+
+/** The first message of an inbox conversation, with enough of it for the model to read. */
+export type ResortCandidate = {
+	id: string;
+	from: string;
+	fromName: string | null;
+	subject: string;
+	bodyText: string | null;
+	/** Only when there is no plain-text body. */
+	bodyHtml: string | null;
+	category: MailCategory | null;
+};
+
 export type CategoriesRepository = {
 	senderCategory(userId: string, address: string): Promise<MailCategory | null>;
 	rememberSender(userId: string, addresses: string[], category: MailCategory): Promise<void>;
 	inboundSenders(userId: string, emailIds: string[]): Promise<string[]>;
 	tabsEnabled(userId: string): Promise<boolean>;
 	setTabsEnabled(userId: string, enabled: boolean): Promise<void>;
+	tabSettings(userId: string): Promise<TabSettings>;
+	setAiTabsEnabled(userId: string, enabled: boolean): Promise<void>;
+	/** The newest inbox conversations whose sender the user never sorted by hand. */
+	resortCandidates(userId: string, limit: number): Promise<ResortCandidate[]>;
 	/** The oldest still-unsorted inbound message of each conversation that has one. */
 	uncategorized(userId: string, limit: number): Promise<UncategorizedMessage[]>;
 	countUncategorized(userId: string): Promise<number>;
@@ -68,6 +90,53 @@ export function createD1CategoriesRepository(db: D1Database): CategoriesReposito
 
 		async setTabsEnabled(userId, enabled) {
 			await db.prepare('UPDATE users SET inbox_tabs = ? WHERE id = ?').bind(enabled ? 1 : 0, userId).run();
+		},
+
+		async tabSettings(userId) {
+			const row = await db
+				.prepare('SELECT inbox_tabs, ai_inbox_tabs FROM users WHERE id = ?')
+				.bind(userId)
+				.first<{ inbox_tabs: number; ai_inbox_tabs: number }>();
+			return { enabled: row?.inbox_tabs !== 0, ai: row?.ai_inbox_tabs === 1 };
+		},
+
+		async setAiTabsEnabled(userId, enabled) {
+			await db.prepare('UPDATE users SET ai_inbox_tabs = ? WHERE id = ?').bind(enabled ? 1 : 0, userId).run();
+		},
+
+		async resortCandidates(userId, limit) {
+			const { results } = await db
+				.prepare(
+					`SELECT e.id, e.from_addr, e.from_name, e.subject, substr(e.body_text, 1, ?) AS body_text,
+					        CASE WHEN e.body_text IS NULL THEN substr(e.body_html, 1, ?) END AS body_html, e.category
+					 FROM emails e
+					 WHERE e.user_id = ? AND e.direction = 'inbound' AND COALESCE(e.thread_id, e.id) = e.id
+					   AND e.deleted_at IS NULL AND e.archived_at IS NULL AND e.spam_at IS NULL
+					   AND NOT EXISTS (
+					     SELECT 1 FROM sender_categories s WHERE s.user_id = e.user_id AND s.address = lower(e.from_addr)
+					   )
+					 ORDER BY e.created_at DESC
+					 LIMIT ?`
+				)
+				.bind(RESORT_TEXT_CHARS, RESORT_HTML_CHARS, userId, limit)
+				.all<{
+					id: string;
+					from_addr: string;
+					from_name: string | null;
+					subject: string;
+					body_text: string | null;
+					body_html: string | null;
+					category: string | null;
+				}>();
+			return results.map((row) => ({
+				id: row.id,
+				from: row.from_addr,
+				fromName: row.from_name,
+				subject: row.subject,
+				bodyText: row.body_text,
+				bodyHtml: row.body_html,
+				category: parseMailCategory(row.category) ?? null
+			}));
 		},
 
 		async uncategorized(userId, limit) {

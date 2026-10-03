@@ -46,6 +46,7 @@ export default {
 		const inboundEnv: CloudflareInboundEnv = {
 			DB: env.DB,
 			ATTACHMENTS: env.ATTACHMENTS,
+			AI: env.AI,
 			VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY,
 			VAPID_PRIVATE_KEY: env.VAPID_PRIVATE_KEY,
 			VAPID_SUBJECT: env.VAPID_SUBJECT,
