@@ -939,7 +939,14 @@
 		"sortExisting": "Urutkan email lama",
 		"sorting": "Mengurutkan… {count} selesai",
 		"sortDone": "{count} percakapan telah diurutkan.",
-		"sortHint": "Email dari sebelum ada tab tetap di Utama sampai diurutkan. Pengurutannya hanya memakai pengirim dan subjek."
+		"sortHint": "Email dari sebelum ada tab tetap di Utama sampai diurutkan. Pengurutannya hanya memakai pengirim dan subjek.",
+		"aiEnable": "Pilah tab dengan AI",
+		"aiHint": "Clef, model milik Cloudflare sendiri, membaca pengirim, subjek, dan awal setiap percakapan baru untuk memilih tabnya, mengikuti definisi Gmail. Model ini berjalan di Workers AI pada akun Cloudflare Anda sendiri, jadi email tidak dikirim ke tempat lain, dan memakai sekitar 5 dari 10.000 neuron gratis harian per percakapan. Balasan, spam, dan pengirim yang sudah Anda pindahkan sendiri dilewati. Jika jatah habis, aturan biasa memilah email sampai jatah direset.",
+		"aiResort": "Pilah ulang email terbaru dengan AI",
+		"aiResorting": "Memilah ulang…",
+		"aiResortDone": "{count} percakapan diperiksa, {moved} dipindahkan.",
+		"aiResortHint": "Memilah ulang 50 percakapan terbaru di kotak masuk, kecuali pengirim yang sudah Anda pindahkan sendiri. Sekitar 300 neuron per klik.",
+		"aiResortFailed": "AI tidak dapat memilah email Anda. Coba lagi nanti."
 	},
 	"calendar": {
 		"title": "Kalender — {app}",

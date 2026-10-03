@@ -939,7 +939,14 @@
 		"sortExisting": "Sort earlier mail",
 		"sorting": "Sorting… {count} done",
 		"sortDone": "Sorted {count} conversations.",
-		"sortHint": "Mail from before tabs existed sits in Primary until sorted. Sorting it uses the sender and subject only."
+		"sortHint": "Mail from before tabs existed sits in Primary until sorted. Sorting it uses the sender and subject only.",
+		"aiEnable": "Sort tabs with AI",
+		"aiHint": "Clef, Cloudflare's own model, reads the sender, subject and start of each new conversation to pick its tab, following Gmail's definitions. It runs on Workers AI in your own Cloudflare account, so mail isn't sent anywhere else, and uses about 5 of the free 10,000 daily neurons per conversation. Replies, spam and senders you've moved yourself skip it. If the allowance runs out, the rules sort mail until it resets.",
+		"aiResort": "Re-sort recent mail with AI",
+		"aiResorting": "Re-sorting…",
+		"aiResortDone": "Checked {count} conversations, moved {moved}.",
+		"aiResortHint": "Re-sorts the newest 50 inbox conversations, skipping senders you've moved yourself. About 300 neurons a click.",
+		"aiResortFailed": "The AI couldn't sort your mail. Try again later."
 	},
 	"calendar": {
 		"title": "Calendar — {app}",

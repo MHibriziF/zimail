@@ -10,7 +10,17 @@
 	let sorting = $state(false);
 	let sorted = $state(0);
 	let remaining = $state<number | null>(null);
+	let ai = $state(false);
+	let aiAvailable = $state(false);
+	let aiBusy = $state(false);
+	let resorting = $state(false);
+	let resorted = $state<{ sorted: number; moved: number } | null>(null);
 	let error = $state('');
+
+	const RESORT_ERRORS: Record<string, string> = {
+		limit_reached: 'ai.limitReached',
+		unavailable: 'ai.unavailable'
+	};
 
 	async function post(body: unknown): Promise<Record<string, unknown>> {
 		const response = await fetch('/api/settings/inbox-tabs', {
@@ -26,8 +36,10 @@
 	onMount(async () => {
 		try {
 			const response = await fetch('/api/settings/inbox-tabs');
-			const body = (await response.json()) as { enabled?: boolean };
+			const body = (await response.json()) as { enabled?: boolean; ai?: boolean; aiAvailable?: boolean };
 			enabled = body.enabled !== false;
+			ai = body.ai === true;
+			aiAvailable = body.aiAvailable === true;
 		} catch {
 			// Keep the default; the switch still works.
 		} finally {
@@ -47,6 +59,47 @@
 			error = failure instanceof Error ? failure.message : t('common.networkError');
 		} finally {
 			busy = false;
+		}
+	}
+
+	async function toggleAi() {
+		if (aiBusy) return;
+		aiBusy = true;
+		error = '';
+		try {
+			await post({ ai: !ai });
+			ai = !ai;
+			resorted = null;
+		} catch (failure) {
+			error = failure instanceof Error ? failure.message : t('common.networkError');
+		} finally {
+			aiBusy = false;
+		}
+	}
+
+	/** One capped batch per click: each click spends neurons, so it never loops on its own. */
+	async function resort() {
+		if (resorting) return;
+		resorting = true;
+		resorted = null;
+		error = '';
+		try {
+			const response = await fetch('/api/settings/inbox-tabs', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ resort: true })
+			});
+			const body = (await response.json().catch(() => ({}))) as { sorted?: number; moved?: number; error?: string };
+			if (!response.ok) {
+				error = t(RESORT_ERRORS[body.error ?? ''] ?? 'tabs.aiResortFailed');
+				return;
+			}
+			resorted = { sorted: body.sorted ?? 0, moved: body.moved ?? 0 };
+			await invalidateAll();
+		} catch {
+			error = t('common.networkError');
+		} finally {
+			resorting = false;
 		}
 	}
 
@@ -92,6 +145,27 @@
 			{/if}
 		</div>
 		<p class="card-hint">{t('tabs.sortHint')}</p>
+
+		{#if aiAvailable}
+			<label class="switch-row">
+				<input type="checkbox" checked={ai} disabled={!loaded || aiBusy} onchange={toggleAi} />
+				<span>{t('tabs.aiEnable')}</span>
+			</label>
+			<p class="card-hint">{t('tabs.aiHint')}</p>
+
+			{#if ai}
+				<div class="backfill">
+					<button type="button" class="btn-ghost" disabled={resorting} onclick={resort}>
+						<Icon name="sparkling-line" size={16} />
+						{resorting ? t('tabs.aiResorting') : t('tabs.aiResort')}
+					</button>
+					{#if resorted}
+						<span class="done">{t('tabs.aiResortDone', { count: resorted.sorted, moved: resorted.moved })}</span>
+					{/if}
+				</div>
+				<p class="card-hint">{t('tabs.aiResortHint')}</p>
+			{/if}
+		{/if}
 	{/if}
 
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
