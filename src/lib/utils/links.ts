@@ -1,6 +1,14 @@
 const ALLOWED_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const HAS_SCHEME = /^[a-z][a-z\d+.-]*:/i;
-const EMAIL = /^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/;
+
+/** `someone@example.com`: one @, something on each side, and a dot inside the domain. */
+function looksLikeEmail(value: string): boolean {
+	const parts = value.split('@');
+	if (parts.length !== 2 || value.includes('/')) return false;
+	const [local, domain] = parts;
+	const dot = domain.indexOf('.');
+	return local.length > 0 && dot > 0 && dot < domain.length - 1;
+}
 
 /**
  * Turns what someone typed into a link the editor may insert, or null. A bare address gets
@@ -13,7 +21,7 @@ export function normalizeLinkUrl(input: string): string | null {
 
 	let candidate = value;
 	if (!HAS_SCHEME.test(value)) {
-		candidate = EMAIL.test(value) ? `mailto:${value}` : `https://${value.replace(/^\/+/, '')}`;
+		candidate = looksLikeEmail(value) ? `mailto:${value}` : `https://${value.replace(/^\/+/, '')}`;
 	}
 
 	try {
