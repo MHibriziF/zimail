@@ -1,0 +1,43 @@
+name: Feature
+description: A new feature or a change to an existing one.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is missing or awkward today, and for whom.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The behaviour you want, and how it could be built.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: cost
+    attributes:
+      label: Cost
+      description: >-
+        Needed if it runs on a schedule, changes how much or how often D1 is written, adds schema or a
+        new service, or uses a metered or free-tier quota (D1, R2, Workers AI neurons, LiveKit).
+        Runs per day × work per run, at today's data size and at 100×.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: Both themes (Classic and Zero)
+        - label: Strings in all five `messages/*.json`
+        - label: Free, and sends no mail content to a third party
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: How we know it's finished.

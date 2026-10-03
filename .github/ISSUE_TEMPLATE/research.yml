@@ -1,0 +1,31 @@
+name: Research
+description: A question to investigate before deciding what to build.
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What we want to find out, and why now.
+    validations:
+      required: true
+  - type: textarea
+    id: candidates
+    attributes:
+      label: Candidates to look at
+      description: Options, services or approaches to compare.
+  - type: textarea
+    id: answer
+    attributes:
+      label: What a useful answer looks like
+      description: For each candidate, what it enables, cost (free-tier limits, today and at 100×), privacy, infrastructure needed, effort, and a recommendation.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      value: |
+        - Free, or within a free tier that stops rather than bills.
+        - No mail or meeting content to a third party without asking first.
+        - Runs on Cloudflare Workers unless there's a reason it can't.
