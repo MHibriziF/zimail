@@ -119,6 +119,8 @@
 	let remoteContainerEl = $state<HTMLDivElement>();
 	let connecting = $state(true);
 	let connectionError = $state('');
+	/** Until connect() settles: a Disconnected event then means it failed, not that the call ended. */
+	let awaitingConnect = false;
 	let micEnabled = $state(untrack(() => initialMicEnabled));
 	let cameraEnabled = $state(untrack(() => initialCameraEnabled));
 	let micDeviceId = $state(untrack(() => initialMicDeviceId));
@@ -879,6 +881,44 @@
 		return () => navigator.mediaDevices.removeEventListener('devicechange', loadSpeakerDevices);
 	});
 
+	async function connectToRoom(instance: Room) {
+		connecting = true;
+		connectionError = '';
+		awaitingConnect = true;
+		try {
+			await instance.connect(url, token);
+			awaitingConnect = false;
+			isHost = isHostIdentity(instance.localParticipant.identity);
+			if (isHost) void loadMeetingSettings();
+			if (deafened) syncDeafenedAttribute('1');
+			canShareScreen = mayShareScreen(instance.localParticipant);
+			// Who's already here shows while our own devices are still starting.
+			for (const participant of instance.remoteParticipants.values()) {
+				ensureRemoteTile(participant);
+				readHostScreenShareSettings(participant);
+			}
+			refreshRoster();
+			// A device that won't start is the caller's to fix, not a failed connection.
+			if (micEnabled) await enableMic();
+			if (cameraEnabled) await enableCamera();
+			playJoinChime();
+		} catch (error) {
+			connectionError = error instanceof Error ? error.message : t('meet.connectionError');
+		} finally {
+			awaitingConnect = false;
+			connecting = false;
+		}
+	}
+
+	/** A failed connect fires Disconnected too; that one stays on the stage as an error with Retry. */
+	function handleDisconnected() {
+		if (!awaitingConnect) onleave();
+	}
+
+	function retryConnect() {
+		if (room && !connecting) void connectToRoom(room);
+	}
+
 	onMount(() => {
 		const instance = new Room();
 		room = instance;
@@ -887,7 +927,7 @@
 		instance.on(RoomEvent.TrackUnsubscribed, detachRemoteTrack);
 		instance.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
 		instance.on(RoomEvent.ParticipantDisconnected, removeParticipantTile);
-		instance.on(RoomEvent.Disconnected, onleave);
+		instance.on(RoomEvent.Disconnected, handleDisconnected);
 		instance.on(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
 		instance.on(RoomEvent.LocalTrackUnpublished, handleLocalTrackUnpublished);
 		instance.on(RoomEvent.TrackMuted, handleTrackMuteChanged);
@@ -918,35 +958,14 @@
 			screenShareRequests = screenShareRequests.filter((request) => request.identity !== participantInfo.identity);
 		});
 
-		(async () => {
-			try {
-				await instance.connect(url, token);
-				isHost = isHostIdentity(instance.localParticipant.identity);
-				if (isHost) void loadMeetingSettings();
-				if (deafened) syncDeafenedAttribute('1');
-				// A device that won't start is the caller's to fix, not a failed connection.
-				if (micEnabled) await enableMic();
-				if (cameraEnabled) await enableCamera();
-				canShareScreen = mayShareScreen(instance.localParticipant);
-				for (const participant of instance.remoteParticipants.values()) {
-					ensureRemoteTile(participant);
-					readHostScreenShareSettings(participant);
-				}
-				refreshRoster();
-				playJoinChime();
-			} catch (error) {
-				connectionError = error instanceof Error ? error.message : t('meet.connectionError');
-			} finally {
-				connecting = false;
-			}
-		})();
+		void connectToRoom(instance);
 
 		return () => {
 			instance.off(RoomEvent.TrackSubscribed, attachRemoteTrack);
 			instance.off(RoomEvent.TrackUnsubscribed, detachRemoteTrack);
 			instance.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
 			instance.off(RoomEvent.ParticipantDisconnected, removeParticipantTile);
-			instance.off(RoomEvent.Disconnected, onleave);
+			instance.off(RoomEvent.Disconnected, handleDisconnected);
 			instance.off(RoomEvent.LocalTrackPublished, handleLocalTrackPublished);
 			instance.off(RoomEvent.LocalTrackUnpublished, handleLocalTrackUnpublished);
 			instance.off(RoomEvent.TrackMuted, handleTrackMuteChanged);
@@ -1516,11 +1535,6 @@
 <div class="call-stage">
 	<div class="call-header">
 		<span class="call-header-name">{localName}</span>
-		{#if connecting}
-			<span class="call-header-status">{t('meet.connecting')}</span>
-		{:else if connectionError}
-			<span class="call-header-status call-header-status-error">{connectionError}</span>
-		{/if}
 		{#if screenShareRequested}
 			<span class="call-header-notice call-header-waiting" role="status">
 				<Icon name="computer-line" size={14} />
@@ -1578,7 +1592,7 @@
 					<span class="call-tile-label">{t('meet.you')} · {t('meet.screenShare')}</span>
 				</span>
 			</div>
-			<div class="call-tile call-tile-local">
+			<div class="call-tile call-tile-local" class:call-tile-joining={connecting || connectionError}>
 				<div class="call-tile-avatar" style="background: {localColor}">{localInitials}</div>
 				<div class="call-tile-media" bind:this={localMediaEl}></div>
 				<div class="call-tile-status">
@@ -1590,6 +1604,23 @@
 					<span class="call-tile-label">{localName} · {t('meet.you')}</span>
 					{#if isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
 				</span>
+				{#if connectionError}
+					<div class="call-joining" role="alert">
+						<Icon name="error-warning-line" size={22} />
+						<p class="call-joining-title">{t('meet.connectionError')}</p>
+						{#if connectionError !== t('meet.connectionError')}
+							<p class="call-joining-detail">{connectionError}</p>
+						{/if}
+						<button type="button" class="call-joining-retry" onclick={retryConnect}>{t('common.tryAgain')}</button>
+					</div>
+				{:else if connecting}
+					<div class="call-joining" role="status">
+						<span class="call-joining-spinner" aria-hidden="true"></span>
+						<p class="call-joining-title">
+							{meetingCode ? t('meet.joiningCode', { code: meetingCode }) : t('meet.joining')}
+						</p>
+					</div>
+				{/if}
 			</div>
 			<div class="call-tile-group" bind:this={remoteContainerEl}></div>
 			{#if !connecting && !connectionError && remoteCount === 0}
@@ -1708,15 +1739,6 @@
 		font-weight: 600;
 	}
 
-	.call-header-status {
-		font-size: 0.8125rem;
-		color: rgba(255, 255, 255, 0.6);
-	}
-
-	.call-header-status-error {
-		color: #f87171;
-	}
-
 	.call-header-notice {
 		margin-left: auto;
 		padding: 0.25rem 0.75rem;
@@ -1787,9 +1809,104 @@
 		flex: 1;
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		justify-items: center;
 		gap: 0.75rem;
-		align-content: start;
+		align-content: safe center;
 		min-width: 0;
+	}
+
+	.call-tile-joining .call-tile-avatar {
+		color: transparent;
+	}
+
+	.call-joining {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 1rem;
+		text-align: center;
+		background: rgba(11, 11, 13, 0.6);
+		color: #fff;
+	}
+
+	.call-joining-title {
+		margin: 0;
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+
+	.call-joining-detail {
+		margin: 0;
+		max-width: 32ch;
+		font-size: 0.75rem;
+		color: rgba(255, 255, 255, 0.65);
+		overflow-wrap: anywhere;
+	}
+
+	.call-joining-retry {
+		margin-top: 0.25rem;
+		padding: 0.375rem 1rem;
+		border: none;
+		border-radius: 999px;
+		font-size: 0.8125rem;
+		font-weight: 600;
+		color: #0b0b0d;
+		background: #fff;
+		cursor: pointer;
+	}
+
+	.call-joining-retry:focus-visible {
+		outline: 2px solid rgba(255, 255, 255, 0.6);
+		outline-offset: 2px;
+	}
+
+	.call-joining-spinner {
+		width: 2rem;
+		height: 2rem;
+		border-radius: 50%;
+		border: 3px solid rgba(255, 255, 255, 0.2);
+		border-top-color: #fff;
+		animation: call-spin 0.9s linear infinite;
+	}
+
+	@keyframes call-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	/* Tiles arriving after the stage is up fade in rather than popping into the grid. */
+	.call-tile-group > :global(.call-tile),
+	:global(.call-tile-placeholder) {
+		animation: call-tile-in 0.25s ease-out;
+	}
+
+	@keyframes call-tile-in {
+		from {
+			opacity: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.call-joining-spinner {
+			animation: call-pulse 2s ease-in-out infinite;
+			border-top-color: rgba(255, 255, 255, 0.2);
+		}
+
+		.call-tile-group > :global(.call-tile),
+		:global(.call-tile-placeholder) {
+			animation: none;
+		}
+	}
+
+	@keyframes call-pulse {
+		50% {
+			opacity: 0.4;
+		}
 	}
 
 	/*
@@ -1803,6 +1920,8 @@
 		position: relative;
 		aspect-ratio: 16 / 9;
 		width: 100%;
+		/* auto-fit gives a lone tile the whole row; past this it reads as broken, not big. */
+		max-width: 640px;
 		border-radius: 0.75rem;
 		background: #1c1c1f;
 		overflow: hidden;
@@ -1876,6 +1995,7 @@
 	:global(.call-tile-featured) {
 		grid-column: 1 / -1;
 		order: -1;
+		max-width: none;
 		max-height: 65vh;
 		cursor: default;
 	}
