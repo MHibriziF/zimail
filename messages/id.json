@@ -302,7 +302,14 @@
 		"historyHint": "50 percakapan terakhir Anda disimpan. Menghapus satu akan menghilangkannya selamanya.",
 		"deleteConversation": "Hapus percakapan",
 		"deleteConversationTitle": "Hapus percakapan?",
-		"deleteConversationMessage": "Obrolan ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan."
+		"deleteConversationMessage": "Obrolan ini akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+		"draftNew": "Acara baru",
+		"draftInvites": "Mengundang {guests}",
+		"draftOverlaps": "Bentrok dengan {events}",
+		"draftAdd": "Tambahkan ke kalender",
+		"draftAdding": "Menambahkan…",
+		"draftAdded": "Ditambahkan · Buka kalender",
+		"draftFailed": "Acara tidak dapat ditambahkan. Coba lagi."
 	},
 	"compose": {
 		"title": "Tulis — {app}",

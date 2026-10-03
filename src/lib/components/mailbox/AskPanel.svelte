@@ -25,7 +25,26 @@
 		calendar: string | null;
 		day: string;
 	};
-	type Turn = { role: 'user' | 'assistant'; content: string; messages?: Found[]; events?: FoundEvent[] };
+	/** An event Ask AI prepared; nothing is saved until the user presses Add. */
+	type Draft = {
+		title: string;
+		start: string;
+		end: string;
+		allDay: boolean;
+		location: string | null;
+		guests: string[];
+		day: string;
+		conflicts: string[];
+		status?: 'adding' | 'added' | 'failed';
+		error?: string;
+	};
+	type Turn = {
+		role: 'user' | 'assistant';
+		content: string;
+		messages?: Found[];
+		events?: FoundEvent[];
+		drafts?: Draft[];
+	};
 	type Saved = { id: string; title: string; updatedAt: string };
 
 	let {
@@ -88,6 +107,7 @@
 				answer?: string;
 				messages?: Found[];
 				events?: FoundEvent[];
+				drafts?: Draft[];
 				conversationId?: string;
 				error?: string;
 			};
@@ -99,7 +119,13 @@
 			saved = null;
 			turns = [
 				...turns,
-				{ role: 'assistant', content: body.answer, messages: body.messages ?? [], events: body.events ?? [] }
+				{
+					role: 'assistant',
+					content: body.answer,
+					messages: body.messages ?? [],
+					events: body.events ?? [],
+					drafts: body.drafts ?? []
+				}
 			];
 		} catch {
 			error = t('common.networkError');
@@ -179,8 +205,39 @@
 		return `${folder}?thread=${encodeURIComponent(message.id)}`;
 	}
 
+	/** Saves a prepared event through the normal calendar API: the only way Ask AI's events get saved. */
+	async function addDraft(draft: Draft) {
+		if (draft.status === 'adding' || draft.status === 'added') return;
+		draft.status = 'adding';
+		draft.error = undefined;
+		try {
+			const response = await fetch('/api/calendar/events', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					title: draft.title,
+					start: draft.start,
+					end: draft.end,
+					allDay: draft.allDay,
+					location: draft.location ?? '',
+					guests: draft.guests
+				})
+			});
+			if (response.ok) {
+				draft.status = 'added';
+				return;
+			}
+			const body = (await response.json().catch(() => ({}))) as { error?: string };
+			draft.status = 'failed';
+			draft.error = body.error ?? t('ai.draftFailed');
+		} catch {
+			draft.status = 'failed';
+			draft.error = t('common.networkError');
+		}
+	}
+
 	/** "Thu, Oct 1 · 09:00 – 09:30" in the reader's zone; all-day events are floating dates. */
-	function when(event: FoundEvent): string {
+	function when(event: Pick<FoundEvent, 'start' | 'end' | 'allDay'>): string {
 		if (event.allDay) {
 			const day = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
 			return `${day.format(new Date(event.start))} · ${t('calendar.allDay')}`;
@@ -286,6 +343,37 @@
 								<span class="ask-card-subject">{event.title}</span>
 								{#if event.location}<span class="ask-card-place">{event.location}</span>{/if}
 							</a>
+						{/each}
+						{#each turn.drafts ?? [] as draft, draftIndex (draftIndex)}
+							<div class="ask-card event ask-draft">
+								<span class="ask-card-top">
+									<span class="ask-card-who">{when(draft)}</span>
+									<span class="ask-card-date">{t('ai.draftNew')}</span>
+								</span>
+								<span class="ask-card-subject">{draft.title}</span>
+								{#if draft.location}<span class="ask-card-place">{draft.location}</span>{/if}
+								{#if draft.guests.length > 0}
+									<span class="ask-draft-note">{t('ai.draftInvites', { guests: draft.guests.join(', ') })}</span>
+								{/if}
+								{#if draft.conflicts.length > 0}
+									<span class="ask-draft-note warn">{t('ai.draftOverlaps', { events: draft.conflicts.join(', ') })}</span>
+								{/if}
+								{#if draft.status === 'added'}
+									<a class="ask-draft-done" href="/calendar?day={draft.day}" onclick={() => (open = false)}>
+										{t('ai.draftAdded')}
+									</a>
+								{:else}
+									<button
+										type="button"
+										class="ask-draft-add"
+										disabled={draft.status === 'adding'}
+										onclick={() => addDraft(draft)}
+									>
+										{draft.status === 'adding' ? t('ai.draftAdding') : t('ai.draftAdd')}
+									</button>
+								{/if}
+								{#if draft.status === 'failed'}<p class="ask-error" role="alert">{draft.error}</p>{/if}
+							</div>
 						{/each}
 					</div>
 				{/if}
@@ -530,6 +618,48 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+
+	.ask-draft {
+		gap: 0.25rem;
+	}
+
+	.ask-draft-note {
+		font-size: 0.75rem;
+		color: var(--ask-muted);
+		overflow-wrap: anywhere;
+	}
+
+	.ask-draft-note.warn {
+		color: var(--color-warning, #b26a00);
+	}
+
+	.ask-draft-add,
+	.ask-draft-done {
+		justify-self: start;
+		margin-top: 0.25rem;
+		padding: 0.375rem 0.75rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		font-weight: 600;
+	}
+
+	.ask-draft-add {
+		border: none;
+		background: var(--ask-accent);
+		color: var(--ask-on-accent);
+		cursor: pointer;
+	}
+
+	.ask-draft-add:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+
+	.ask-draft-done {
+		border: 1px solid var(--ask-line);
+		color: inherit;
+		text-decoration: none;
 	}
 
 	.ask-error {

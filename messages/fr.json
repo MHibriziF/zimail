@@ -302,7 +302,14 @@
 		"historyHint": "Vos 50 dernières conversations sont conservées. En supprimer une l’efface définitivement.",
 		"deleteConversation": "Supprimer la conversation",
 		"deleteConversationTitle": "Supprimer la conversation ?",
-		"deleteConversationMessage": "Cette discussion sera supprimée définitivement. Cette action est irréversible."
+		"deleteConversationMessage": "Cette discussion sera supprimée définitivement. Cette action est irréversible.",
+		"draftNew": "Nouvel événement",
+		"draftInvites": "Invite {guests}",
+		"draftOverlaps": "Chevauche {events}",
+		"draftAdd": "Ajouter à l'agenda",
+		"draftAdding": "Ajout…",
+		"draftAdded": "Ajouté · Ouvrir l'agenda",
+		"draftFailed": "Impossible d'ajouter l'événement. Réessayez."
 	},
 	"compose": {
 		"title": "Composer — {app}",

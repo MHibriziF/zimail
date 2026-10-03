@@ -302,7 +302,14 @@
 		"historyHint": "Your last 50 conversations are kept. Deleting one removes it for good.",
 		"deleteConversation": "Delete conversation",
 		"deleteConversationTitle": "Delete conversation?",
-		"deleteConversationMessage": "This chat will be permanently deleted. This can't be undone."
+		"deleteConversationMessage": "This chat will be permanently deleted. This can't be undone.",
+		"draftNew": "New event",
+		"draftInvites": "Invites {guests}",
+		"draftOverlaps": "Overlaps {events}",
+		"draftAdd": "Add to calendar",
+		"draftAdding": "Adding…",
+		"draftAdded": "Added · Open calendar",
+		"draftFailed": "Couldn't add the event. Try again."
 	},
 	"compose": {
 		"title": "Compose — {app}",
