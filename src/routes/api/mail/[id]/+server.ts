@@ -20,6 +20,7 @@ type ReplyBody = {
 	text?: string;
 	html?: string;
 	attachments?: OutboundAttachmentInput[];
+	signatureIncluded?: boolean;
 };
 
 export const GET: RequestHandler = async ({ params, locals, platform }) => {
@@ -164,7 +165,8 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 				references: buildReferences(original.references_header, original.message_id),
 				replyToEmailId: original.id,
 				attachments: body.attachments,
-				scheduledAt: schedule.iso
+				scheduledAt: schedule.iso,
+				signatureIncluded: body.signatureIncluded === true
 			}
 		);
 

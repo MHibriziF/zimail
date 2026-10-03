@@ -8,6 +8,7 @@ type UserRow = {
 	is_admin: number;
 	must_change_password: number;
 	created_at: string;
+	email_signature?: string;
 };
 
 function mapUser(row: UserRow): User {
@@ -17,7 +18,8 @@ function mapUser(row: UserRow): User {
 		name: row.name,
 		is_admin: row.is_admin === 1,
 		must_change_password: row.must_change_password === 1,
-		created_at: row.created_at
+		created_at: row.created_at,
+		...(row.email_signature === undefined ? {} : { email_signature: row.email_signature })
 	};
 }
 
@@ -293,7 +295,7 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 		async getUserFromSessionByTokenHash(tokenHash) {
 			const row = await db
 				.prepare(
-					`SELECT u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at
+					`SELECT u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at, u.email_signature
 					 FROM sessions s
 					 JOIN users u ON u.id = s.user_id
 					 WHERE s.token_hash = ? AND s.expires_at > datetime('now')`

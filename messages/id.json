@@ -350,7 +350,13 @@
 		"undoSent": "Pesan terkirim",
 		"undoView": "Lihat pesan",
 		"undoFailed": "Pesan Anda gagal dikirim",
-		"undoLeaveWarning": "Pesan masih dikirim. Tetap tinggalkan?"
+		"undoLeaveWarning": "Pesan masih dikirim. Tetap tinggalkan?",
+		"linkTitle": "Tautan",
+		"linkText": "Teks",
+		"linkUrl": "Tautan",
+		"linkApply": "Terapkan",
+		"linkRemove": "Hapus tautan",
+		"linkInvalid": "Masukkan alamat web atau email"
 	},
 	"thread": {
 		"close": "Tutup",

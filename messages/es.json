@@ -350,7 +350,13 @@
 		"undoSent": "Mensaje enviado",
 		"undoView": "Ver mensaje",
 		"undoFailed": "No se pudo enviar tu mensaje",
-		"undoLeaveWarning": "Aún se está enviando un mensaje. ¿Salir de todos modos?"
+		"undoLeaveWarning": "Aún se está enviando un mensaje. ¿Salir de todos modos?",
+		"linkTitle": "Enlace",
+		"linkText": "Texto",
+		"linkUrl": "Enlace",
+		"linkApply": "Aplicar",
+		"linkRemove": "Quitar enlace",
+		"linkInvalid": "Introduce una dirección web o un correo"
 	},
 	"thread": {
 		"close": "Cerrar",

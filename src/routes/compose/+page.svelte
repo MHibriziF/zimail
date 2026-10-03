@@ -13,6 +13,8 @@
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { describeMailError, sendMessage, type SendMessageInput } from '$lib/mail/client';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';
+	import { isBodyEmpty, signatureFor, swapSignature } from '$lib/mail/signature';
+	import { composerBody, hasSignatureBlock } from '$lib/email-signature';
 	import { requestSkipViewTransition } from '$lib/app-chrome';
 	import { APP_NAME } from '$lib/constants';
 	import type { OutboundAttachmentInput } from '$lib/types';
@@ -52,7 +54,24 @@
 	let cc = $state(back?.cc ?? draft?.cc_addr ?? '');
 	let bcc = $state(back?.bcc ?? draft?.bcc_addr ?? '');
 	let subject = $state(back?.subject ?? draft?.subject ?? '');
-	let html = $state(back?.html ?? draft?.body_html ?? '');
+	const accountSignature = $derived(data.user?.email_signature);
+	const signatureOf = (addressId: string) =>
+		signatureFor(addresses.find((address) => address.id === addressId), accountSignature);
+
+	/** The signature shows from the start, so nobody types a second one by hand. */
+	function initialBody(): string {
+		if (back) return back.html;
+		const body = draft?.body_html ?? '';
+		if (hasSignatureBlock(body)) return body;
+		return composerBody(untrack(() => signatureOf(fromAddressId)), body);
+	}
+
+	let html = $state(initialBody());
+
+	function chooseFrom(addressId: string) {
+		chosenAddressId = addressId;
+		html = swapSignature(html, signatureOf(fromAddressId));
+	}
 	let attachments = $state<OutboundAttachmentInput[]>(back?.attachments ?? []);
 	let showCopies = $state(Boolean(back?.cc || back?.bcc || draft?.cc_addr || draft?.bcc_addr));
 	let error = $state(restored?.error ?? '');
@@ -61,7 +80,7 @@
 	let savedAt = $state('');
 	let startingMeeting = $state(false);
 
-	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isHtmlEmpty(html)));
+	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isBodyEmpty(html)));
 
 	async function addMeetingLink() {
 		if (startingMeeting) return;
@@ -144,7 +163,7 @@
 
 	/** Send now, or leave it in the outbox until `scheduledAt`. */
 	async function deliver(scheduledAt: string | null) {
-		if (isHtmlEmpty(html)) {
+		if (isBodyEmpty(html)) {
 			error = t('compose.writeMessage');
 			return;
 		}
@@ -239,7 +258,7 @@
 			{#if addresses.length > 1}
 				<select
 					value={fromAddressId}
-					onchange={(event) => (chosenAddressId = event.currentTarget.value)}
+					onchange={(event) => chooseFrom(event.currentTarget.value)}
 					class="field-input"
 					aria-label={t('compose.sendFrom')}
 				>

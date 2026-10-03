@@ -350,7 +350,13 @@
 		"undoSent": "Message envoyé",
 		"undoView": "Afficher le message",
 		"undoFailed": "Impossible d'envoyer votre message",
-		"undoLeaveWarning": "Un message est encore en cours d’envoi. Quitter quand même ?"
+		"undoLeaveWarning": "Un message est encore en cours d’envoi. Quitter quand même ?",
+		"linkTitle": "Lien",
+		"linkText": "Texte",
+		"linkUrl": "Lien",
+		"linkApply": "Appliquer",
+		"linkRemove": "Supprimer le lien",
+		"linkInvalid": "Saisissez une adresse web ou un e-mail"
 	},
 	"thread": {
 		"close": "Fermer",

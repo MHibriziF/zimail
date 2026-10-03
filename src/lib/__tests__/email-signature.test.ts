@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
 	appendEmailSignature,
+	composerBody,
+	hasSignatureBlock,
+	signatureBlockHtml,
 	MAX_EMAIL_SIGNATURE_LENGTH,
 	normalizeEmailSignature,
 	parseMailboxSignature,
@@ -63,5 +66,30 @@ import {
 			() => parseMailboxSignature('x'.repeat(MAX_EMAIL_SIGNATURE_LENGTH + 1)),
 			/1000 characters or fewer/
 		);
+	});
+});
+
+describe('composerBody', () => {
+	test('leaves a line to write on above the signature', () => {
+		assert.equal(
+			composerBody('Izi\nZimail'),
+			'<div><br></div><div><br></div><div data-email-signature="true">Izi<br>\nZimail</div>'
+		);
+	});
+
+	test('keeps a body that is already there', () => {
+		assert.match(composerBody('Izi', '<p>Hi</p>'), /^<p>Hi<\/p><div><br><\/div><div data-email-signature/);
+	});
+
+	test('without a signature the body is untouched', () => {
+		assert.equal(composerBody('  '), '');
+		assert.equal(composerBody('', '<p>Hi</p>'), '<p>Hi</p>');
+	});
+
+	test('the block is escaped and recognisable again', () => {
+		const html = composerBody('<b>me</b>');
+		assert.ok(hasSignatureBlock(html));
+		assert.ok(!html.includes('<b>'));
+		assert.equal(signatureBlockHtml(''), '');
 	});
 });

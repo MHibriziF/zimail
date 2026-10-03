@@ -9,6 +9,8 @@ export type User = {
 	/** Admin-created logins start on a temporary password they must replace. */
 	must_change_password: boolean;
 	created_at: string;
+	/** Account sign-off. Loaded with the session so the composer can show it; absent for API tokens. */
+	email_signature?: string;
 };
 
 export type ApiScope = 'mail:send' | 'mail:read' | 'admin';
