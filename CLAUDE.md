@@ -132,8 +132,13 @@ background AI needs the owner's approval, a fallback, and a measured cost.
 
 The Ask AI agent (`find.ts` + `service.ts`) gives the model tools, but **the
 Worker runs them**: the model only ever sees clipped results, never D1. A new
-tool means a definition in `FIND_TOOLS`, an entry in the service's `tools` table
-that cleans its arguments, and a prompt line on when to use it. The model is
+tool means a definition in `FIND_TOOLS` (or `ASK_TOOLS` in the service), an
+entry in the service's `tools` table that cleans its arguments, and a prompt
+line on when to use it. **Tools never write.** One that "does" something, like
+`create_event` (`draft.ts`), returns a draft the panel shows with a button, and
+only the user's click saves it through the normal API: tool results include
+mail other people wrote, so the model must never be able to change anything
+on its own. The model is
 Qwen3 30B, small enough that it needs help, and every one of these was learned
 on the real model:
 - It must be forced to call a tool on the first turn, or it answers "I can't
