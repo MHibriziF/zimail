@@ -65,10 +65,28 @@ export function isSendPending(): boolean {
 
 /** Hands the snapshot to the composer named `key`, once. */
 export function takeRestored<T>(key: string): Restored<T> | null {
+	const current = peekRestored<T>(key);
+	if (current) restoredStore.set(null);
+	return current;
+}
+
+/**
+ * Reads the snapshot without taking it, for a composer that seeds its fields as it is created.
+ * It pairs with `settleRestored`, because navigation can mount a page and then mount it again.
+ */
+export function peekRestored<T>(key: string): Restored<T> | null {
 	const current = get(restoredStore);
-	if (current?.key !== key) return null;
-	restoredStore.set(null);
-	return current as Restored<T>;
+	return current?.key === key ? (current as Restored<T>) : null;
+}
+
+/**
+ * Takes the snapshot once the composer has outlived the navigation that mounted it. Call it from
+ * an effect and return the result: a copy torn down by a remount cancels, so the copy that stays
+ * still finds the snapshot.
+ */
+export function settleRestored(key: string): () => void {
+	const settle = setTimeout(() => takeRestored(key));
+	return () => clearTimeout(settle);
 }
 
 export function dismissOutgoing(): void {
@@ -93,9 +111,9 @@ async function dispatch(): Promise<void> {
 	};
 	try {
 		report({ phase: 'sent', viewHref: await sending.send() });
-	} catch (failure) {
+	} catch (error_) {
 		report({ phase: 'failed' });
-		giveBack(sending, sending.describeError(failure));
+		giveBack(sending, sending.describeError(error_));
 	} finally {
 		inFlight -= 1;
 	}

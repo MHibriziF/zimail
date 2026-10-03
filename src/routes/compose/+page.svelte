@@ -3,7 +3,7 @@
 	import { t } from '$lib/i18n';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { holdSend, takeRestored } from '$lib/mail/undo-send';
+	import { holdSend, peekRestored, settleRestored } from '$lib/mail/undo-send';
 	import Icon from '$lib/components/Icon.svelte';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
@@ -39,7 +39,8 @@
 	// The draft seeds the form once; after that the fields own their values.
 	// A message taken back with Undo seeds it instead, as it was when sent.
 	const draft = untrack(() => data.draft);
-	const restored = takeRestored<Snapshot>('compose');
+	const restored = peekRestored<Snapshot>('compose');
+	$effect(() => settleRestored('compose'));
 	const back = restored?.snapshot;
 
 	// Falls back to the default identity until the composer picks another.

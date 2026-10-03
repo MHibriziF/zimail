@@ -6,6 +6,7 @@ import {
 	holdSend,
 	isSendPending,
 	outgoing,
+	peekRestored,
 	sendNow,
 	takeRestored,
 	undoSend,
@@ -63,6 +64,15 @@ describe('undo send', () => {
 		assert.equal(takeRestored('other'), null);
 		assert.notEqual(takeRestored('compose'), null);
 		assert.equal(takeRestored('compose'), null);
+	});
+
+	test('peeking leaves the snapshot for a composer created again by navigation', () => {
+		holdSend(held().entry);
+		undoSend();
+		assert.notEqual(peekRestored('compose'), null);
+		assert.notEqual(peekRestored('compose'), null);
+		assert.notEqual(takeRestored('compose'), null);
+		assert.equal(peekRestored('compose'), null);
 	});
 
 	test('sending reports where to view the message', async () => {

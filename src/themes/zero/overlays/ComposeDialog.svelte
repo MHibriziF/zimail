@@ -7,7 +7,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { describeMailError, sendMessage, type SendMessageInput } from '$lib/mail/client';
-	import { holdSend, takeRestored } from '$lib/mail/undo-send';
+	import { holdSend, peekRestored, settleRestored } from '$lib/mail/undo-send';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';
 	import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
@@ -39,7 +39,8 @@
 	};
 
 	// A message taken back with Undo comes back as it was sent, ahead of any saved draft.
-	const restored = takeRestored<Snapshot>('compose');
+	const restored = peekRestored<Snapshot>('compose');
+	$effect(() => settleRestored('compose'));
 	const back = restored?.snapshot;
 
 	let chosenAddressId = $state(back?.chosenAddressId ?? '');
