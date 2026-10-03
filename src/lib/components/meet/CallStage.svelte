@@ -41,6 +41,8 @@
 		type ScreenSharePolicy,
 		type ScreenShareSettings
 	} from '$lib/meet/screen-share';
+	import { HAND_ATTRIBUTE, HAND_NOTICE_WINDOW_MS, parseHandRaisedAt } from '$lib/meet/raised-hands';
+	import { createReactionLimiter, isReaction, pushCapped, type Reaction } from '$lib/meet/reactions';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import BackgroundPickerModal from '$lib/components/meet/BackgroundPickerModal.svelte';
@@ -109,6 +111,9 @@
 	const SCREEN_SHARE_REQUEST_TOPIC = 'screen-share-request';
 	const SCREEN_SHARE_DECLINED_TOPIC = 'screen-share-declined';
 	const SCREEN_SHARE_CANCELLED_TOPIC = 'screen-share-cancelled';
+	const REACTION_TOPIC = 'reaction';
+	/** Long enough for the float-up animation to finish before the element goes. */
+	const REACTION_DURATION_MS = 3000;
 	/** `TrackSource.SCREEN_SHARE` in LiveKit's protocol — livekit-client doesn't re-export the enum. */
 	const PROTO_SCREEN_SHARE_SOURCE = 3;
 	/** Stands in for your own share in `shareOrder`, where everyone else is keyed by identity. */
@@ -188,6 +193,13 @@
 	let recordingElapsed = $state(0);
 	let recordingTimer: ReturnType<typeof setInterval> | null = null;
 
+	let handRaisedAt = $state<number | null>(null);
+	const handNoticeGate = createRequestChimeGate(HAND_NOTICE_WINDOW_MS);
+	let floatingReactions = $state<{ id: string; emoji: Reaction; name: string; left: number }[]>([]);
+	let reactionsShown = 0;
+	const reactionLimiter = createReactionLimiter();
+	const LOCAL_REACTION_KEY = 'local';
+
 	let panel = $state<'none' | 'participants' | 'chat' | 'settings'>('none');
 	let roster = $state<
 		{
@@ -198,11 +210,13 @@
 			canShareScreen: boolean;
 			/** Self-reported through the `recording` attribute — a consent notice, not a permission. */
 			recording: RecordingKind | null;
+			handRaisedAt: number | null;
 		}[]
 	>([]);
 	const othersRecording = $derived(
 		roster.filter((entry) => !entry.isLocal && entry.recording !== null)
 	);
+	const raisedHandCount = $derived(roster.filter((entry) => entry.handRaisedAt !== null).length);
 	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean; isHost: boolean }[]>([]);
 	let unread = $state(0);
 
@@ -284,6 +298,7 @@
 		micIcon: HTMLElement;
 		cameraIcon: HTMLElement;
 		deafenedIcon: HTMLElement;
+		handIcon: HTMLElement;
 	};
 	const remoteTiles = new Map<string, Tile>();
 	const screenTiles = new Map<string, Tile>();
@@ -314,6 +329,11 @@
 		deafenedIcon.hidden = true;
 		status.append(micIcon, cameraIcon, deafenedIcon);
 
+		const handIcon = document.createElement('i');
+		handIcon.className = 'ri-hand call-tile-hand';
+		handIcon.title = t('meet.handRaised');
+		handIcon.hidden = true;
+
 		// The label is its own span so renaming can replace the text without
 		// touching the host badge beside it.
 		const nameRow = document.createElement('span');
@@ -329,8 +349,8 @@
 			nameRow.append(badge);
 		}
 
-		el.append(avatar, media, status, nameRow);
-		return { el, avatar, nameEl: name, media, micIcon, cameraIcon, deafenedIcon };
+		el.append(avatar, media, status, handIcon, nameRow);
+		return { el, avatar, nameEl: name, media, micIcon, cameraIcon, deafenedIcon, handIcon };
 	}
 
 	function handleParticipantNameChanged(_name: string, participant: Participant) {
@@ -366,6 +386,9 @@
 		tile.micIcon.hidden = participant.isMicrophoneEnabled;
 		tile.cameraIcon.hidden = participant.isCameraEnabled;
 		tile.deafenedIcon.hidden = participant.attributes.deafened !== '1';
+		const handRaised = parseHandRaisedAt(participant.attributes[HAND_ATTRIBUTE]) !== null;
+		tile.handIcon.hidden = !handRaised;
+		tile.el.classList.toggle('call-tile-hand-raised', handRaised);
 	}
 
 	function ensureRemoteTile(participant: Participant): Tile {
@@ -404,11 +427,21 @@
 	}
 
 	/** The `deafened` attribute (see toggleDeafen) is the only way another participant's tile can know they've left audio — there's no track for it. */
-	function handleParticipantAttributesChanged(_changed: Record<string, string>, participant: Participant) {
+	function handleParticipantAttributesChanged(changed: Record<string, string>, participant: Participant) {
 		const tile = remoteTiles.get(participant.identity);
 		if (tile) updateTileStatus(tile, participant);
-		if (room && participant !== room.localParticipant) readHostScreenShareSettings(participant);
+		if (room && participant !== room.localParticipant) {
+			readHostScreenShareSettings(participant);
+			if (HAND_ATTRIBUTE in changed) announceRaisedHand(participant, changed[HAND_ATTRIBUTE]);
+		}
 		refreshRoster();
+	}
+
+	/** Once per raise, and not again for a while — lowering and raising in a loop can't spam everyone. */
+	function announceRaisedHand(participant: Participant, value: string | undefined) {
+		if (parseHandRaisedAt(value) === null) return;
+		if (!handNoticeGate.shouldRing(participant.identity, Date.now())) return;
+		showNotice(t('meet.handRaisedBy', { name: participant.name || t('meet.guest') }));
 	}
 
 	function ensureScreenTile(participant: Participant): Tile {
@@ -533,6 +566,8 @@
 		}
 		removeScreenTile(participant.identity);
 		requestChimeGate.forget(participant.identity);
+		handNoticeGate.forget(participant.identity);
+		reactionLimiter.forget(participant.identity);
 		screenShareRequests = screenShareRequests.filter((request) => request.identity !== participant.identity);
 		refreshRoster();
 	}
@@ -545,7 +580,8 @@
 			isLocal: false,
 			isHost: isHostIdentity(p.identity),
 			canShareScreen: mayShareScreen(p),
-			recording: parseRecordingAttribute(p.attributes.recording)
+			recording: parseRecordingAttribute(p.attributes.recording),
+			handRaisedAt: parseHandRaisedAt(p.attributes[HAND_ATTRIBUTE])
 		}));
 		roster = [
 			{
@@ -554,7 +590,8 @@
 				isLocal: true,
 				isHost: isHostIdentity(room.localParticipant.identity),
 				canShareScreen,
-				recording: recording ? recordingKind : null
+				recording: recording ? recordingKind : null,
+				handRaisedAt
 			},
 			...remote
 		];
@@ -891,6 +928,7 @@
 			isHost = isHostIdentity(instance.localParticipant.identity);
 			if (isHost) void loadMeetingSettings();
 			if (deafened) syncDeafenedAttribute('1');
+			if (handRaisedAt !== null) syncHandAttribute();
 			canShareScreen = mayShareScreen(instance.localParticipant);
 			// Who's already here shows while our own devices are still starting.
 			for (const participant of instance.remoteParticipants.values()) {
@@ -953,6 +991,9 @@
 			startShareCooldown();
 			showNotice(t('meet.screenShareDeclined'));
 		});
+		instance.registerTextStreamHandler(REACTION_TOPIC, async (reader, participantInfo) => {
+			receiveReaction(await reader.readAll(), participantInfo.identity);
+		});
 		instance.registerTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC, async (reader, participantInfo) => {
 			await reader.readAll();
 			screenShareRequests = screenShareRequests.filter((request) => request.identity !== participantInfo.identity);
@@ -978,6 +1019,7 @@
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_REQUEST_TOPIC);
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC);
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC);
+			instance.unregisterTextStreamHandler(REACTION_TOPIC);
 		};
 	});
 
@@ -1057,6 +1099,49 @@
 	function syncDeafenedAttribute(value: '0' | '1') {
 		if (!room) return;
 		room.localParticipant.setAttributes({ deafened: value }).catch(() => {});
+	}
+
+	function syncHandAttribute() {
+		if (!room) return;
+		room.localParticipant
+			.setAttributes({ [HAND_ATTRIBUTE]: handRaisedAt === null ? '' : String(handRaisedAt) })
+			.catch(() => {});
+	}
+
+	function toggleHand() {
+		handRaisedAt = handRaisedAt === null ? Date.now() : null;
+		syncHandAttribute();
+		refreshRoster();
+	}
+
+	/** Ctrl+Alt+H, unless typing — AltGr is Ctrl+Alt on some layouts, so it can arrive mid-word. */
+	function handleShortcut(event: KeyboardEvent) {
+		if (!event.ctrlKey || !event.altKey || event.code !== 'KeyH') return;
+		const target = event.target as HTMLElement | null;
+		if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+		event.preventDefault();
+		toggleHand();
+	}
+
+	function showReaction(emoji: Reaction, name: string) {
+		const id = crypto.randomUUID();
+		// Spread across the lower-left corner so a burst doesn't stack into one glyph.
+		const left = 1 + ((reactionsShown++ * 3.5) % 17.5);
+		floatingReactions = pushCapped(floatingReactions, { id, emoji, name, left });
+		setTimeout(() => {
+			floatingReactions = floatingReactions.filter((reaction) => reaction.id !== id);
+		}, REACTION_DURATION_MS);
+	}
+
+	function sendReaction(emoji: Reaction) {
+		if (!room || !reactionLimiter.allow(LOCAL_REACTION_KEY, Date.now())) return;
+		showReaction(emoji, localName);
+		room.localParticipant.sendText(emoji, { topic: REACTION_TOPIC }).catch(() => {});
+	}
+
+	function receiveReaction(text: string, identity: string) {
+		if (!room || !isReaction(text) || !reactionLimiter.allow(identity, Date.now())) return;
+		showReaction(text, room.remoteParticipants.get(identity)?.name || t('meet.guest'));
 	}
 
 	/** Mutes every currently-attached remote audio element — screen-share audio included. */
@@ -1532,6 +1617,8 @@
 	}
 </script>
 
+<svelte:window onkeydown={handleShortcut} />
+
 <div class="call-stage">
 	<div class="call-header">
 		<span class="call-header-name">{localName}</span>
@@ -1592,7 +1679,11 @@
 					<span class="call-tile-label">{t('meet.you')} · {t('meet.screenShare')}</span>
 				</span>
 			</div>
-			<div class="call-tile call-tile-local" class:call-tile-joining={connecting || connectionError}>
+			<div
+				class="call-tile call-tile-local"
+				class:call-tile-joining={connecting || connectionError}
+				class:call-tile-hand-raised={handRaisedAt !== null}
+			>
 				<div class="call-tile-avatar" style="background: {localColor}">{localInitials}</div>
 				<div class="call-tile-media" bind:this={localMediaEl}></div>
 				<div class="call-tile-status">
@@ -1600,6 +1691,9 @@
 					{#if !cameraEnabled}<Icon name="camera-off-line" size={14} class="call-tile-status-icon" />{/if}
 					{#if deafened}<Icon name="volume-mute-line" size={14} class="call-tile-status-icon" />{/if}
 				</div>
+				{#if handRaisedAt !== null}
+					<i class="ri-hand call-tile-hand" title={t('meet.handRaised')}></i>
+				{/if}
 				<span class="call-tile-name">
 					<span class="call-tile-label">{localName} · {t('meet.you')}</span>
 					{#if isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
@@ -1628,6 +1722,15 @@
 					<span>{t('meet.waitingForOthers')}</span>
 				</div>
 			{/if}
+		</div>
+
+		<div class="call-reactions" aria-hidden="true">
+			{#each floatingReactions as reaction (reaction.id)}
+				<div class="call-reaction" style="left: {reaction.left}rem">
+					<span class="call-reaction-emoji">{reaction.emoji}</span>
+					<span class="call-reaction-name">{reaction.name}</span>
+				</div>
+			{/each}
 		</div>
 
 		{#if panel === 'participants'}
@@ -1684,6 +1787,8 @@
 		{recordingSaving}
 		{panel}
 		rosterCount={roster.length}
+		handRaised={handRaisedAt !== null}
+		{raisedHandCount}
 		{unread}
 		{isHost}
 		pendingAdmissionsCount={pendingAdmissions.length + screenShareRequests.length}
@@ -1699,6 +1804,8 @@
 		onRecord={(kind) => void beginRecording(kind)}
 		onStopRecording={() => void finishRecording()}
 		onTogglePanel={togglePanel}
+		onToggleHand={toggleHand}
+		onSendReaction={sendReaction}
 		onLeave={leave}
 	/>
 </div>
@@ -1799,6 +1906,7 @@
 	}
 
 	.call-body {
+		position: relative;
 		flex: 1;
 		display: flex;
 		gap: 0.75rem;
@@ -1881,6 +1989,96 @@
 
 	/* Tiles arriving after the stage is up fade in rather than popping into the grid. */
 	.call-tile-group > :global(.call-tile),
+	:global(.call-tile-hand) {
+		position: absolute;
+		top: 0.5rem;
+		left: 0.5rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		border-radius: 999px;
+		font-size: 1rem;
+		color: #0b0b0d;
+		background: #fbbf24;
+	}
+
+	:global(.call-tile-hand[hidden]) {
+		display: none;
+	}
+
+	:global(.call-tile-hand-raised) {
+		box-shadow: inset 0 0 0 2px #fbbf24;
+	}
+
+	.call-reactions {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+		pointer-events: none;
+	}
+
+	.call-reaction {
+		position: absolute;
+		bottom: 0.5rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.125rem;
+		animation: call-reaction-float 3s ease-out forwards;
+	}
+
+	.call-reaction-emoji {
+		font-size: 2rem;
+		line-height: 1;
+	}
+
+	.call-reaction-name {
+		max-width: 8rem;
+		padding: 0.0625rem 0.5rem;
+		border-radius: 999px;
+		font-size: 0.6875rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		background: rgba(0, 0, 0, 0.55);
+	}
+
+	@keyframes call-reaction-float {
+		from {
+			opacity: 0;
+			transform: translateY(1rem);
+		}
+		15% {
+			opacity: 1;
+		}
+		75% {
+			opacity: 1;
+		}
+		to {
+			opacity: 0;
+			transform: translateY(-50vh);
+		}
+	}
+
+	@keyframes call-reaction-badge {
+		from,
+		to {
+			opacity: 0;
+		}
+		10%,
+		80% {
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.call-reaction {
+			animation: call-reaction-badge 2s linear forwards;
+		}
+	}
+
 	:global(.call-tile-placeholder) {
 		animation: call-tile-in 0.25s ease-out;
 	}
