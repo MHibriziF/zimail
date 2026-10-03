@@ -123,12 +123,12 @@ account as the mail, within the free 10,000 neurons a day. On the free plan it
 stops for the day rather than billing. Keep new AI work there, and user-triggered
 only: nothing that spends the allowance in the background.
 
-The one exception is **sorting inbox tabs with Clef** (`ai/tabs.ts`, #153): it
-runs on incoming mail, but only after the user switches it on, only for
-messages that start a conversation (not replies, spam or senders they sorted
-themselves), and it falls back to the header rules when the model fails or the
-allowance runs out. Any new background AI needs the same: off by default, a
-fallback, and a measured cost.
+The one exception is **sorting inbox tabs with Clef** (`ai/tabs.ts`, #153):
+like Gmail, it runs on incoming mail whenever tabs are on, with no separate
+switch. It stays cheap because it only sees messages that start a conversation
+(not replies, spam or senders the user sorted themselves), and it falls back to
+the header rules when the model fails or the allowance runs out. Any other
+background AI needs the owner's approval, a fallback, and a measured cost.
 
 The Ask AI agent (`find.ts` + `service.ts`) gives the model tools, but **the
 Worker runs them**: the model only ever sees clipped results, never D1. A new
