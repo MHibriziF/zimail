@@ -44,8 +44,40 @@
 
 	function exec(command: string, value?: string) {
 		editor?.focus();
+		const caret = caretOffset();
 		document.execCommand(command, false, value);
+		// Chrome's list command rebuilds the line and drops the caret at its start, so the next
+		// keystroke lands in front of what was just typed. Put it back at the same character.
+		if (caret !== null) placeCaretAt(caret);
 		html = editor?.innerHTML ?? '';
+	}
+
+	/** The caret as a count of characters from the start of the editor, which survives a rebuild. */
+	function caretOffset(): number | null {
+		const range = selectionInEditor();
+		if (!editor || !range?.collapsed) return null;
+		const before = document.createRange();
+		before.selectNodeContents(editor);
+		before.setEnd(range.endContainer, range.endOffset);
+		return before.toString().length;
+	}
+
+	function placeCaretAt(offset: number) {
+		if (!editor) return;
+		const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+		let remaining = offset;
+		for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+			const length = node.textContent?.length ?? 0;
+			if (remaining <= length) {
+				const range = document.createRange();
+				range.setStart(node, remaining);
+				range.collapse(true);
+				window.getSelection()?.removeAllRanges();
+				window.getSelection()?.addRange(range);
+				return;
+			}
+			remaining -= length;
+		}
 	}
 
 	function handleInput() {
