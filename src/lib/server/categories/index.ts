@@ -1,23 +1,25 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { sortTabs, type AiBinding } from '../ai';
 import { listAddressesForUser } from '../domains';
 import { mailStoreServiceForDb } from '../mail-store';
 import { createD1CategoriesRepository } from './repository';
 import { createCategoriesService, type CategoriesService } from './service';
 
 export { classifyMail, pickClassifyHeaders, type ClassifyInput } from './classify';
-export { createCategoriesService, type CategoriesService } from './service';
+export { createCategoriesService, type CategoriesService, type ResortOutcome } from './service';
 export { createD1CategoriesRepository, type CategoriesRepository } from './repository';
 
 type PlatformLike = App.Platform | undefined | null;
 
 /** For the inbound paths, which are handed a `db` rather than `platform`. */
-export function categoriesServiceForDb(db: D1Database): CategoriesService {
+export function categoriesServiceForDb(db: D1Database, ai?: AiBinding | null): CategoriesService {
 	const mailStore = mailStoreServiceForDb(db);
 	return createCategoriesService({
 		repo: createD1CategoriesRepository(db),
 		expandToThreads: (userId, ids) => mailStore.expandToThreads(userId, ids),
 		setCategory: (userId, ids, category) => mailStore.setCategory(userId, ids, category),
-		ownAddresses: async (userId) => (await listAddressesForUser(db, userId)).map((address) => address.address)
+		ownAddresses: async (userId) => (await listAddressesForUser(db, userId)).map((address) => address.address),
+		sortTabs: ai ? (messages) => sortTabs(ai, messages) : null
 	});
 }
 
@@ -25,5 +27,5 @@ export function categoriesServiceForDb(db: D1Database): CategoriesService {
 export function getCategoriesService(platform: PlatformLike): CategoriesService {
 	const db = platform?.env.DB;
 	if (!db) throw new Error('Database unavailable');
-	return categoriesServiceForDb(db);
+	return categoriesServiceForDb(db, platform?.env.AI);
 }

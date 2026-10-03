@@ -16,6 +16,7 @@ import {
 } from '../telegram-notify';
 import { stripHtml } from '../util/html';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
+import type { AiBinding } from '../ai/service';
 import { categoriesServiceForDb, pickClassifyHeaders } from '../categories';
 
 export type ResendWebhookEvent = {
@@ -29,7 +30,12 @@ export type WebhookOutcome = {
 	note: string;
 };
 
-type InboundEnv = PushNotificationEnv & TelegramNotificationEnv & { ATTACHMENTS: R2Bucket };
+type InboundEnv = PushNotificationEnv &
+	TelegramNotificationEnv & {
+		ATTACHMENTS: R2Bucket;
+		/** Sorts inbox tabs with Clef when the user turned that on. */
+		AI?: AiBinding;
+	};
 
 /** Resend delivery events → the status we display on a sent message. */
 const STATUS_BY_EVENT: Record<string, DeliveryStatus> = {
@@ -147,11 +153,15 @@ async function handleInboundEmail(
 	// Resend hands headers over as a plain object; don't rely on its key casing.
 	const headerMap = new Map(Object.entries(received.headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]));
 	const listed = await listInboundAttachments(client, providerId);
-	const category = await categoriesServiceForDb(env.DB).categorizeInbound(route.userId, {
+	const category = await categoriesServiceForDb(env.DB, env.AI).categorizeInbound(route.userId, {
 		from,
+		fromName: sender.name,
 		subject,
+		body: received.text ?? (received.html ? stripHtml(received.html) : null),
 		headers: pickClassifyHeaders((name) => headerMap.get(name)),
-		calendar: listed.some((attachment) => isCalendarAttachment(attachment.content_type, attachment.filename))
+		calendar: listed.some((attachment) => isCalendarAttachment(attachment.content_type, attachment.filename)),
+		reply: Boolean(headerMap.get('in-reply-to') || headerMap.get('references')),
+		spam
 	});
 
 	const emailId = await insertEmail(env.DB, {
