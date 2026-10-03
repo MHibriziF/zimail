@@ -22,3 +22,8 @@ export function stripHtml(html: string): string {
 			.trim()
 	);
 }
+
+/** A message's plain-text body, falling back to its HTML stripped to text. */
+export function plainBody(text: string | null | undefined, html: string | null | undefined): string | null {
+	return text ?? (html ? stripHtml(html) : null);
+}

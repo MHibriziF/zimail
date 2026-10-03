@@ -14,7 +14,7 @@ import {
 	type StoredAttachment,
 	type TelegramNotificationEnv
 } from '../telegram-notify';
-import { stripHtml } from '../util/html';
+import { plainBody } from '../util/html';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
 import type { AiBinding } from '../ai/service';
 import { categoriesServiceForDb, pickClassifyHeaders } from '../categories';
@@ -133,7 +133,7 @@ async function handleInboundEmail(
 				from,
 				to: recipients.join(', ') || '(unknown)',
 				subject,
-				body: received.text ?? (received.html ? stripHtml(received.html) : null),
+				body: plainBody(received.text, received.html),
 				unrouted: true
 			});
 		}
@@ -157,7 +157,7 @@ async function handleInboundEmail(
 		from,
 		fromName: sender.name,
 		subject,
-		body: received.text ?? (received.html ? stripHtml(received.html) : null),
+		body: plainBody(received.text, received.html),
 		headers: pickClassifyHeaders((name) => headerMap.get(name)),
 		calendar: listed.some((attachment) => isCalendarAttachment(attachment.content_type, attachment.filename)),
 		reply: Boolean(headerMap.get('in-reply-to') || headerMap.get('references')),
@@ -203,7 +203,7 @@ async function handleInboundEmail(
 		from: sender.name ? `${sender.name} <${from}>` : from,
 		to: route.address,
 		subject,
-		body: received.text ?? (received.html ? stripHtml(received.html) : null),
+		body: plainBody(received.text, received.html),
 		attachments: storedAttachments,
 		emailId
 	});

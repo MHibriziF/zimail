@@ -12,7 +12,7 @@ import {
 	type StoredAttachment,
 	type TelegramNotificationEnv
 } from '../telegram-notify';
-import { stripHtml } from '../util/html';
+import { plainBody } from '../util/html';
 import { isCalendarAttachment } from '../../utils/attachments';
 import { applyArrivedInvitation, hasBytes } from '../invitations';
 import { isFiledAsSpam, spamServiceForDb } from '../spam';
@@ -87,7 +87,7 @@ export async function handleCloudflareInbound(
 				from,
 				to: recipients.join(', ') || envelopeTo || '(unknown)',
 				subject,
-				body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+				body: plainBody(parsed.text, parsed.html),
 				unrouted: true
 			});
 		}
@@ -103,7 +103,7 @@ export async function handleCloudflareInbound(
 		from,
 		fromName: sender?.name ?? null,
 		subject,
-		body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+		body: plainBody(parsed.text, parsed.html),
 		headers: pickClassifyHeaders((name) => message.headers.get(name)),
 		calendar: parsed.attachments.some((attachment) => isCalendarAttachment(attachment.mimeType, attachment.filename ?? '')),
 		reply: Boolean(inReplyTo || references),
@@ -144,7 +144,7 @@ export async function handleCloudflareInbound(
 		from: sender?.name ? `${sender.name} <${from}>` : from,
 		to: route.address,
 		subject,
-		body: parsed.text ?? (parsed.html ? stripHtml(parsed.html) : null),
+		body: plainBody(parsed.text, parsed.html),
 		attachments: storedAttachments,
 		emailId
 	});

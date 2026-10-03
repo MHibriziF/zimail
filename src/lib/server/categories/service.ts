@@ -1,6 +1,6 @@
 import type { MailCategory } from '../../mail/categories';
 import type { TabMessage, TabsOutcome } from '../ai/tabs';
-import { stripHtml } from '../util/html';
+import { plainBody } from '../util/html';
 import { classifyMail, type ClassifyInput } from './classify';
 import type { CategoriesRepository, ResortCandidate, TabSettings } from './repository';
 
@@ -62,8 +62,13 @@ function resortMessage(candidate: ResortCandidate): TabMessage {
 		from: candidate.from,
 		fromName: candidate.fromName,
 		subject: candidate.subject,
-		body: candidate.bodyText ?? (candidate.bodyHtml ? stripHtml(candidate.bodyHtml) : null)
+		body: plainBody(candidate.bodyText, candidate.bodyHtml)
 	};
+}
+
+/** Only a message that can start a conversation in a visible tab is worth a model call. */
+function worthAsking(input: InboundTabInput): boolean {
+	return !input.calendar && !input.reply && !input.spam;
 }
 
 export function createCategoriesService(deps: CategoriesServiceDeps): CategoriesService {
@@ -76,11 +81,6 @@ export function createCategoriesService(deps: CategoriesServiceDeps): Categories
 	async function aiSortingOn(userId: string): Promise<boolean> {
 		const settings = await repo.tabSettings(userId);
 		return settings.enabled && settings.ai;
-	}
-
-	/** Only a message that can start a conversation in a visible tab is worth a model call. */
-	function worthAsking(input: InboundTabInput): boolean {
-		return !input.calendar && !input.reply && !input.spam;
 	}
 
 	async function categorizeInbound(userId: string, input: InboundTabInput): Promise<MailCategory> {
