@@ -12,7 +12,7 @@
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
-	import { ConfirmTwice } from '$lib/components/confirm-twice.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 
 	let {
 		view,
@@ -25,7 +25,7 @@
 	} = $props();
 
 	let selected = $state<string[]>([]);
-	const deleteForever = new ConfirmTwice();
+	let deleting = $state<string | null>(null);
 	// Seeded from the prop, not left empty for an effect to fill: effects do not
 	// run during SSR, so an empty start renders the "nothing here" state on the
 	// server and the rows only appear once hydration catches up.
@@ -359,19 +359,14 @@
 										<Icon name="CurvedArrow" size={14} />
 									</button>
 								</Tooltip>
-								{@const deleteLabel =
-									deleteForever.armed === thread.latest_id
-										? t('mailbox.deleteForeverConfirm')
-										: t('mailbox.deletePermanently')}
-								<Tooltip text={deleteLabel}>
+								<Tooltip text={t('mailbox.deletePermanently')}>
 									<button
 										type="button"
 										class="danger"
-										class:armed={deleteForever.armed === thread.latest_id}
-										aria-label={deleteLabel}
+										aria-label={t('mailbox.deletePermanently')}
 										onclick={(event) => {
 											event.stopPropagation();
-											if (deleteForever.press(thread.latest_id)) void act('delete', [thread.latest_id]);
+											deleting = thread.latest_id;
 										}}
 									>
 										<Icon name="Trash" size={14} />
@@ -439,3 +434,15 @@
 		/>
 	</section>
 </div>
+
+<ConfirmDialog
+	open={deleting !== null}
+	title={t('mailbox.deleteForeverTitle')}
+	message={t('mailbox.deleteForeverOne')}
+	confirmLabel={t('mailbox.deletePermanently')}
+	onCancel={() => (deleting = null)}
+	onConfirm={() => {
+		if (deleting) void act('delete', [deleting]);
+		deleting = null;
+	}}
+/>

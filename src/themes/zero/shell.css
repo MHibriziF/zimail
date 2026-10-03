@@ -698,15 +698,6 @@
 	background: #411d23;
 }
 
-/* Delete forever, waiting for its second press. */
-[data-ui-theme='zero'] .z-row-hover button.danger.armed,
-[data-ui-theme='zero'] button.z-thread-trash.armed {
-	background: #be123c;
-	border-color: #be123c;
-	--icon-color: #ffffff;
-	color: #ffffff;
-}
-
 [data-ui-theme='zero'] .z-star-on {
 	color: #facc15;
 	--icon-color: #facc15;
