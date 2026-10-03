@@ -36,5 +36,12 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		messages: outcome.messages,
 		events: outcome.events
 	});
-	return json({ answer: outcome.answer, messages: outcome.messages, events: outcome.events, conversationId });
+	// Drafts aren't saved with the conversation: reopened later, an "Add" button could add it twice.
+	return json({
+		answer: outcome.answer,
+		messages: outcome.messages,
+		events: outcome.events,
+		drafts: outcome.drafts,
+		conversationId
+	});
 };

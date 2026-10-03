@@ -302,7 +302,14 @@
 		"historyHint": "会保留你最近的 50 个对话。删除后将永久移除。",
 		"deleteConversation": "删除对话",
 		"deleteConversationTitle": "删除对话？",
-		"deleteConversationMessage": "此对话将被永久删除，且无法撤销。"
+		"deleteConversationMessage": "此对话将被永久删除，且无法撤销。",
+		"draftNew": "新活动",
+		"draftInvites": "邀请 {guests}",
+		"draftOverlaps": "与 {events} 时间冲突",
+		"draftAdd": "添加到日历",
+		"draftAdding": "正在添加…",
+		"draftAdded": "已添加 · 打开日历",
+		"draftFailed": "无法添加活动，请重试。"
 	},
 	"compose": {
 		"title": "撰写 — {app}",

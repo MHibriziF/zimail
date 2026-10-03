@@ -187,7 +187,7 @@ test('loosened matches are not shown as cards unless the model read them', async
 	});
 	const outcome = await svc.find('u1', { question: 'loan from my bank?', history: [], timeZone: 'UTC' });
 	assert.deepEqual(searches, [false, true]);
-	assert.deepEqual(outcome, { kind: 'ok', answer: 'Nothing about a loan.', messages: [], events: [] });
+	assert.deepEqual(outcome, { kind: 'ok', answer: 'Nothing about a loan.', messages: [], events: [], drafts: [] });
 });
 
 const standup: FoundEvent = {
@@ -290,4 +290,49 @@ test('find reports the daily limit and a missing binding', async () => {
 	const input = { question: 'x', history: [], timeZone: 'UTC' };
 	assert.deepEqual(await service(exhausted).svc.find('u1', input), { kind: 'limit_reached' });
 	assert.deepEqual(await service(null).svc.find('u1', input), { kind: 'unavailable' });
+});
+
+test('create_event prepares a draft in the reader’s zone and never saves it', async () => {
+	const { ai, calls } = scripted([
+		callTool('create_event', { title: 'Meetup with Izi', date: '2026-10-01', start_time: '09:00', guests: ['IZI@example.com', 'not an email'] }),
+		{ response: 'Meetup with Izi on Thu 1 October at 09:00 is ready to add. It overlaps Standup.' }
+	]);
+	const { svc, listed } = service(ai, [], [standup]);
+	const outcome = await svc.find('u1', { question: 'create a meetup with izi tomorrow at 9', history: [], timeZone: 'Asia/Jakarta' });
+	assert.equal(outcome.kind, 'ok');
+	const drafts = outcome.kind === 'ok' ? outcome.drafts : [];
+	assert.deepEqual(drafts, [
+		{
+			title: 'Meetup with Izi',
+			// 09:00 in Jakarta (UTC+7) is 02:00 UTC; 30 minutes by default.
+			start: '2026-10-01T02:00:00.000Z',
+			end: '2026-10-01T02:30:00.000Z',
+			allDay: false,
+			location: null,
+			guests: ['izi@example.com'],
+			day: '2026-10-01',
+			conflicts: ['Standup 09:00–09:30']
+		}
+	]);
+	assert.deepEqual(listed[0], { after: '2026-10-01', before: '2026-10-02', text: null });
+	const toolResult = JSON.parse((calls[1].messages as { content: string }[]).at(-1)!.content);
+	assert.equal(toolResult.prepared, true);
+	assert.match(toolResult.note, /NOT on the calendar/);
+});
+
+test('a bad create_event goes back to the model to fix, and prepares nothing', async () => {
+	const { ai, calls } = scripted([callTool('create_event', { title: 'Lunch', date: 'tomorrow' }), { response: 'What day and time?' }]);
+	const { svc } = service(ai);
+	const outcome = await svc.find('u1', { question: 'add lunch', history: [], timeZone: 'UTC' });
+	assert.deepEqual(outcome.kind === 'ok' && outcome.drafts, []);
+	assert.match((calls[1].messages as { content: string }[]).at(-1)!.content, /YYYY-MM-DD/);
+});
+
+test('the prompt says create_event only prepares, and the model gets the tool', async () => {
+	const { ai, calls } = scripted([{ response: 'ok' }]);
+	await service(ai).svc.find('u1', { question: 'hi', history: [], timeZone: 'UTC' });
+	const system = (calls[0].messages as { content: string }[])[0].content;
+	assert.match(system, /never say you created/);
+	const names = (calls[0].tools as { function: { name: string } }[]).map((tool) => tool.function.name);
+	assert.ok(names.includes('create_event'));
 });

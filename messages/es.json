@@ -302,7 +302,14 @@
 		"historyHint": "Se guardan tus últimas 50 conversaciones. Eliminar una la borra para siempre.",
 		"deleteConversation": "Eliminar conversación",
 		"deleteConversationTitle": "¿Eliminar la conversación?",
-		"deleteConversationMessage": "Este chat se eliminará de forma permanente. No se puede deshacer."
+		"deleteConversationMessage": "Este chat se eliminará de forma permanente. No se puede deshacer.",
+		"draftNew": "Evento nuevo",
+		"draftInvites": "Invita a {guests}",
+		"draftOverlaps": "Coincide con {events}",
+		"draftAdd": "Añadir al calendario",
+		"draftAdding": "Añadiendo…",
+		"draftAdded": "Añadido · Abrir calendario",
+		"draftFailed": "No se pudo añadir el evento. Inténtalo de nuevo."
 	},
 	"compose": {
 		"title": "Redactar — {app}",

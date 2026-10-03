@@ -1,3 +1,4 @@
+import { addDays } from '$lib/calendar/events';
 import {
 	composeMessages,
 	parseComposeReply,
@@ -30,6 +31,7 @@ import {
 	type SearchArgs,
 	type ToolCall
 } from './find';
+import { CREATE_EVENT_TOOL, draftForModel, eventDraft, withConflicts, type EventDraft } from './draft';
 
 /** The slice of the Workers AI binding this module uses. */
 export type AiBinding = { run(model: string, inputs: Record<string, unknown>): Promise<unknown> };
@@ -46,6 +48,8 @@ const MAX_FIND_STEPS = 4;
 const MAX_CALLS_PER_STEP = 3;
 const FIND_TEMPERATURE = 0.1;
 const MAX_CARDS = 5;
+const MAX_DRAFTS = 3;
+const ASK_TOOLS = [...FIND_TOOLS, CREATE_EVENT_TOOL];
 
 export type ComposeInput = Omit<ComposeRequest, 'replyTo'> & { replyToId: string | null };
 
@@ -60,7 +64,9 @@ type Failure =
 export type ComposeOutcome = { kind: 'ok'; subject: string; html: string } | Failure;
 
 export type FindInput = { question: string; history: HistoryTurn[]; timeZone: string };
-export type FindOutcome = { kind: 'ok'; answer: string; messages: FoundMessage[]; events: FoundEvent[] } | Failure;
+export type FindOutcome =
+	| { kind: 'ok'; answer: string; messages: FoundMessage[]; events: FoundEvent[]; drafts: EventDraft[] }
+	| Failure;
 
 export type AiService = {
 	compose(userId: string, input: ComposeInput): Promise<ComposeOutcome>;
@@ -120,6 +126,8 @@ export function createAiService(deps: AiServiceDeps): AiService {
 		lastSearch: LastSearch;
 		/** Every event any list_events call returned, by id: "Monday and Tuesday" is two calls. */
 		events: Map<string, FoundEvent>;
+		/** Events create_event prepared, by title and start: a retry replaces rather than repeats. */
+		drafts: Map<string, EventDraft>;
 	};
 
 	/**
@@ -148,6 +156,15 @@ export function createAiService(deps: AiServiceDeps): AiService {
 			const { events, note } = filterEvents(await deps.listEvents(run.userId, range, run.timeZone), range);
 			for (const event of events) run.events.set(event.id, event);
 			return eventsForModel(events, range, run.timeZone, note);
+		},
+		/** Never writes: the draft goes to the panel, and only the user's click saves it. */
+		async create_event(run, raw) {
+			const prepared = eventDraft(raw, run.timeZone);
+			if ('error' in prepared) return prepared;
+			const day = { after: prepared.day, before: addDays(prepared.day, 1), text: null };
+			const draft = withConflicts(prepared, await deps.listEvents(run.userId, day, run.timeZone), run.timeZone);
+			run.drafts.set(`${draft.title}|${draft.start}`, draft);
+			return draftForModel(draft, run.timeZone);
 		}
 	};
 
@@ -181,7 +198,8 @@ export function createAiService(deps: AiServiceDeps): AiService {
 			kind: 'ok',
 			answer,
 			messages: cards.slice(0, MAX_CARDS),
-			events: [...run.events.values()].slice(0, MAX_CARDS)
+			events: [...run.events.values()].slice(0, MAX_CARDS),
+			drafts: [...run.drafts.values()].slice(0, MAX_DRAFTS)
 		};
 	}
 
@@ -195,12 +213,13 @@ export function createAiService(deps: AiServiceDeps): AiService {
 			messages: findMessages({ question: input.question, history: input.history, timeZone, now }),
 			read: new Map(),
 			lastSearch: { found: [], loose: false },
-			events: new Map()
+			events: new Map(),
+			drafts: new Map()
 		};
 
 		for (let step = 0; step < MAX_FIND_STEPS; step++) {
 			// The last turn gets no tools, so the model has to answer with what it has.
-			const tools = step < MAX_FIND_STEPS - 1 ? FIND_TOOLS : undefined;
+			const tools = step < MAX_FIND_STEPS - 1 ? ASK_TOOLS : undefined;
 			const result = await ai().run(MODEL, {
 				messages: run.messages,
 				tools,
