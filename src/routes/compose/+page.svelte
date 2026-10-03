@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { holdSend, peekRestored, settleRestored } from '$lib/mail/undo-send';
 	import Icon from '$lib/components/Icon.svelte';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
@@ -9,7 +11,7 @@
 	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
 	import SendButton from '$lib/components/mailbox/SendButton.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
-	import { describeMailError, sendMessage } from '$lib/mail/client';
+	import { describeMailError, sendMessage, type SendMessageInput } from '$lib/mail/client';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';
 	import { requestSkipViewTransition } from '$lib/app-chrome';
 	import { APP_NAME } from '$lib/constants';
@@ -23,22 +25,37 @@
 		addresses.find((address) => address.is_default)?.id ?? addresses[0]?.id ?? ''
 	);
 
-	// Falls back to the default identity until the composer picks another.
-	let chosenAddressId = $state('');
-	const fromAddressId = $derived(chosenAddressId || defaultAddressId);
+	type Snapshot = {
+		draftId: string | null;
+		chosenAddressId: string;
+		to: string;
+		cc: string;
+		bcc: string;
+		subject: string;
+		html: string;
+		attachments: OutboundAttachmentInput[];
+	};
 
 	// The draft seeds the form once; after that the fields own their values.
+	// A message taken back with Undo seeds it instead, as it was when sent.
 	const draft = untrack(() => data.draft);
+	const restored = peekRestored<Snapshot>('compose');
+	$effect(() => settleRestored('compose'));
+	const back = restored?.snapshot;
 
-	let draftId = $state<string | null>(draft?.id ?? null);
-	let to = $state(draft?.to_addr ?? '');
-	let cc = $state(draft?.cc_addr ?? '');
-	let bcc = $state(draft?.bcc_addr ?? '');
-	let subject = $state(draft?.subject ?? '');
-	let html = $state(draft?.body_html ?? '');
-	let attachments = $state<OutboundAttachmentInput[]>([]);
-	let showCopies = $state(Boolean(draft?.cc_addr || draft?.bcc_addr));
-	let error = $state('');
+	// Falls back to the default identity until the composer picks another.
+	let chosenAddressId = $state(back?.chosenAddressId ?? '');
+	const fromAddressId = $derived(chosenAddressId || defaultAddressId);
+
+	let draftId = $state<string | null>(back ? back.draftId : (draft?.id ?? null));
+	let to = $state(back?.to ?? draft?.to_addr ?? '');
+	let cc = $state(back?.cc ?? draft?.cc_addr ?? '');
+	let bcc = $state(back?.bcc ?? draft?.bcc_addr ?? '');
+	let subject = $state(back?.subject ?? draft?.subject ?? '');
+	let html = $state(back?.html ?? draft?.body_html ?? '');
+	let attachments = $state<OutboundAttachmentInput[]>(back?.attachments ?? []);
+	let showCopies = $state(Boolean(back?.cc || back?.bcc || draft?.cc_addr || draft?.bcc_addr));
+	let error = $state(restored?.error ?? '');
 	let sending = $state(false);
 	let savingDraft = $state(false);
 	let savedAt = $state('');
@@ -121,6 +138,10 @@
 		void deliver(null);
 	}
 
+	function input(scheduledAt: string | null): SendMessageInput {
+		return { draftId, fromAddressId, to, cc, bcc, subject, html, text: htmlToPlainText(html), attachments, scheduledAt };
+	}
+
 	/** Send now, or leave it in the outbox until `scheduledAt`. */
 	async function deliver(scheduledAt: string | null) {
 		if (isHtmlEmpty(html)) {
@@ -128,22 +149,30 @@
 			return;
 		}
 
+		if (!scheduledAt) {
+			const message = input(null);
+			const reopenAt = `${$page.url.pathname}${$page.url.search}`;
+			holdSend<Snapshot>({
+				key: 'compose',
+				snapshot: { draftId, chosenAddressId, to, cc, bcc, subject, html, attachments },
+				send: async () => {
+					const sent = await sendMessage(message);
+					await invalidateAll();
+					return sent.id ? `/mail/${sent.id}` : '/sent';
+				},
+				reopen: () => void goto(reopenAt),
+				describeError: (failure) => describeMailError(failure, t('common.networkError'))
+			});
+			requestSkipViewTransition();
+			await goto('/sent');
+			return;
+		}
+
 		sending = true;
 		error = '';
 
 		try {
-			await sendMessage({
-				draftId,
-				fromAddressId,
-				to,
-				cc,
-				bcc,
-				subject,
-				html,
-				text: htmlToPlainText(html),
-				attachments,
-				scheduledAt
-			});
+			await sendMessage(input(scheduledAt));
 			window.location.href = '/sent';
 		} catch (failure) {
 			error = describeMailError(failure, t('common.networkError'));

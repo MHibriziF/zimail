@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { goto, invalidate, invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { holdSend, restored, takeRestored } from '$lib/mail/undo-send';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -78,6 +80,47 @@
 	let forwardTo = $state('');
 	let forwardHtml = $state('');
 	let includeAttachments = $state(true);
+
+	type ThreadSnapshot =
+		| { mode: 'reply'; html: string; attachments: OutboundAttachmentInput[] }
+		| { mode: 'forward'; to: string; html: string; includeAttachments: boolean };
+
+	const composerKey = $derived(`thread:${$page.params.id}`);
+
+	// Undo, or a send that failed, puts the reply or forward back as it was.
+	$effect(() => {
+		void $restored;
+		const back = takeRestored<ThreadSnapshot>(composerKey);
+		if (!back) return;
+		error = back.error ?? '';
+		const snapshot = back.snapshot;
+		replyOpen = snapshot.mode === 'reply';
+		forwardOpen = snapshot.mode === 'forward';
+		if (snapshot.mode === 'reply') {
+			replyHtml = snapshot.html;
+			replyAttachments = snapshot.attachments;
+		} else {
+			forwardTo = snapshot.to;
+			forwardHtml = snapshot.html;
+			includeAttachments = snapshot.includeAttachments;
+		}
+	});
+
+	/** Gives the reader a few seconds to take it back; `viewHref` is where the sent copy shows, the thread itself when null. */
+	function holdThreadSend(snapshot: ThreadSnapshot, send: () => Promise<void>, viewHref: string | null) {
+		const reopenAt = `${$page.url.pathname}${$page.url.search}`;
+		holdSend<ThreadSnapshot>({
+			key: composerKey,
+			snapshot,
+			send: async () => {
+				await send();
+				await invalidateAll();
+				return viewHref ?? reopenAt;
+			},
+			reopen: () => void goto(reopenAt, { noScroll: true }),
+			describeError: (failure) => describeMailError(failure, t('common.networkError'))
+		});
+	}
 
 	const messages = $derived(data.messages);
 	const latest = $derived(messages[messages.length - 1]);
@@ -197,27 +240,23 @@
 		event.preventDefault();
 		if (!latest || !forwardTo.trim()) return;
 
-		sending = true;
+		const messageId = latest.id;
+		const input = {
+			to: forwardTo,
+			html: isHtmlEmpty(forwardHtml) ? undefined : forwardHtml,
+			text: isHtmlEmpty(forwardHtml) ? undefined : htmlToPlainText(forwardHtml),
+			includeAttachments
+		};
+		holdThreadSend(
+			{ mode: 'forward', to: forwardTo, html: forwardHtml, includeAttachments },
+			() => forwardMessage(messageId, input),
+			'/sent'
+		);
+
 		error = '';
-
-		try {
-			await forwardMessage(latest.id, {
-				to: forwardTo,
-				html: isHtmlEmpty(forwardHtml) ? undefined : forwardHtml,
-				text: isHtmlEmpty(forwardHtml) ? undefined : htmlToPlainText(forwardHtml),
-				includeAttachments
-			});
-
-			forwardTo = '';
-			forwardHtml = '';
-			forwardOpen = false;
-			// The forward is our own message now, so the mailbox has changed.
-			await invalidateAll();
-		} catch (failure) {
-			error = describeMailError(failure, t('common.networkError'));
-		} finally {
-			sending = false;
-		}
+		forwardTo = '';
+		forwardHtml = '';
+		forwardOpen = false;
 	}
 
 	/** Replies continue from the newest message, so the chain stays intact. */
@@ -229,6 +268,21 @@
 	/** Send the reply now, or leave it in the outbox until `scheduledAt`. */
 	async function deliverReply(scheduledAt: string | null) {
 		if (!latest || isHtmlEmpty(replyHtml)) return;
+
+		if (!scheduledAt) {
+			const messageId = latest.id;
+			const input = { html: replyHtml, text: htmlToPlainText(replyHtml), attachments: replyAttachments };
+			holdThreadSend(
+				{ mode: 'reply', html: replyHtml, attachments: replyAttachments },
+				() => sendReply(messageId, input),
+				null
+			);
+			error = '';
+			replyHtml = '';
+			replyAttachments = [];
+			replyOpen = false;
+			return;
+		}
 
 		sending = true;
 		error = '';

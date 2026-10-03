@@ -13,6 +13,7 @@
 	import { persistLocale } from '$lib/i18n';
 	import { getTheme } from '$lib/ui-theme/registry';
 	import MailboxLiveSync from '$lib/components/mailbox/MailboxLiveSync.svelte';
+	import SendToast from '$lib/components/mailbox/SendToast.svelte';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import type { LayoutData } from './$types';
 
@@ -105,6 +106,7 @@
 	<ThemeShell data={shellData}>
 		{@render children()}
 	</ThemeShell>
+	<SendToast />
 {:else}
 	{@render children()}
 {/if}

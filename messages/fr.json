@@ -344,7 +344,13 @@
 		"removeRecipient": "Supprimer {address}",
 		"spaceToAdd": "Espace pour ajouter",
 		"cancelSend": "Annuler l’envoi",
-		"recalling": "Annulation…"
+		"recalling": "Annulation…",
+		"undoSending": "Envoi…",
+		"undoAction": "Annuler",
+		"undoSent": "Message envoyé",
+		"undoView": "Afficher le message",
+		"undoFailed": "Impossible d'envoyer votre message",
+		"undoLeaveWarning": "Un message est encore en cours d’envoi. Quitter quand même ?"
 	},
 	"thread": {
 		"close": "Fermer",
