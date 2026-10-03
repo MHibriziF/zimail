@@ -11,7 +11,8 @@ import { createAiService, type AiService } from './service';
 
 export { COMPOSE_ACTIONS, type ComposeAction } from './prompt';
 export { MAX_QUESTION_CHARS, type FoundEvent, type FoundMessage, type HistoryTurn } from './find';
-export { createAiService, type AiService, type ComposeOutcome, type FindOutcome } from './service';
+export { createAiService, type AiBinding, type AiService, type ComposeOutcome, type FindOutcome } from './service';
+export { sortTabs, type TabMessage, type TabsOutcome } from './tabs';
 
 type PlatformLike = App.Platform | undefined | null;
 
