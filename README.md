@@ -37,7 +37,7 @@ no servers to maintain.
 
 On top of everything upstream ships:
 
-- **[AI assistant](#ai-assistant)** — **Write with AI** drafts and polishes emails and replies, and **Ask AI** answers questions about your mail and calendar, with links to what it used. Free on Cloudflare Workers AI, no API key, and it never sends anything by itself.
+- **[AI assistant](#ai-assistant)** — **Write with AI** drafts and polishes emails and replies, **Ask AI** answers questions about your mail and calendar and prepares events for you to add, and inbox tabs are sorted by Cloudflare's own model, **Clef**, the way Gmail does it. Free on Cloudflare Workers AI, no API key, and it never sends or saves anything by itself.
 - **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat, and [recording](#recording-a-meeting) in the browser. **Compose → New meeting**, or the **Meetings** view.
 - **[Calendar](#calendar)** — month and agenda views next to the mailbox, with today's and tomorrow's events in the sidebar. Pull in [Google, Outlook or iCloud calendars](#other-calendars) by their iCal address, and share [reservation pages](#reservation-pages) where people book a free slot — checked against every calendar you have, sent as a real calendar invitation, and optionally with its own meeting room. **Calendar** in the sidebar.
 - **Scheduled send** — pick any future date and time, or one of the presets, from the caret beside **Send**. The message waits in your own outbox and a [cron trigger](#scheduled-send) delivers it, so it works on either mail provider and is not capped at a provider's hold-until horizon. Recall it back to a draft any time before it goes.
@@ -421,11 +421,23 @@ Cloudflare account. There's no API key and nothing to set up.
 - **Ask AI**, from Classic's top bar or Zero's sidebar. Ask about your mail and
   calendar in plain words: "the invoice Budi sent last month", "am I free Friday
   afternoon?". Answers link to the messages and events they came from, and
-  **History** keeps your conversations to come back to or delete.
+  **History** keeps your conversations to come back to or delete. Ask it to
+  set something up ("lunch with Ana Friday at noon") and it prepares the event
+  as a card: nothing is saved, and no guest is invited, until you press **Add
+  to calendar**.
+- **Inbox tabs**, sorted like Gmail's: Primary, Social, Promotions, Updates
+  and Forums. [Clef](https://developers.cloudflare.com/workers-ai/models/clef-flash/),
+  Cloudflare's own decision model, reads the sender, subject and start of each
+  new conversation to pick its tab, so a sign-in code lands in Primary and
+  receipts in Updates. Replies follow their conversation, and when you move a
+  conversation to another tab, that sender's mail follows it there. Turn tabs
+  on or off, or re-sort recent mail, in **Settings → Inbox tabs**.
 
-**Free:** the Workers Free plan includes enough for several hundred questions
-or drafts a day. If that runs out, the assistant pauses until the next day and
-nothing is billed.
+**Free:** the Workers Free plan includes 10,000 neurons a day, shared by all of
+this: enough for several hundred questions or drafts, with tab sorting taking a
+few neurons per new conversation. If that runs out, the assistant pauses and
+tabs fall back to simple header rules until the next day, and nothing is
+billed.
 
 **Private:** your mail and calendar go only to Workers AI, on the same account
 that already stores them, and
