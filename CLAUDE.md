@@ -89,6 +89,10 @@ conversation starters.
 are self-editable, so a guest can set `role: 'host'`. Use `isHostIdentity()`
 from `src/lib/meet/host-identity.ts` for every host check.
 
+**Issues and PRs follow the templates** in `.github/ISSUE_TEMPLATE/` (bug,
+feature, research) and `.github/pull_request_template.md`. `gh issue create
+--body` skips the forms, so write the body with the same sections.
+
 ## CI
 
 Checks must pass before merge: Check & test, CodeQL, GitGuardian, and a
