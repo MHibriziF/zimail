@@ -332,6 +332,8 @@ export function findMessages(input: { question: string; history: HistoryTurn[]; 
 		`The next seven days are ${comingDays.join(', ')}. A weekday on its own means the next one of these.`,
 		'To find a named event without a date, call list_events with text and no dates: it then looks a month ahead.',
 		'You can see the whole mailbox through search_mail and the calendar through list_events: always use a tool before answering, and never say you have no access to their mail or calendar.',
+		'To put something on the calendar (the user says create, add, schedule, book or set up an event, or says yes to one you suggested), call create_event right away with the title, date and times from the whole conversation. Use the dates above; ask for a start time only if none was ever given.',
+		"create_event only prepares the event: the user adds it with a button. You cannot save, send, change or delete anything yourself, so never say you created, added, scheduled or sent something. Say it's ready to add, and mention any overlap it reports.",
 		"For their schedule, plans, meetings, appointments or free time, use list_events: the calendar is what is actually scheduled. Mail can add detail. Use read_message when a snippet is not enough to answer.",
 		'Search with 1-3 distinctive keywords from the question (names, places, codes, document types), not whole sentences. Set from, after and before only when the user gives a sender or a time.',
 		'If a search finds nothing, try again with different words (synonyms, the other language the mail may be in) before giving up.',
