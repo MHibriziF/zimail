@@ -1,12 +1,13 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
-	import { describeMailError, sendMessage } from '$lib/mail/client';
+	import { describeMailError, sendMessage, type SendMessageInput } from '$lib/mail/client';
+	import { holdSend, takeRestored } from '$lib/mail/undo-send';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';
 	import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
@@ -26,29 +27,44 @@
 	const defaultAddressId = $derived(
 		addresses.find((address) => address.is_default)?.id ?? addresses[0]?.id ?? ''
 	);
-	let chosenAddressId = $state('');
+	type Snapshot = {
+		draftId: string | null;
+		chosenAddressId: string;
+		to: string;
+		cc: string;
+		bcc: string;
+		subject: string;
+		html: string;
+		attachments: OutboundAttachmentInput[];
+	};
+
+	// A message taken back with Undo comes back as it was sent, ahead of any saved draft.
+	const restored = takeRestored<Snapshot>('compose');
+	const back = restored?.snapshot;
+
+	let chosenAddressId = $state(back?.chosenAddressId ?? '');
 	const fromAddressId = $derived(chosenAddressId || defaultAddressId);
 
-	let activeDraft = $state<string | null>(null);
-	let to = $state('');
-	let cc = $state('');
-	let bcc = $state('');
-	let subject = $state('');
-	let html = $state('');
-	let attachments = $state<OutboundAttachmentInput[]>([]);
-	let showCc = $state(false);
-	let showBcc = $state(false);
-	let error = $state('');
+	let activeDraft = $state<string | null>(back?.draftId ?? null);
+	let to = $state(back?.to ?? '');
+	let cc = $state(back?.cc ?? '');
+	let bcc = $state(back?.bcc ?? '');
+	let subject = $state(back?.subject ?? '');
+	let html = $state(back?.html ?? '');
+	let attachments = $state<OutboundAttachmentInput[]>(back?.attachments ?? []);
+	let showCc = $state(Boolean(back?.cc));
+	let showBcc = $state(Boolean(back?.bcc));
+	let error = $state(restored?.error ?? '');
 	let sending = $state(false);
 	let savingDraft = $state(false);
 
 	$effect(() => {
-		activeDraft = draftId;
+		if (!back) activeDraft = draftId;
 	});
 
 	$effect(() => {
 		const id = draftId;
-		if (!id) return;
+		if (!id || back) return;
 		void fetch(`/api/drafts/${id}`)
 			.then(async (response) => {
 				const draft = (await response.json()) as {
@@ -144,21 +160,38 @@
 			error = t('compose.writeMessage');
 			return;
 		}
+		const message: SendMessageInput = {
+			draftId: activeDraft,
+			fromAddressId,
+			to,
+			cc,
+			bcc,
+			subject,
+			html,
+			text: htmlToPlainText(html),
+			attachments,
+			scheduledAt
+		};
+		if (!scheduledAt) {
+			const reopenAt = `${$page.url.pathname}${$page.url.search}`;
+			holdSend<Snapshot>({
+				key: 'compose',
+				snapshot: { draftId: activeDraft, chosenAddressId, to, cc, bcc, subject, html, attachments },
+				send: async () => {
+					const sent = await sendMessage(message);
+					await invalidateAll();
+					return sent.id ? `/sent?thread=${encodeURIComponent(sent.id)}` : '/sent';
+				},
+				reopen: () => void goto(reopenAt, { keepFocus: true, noScroll: true }),
+				describeError: (failure) => describeMailError(failure, t('common.networkError'))
+			});
+			onClose();
+			return;
+		}
 		sending = true;
 		error = '';
 		try {
-			await sendMessage({
-				draftId: activeDraft,
-				fromAddressId,
-				to,
-				cc,
-				bcc,
-				subject,
-				html,
-				text: htmlToPlainText(html),
-				attachments,
-				scheduledAt
-			});
+			await sendMessage(message);
 			await invalidateAll();
 			onClose();
 		} catch (failure) {

@@ -344,7 +344,13 @@
 		"removeRecipient": "Hapus {address}",
 		"spaceToAdd": "Spasi untuk menambah",
 		"cancelSend": "Batalkan pengiriman",
-		"recalling": "Menarik kembali…"
+		"recalling": "Menarik kembali…",
+		"undoSending": "Mengirim…",
+		"undoAction": "Urungkan",
+		"undoSent": "Pesan terkirim",
+		"undoView": "Lihat pesan",
+		"undoFailed": "Pesan Anda gagal dikirim",
+		"undoLeaveWarning": "Pesan masih dikirim. Tetap tinggalkan?"
 	},
 	"thread": {
 		"close": "Tutup",

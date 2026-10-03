@@ -344,7 +344,13 @@
 		"removeRecipient": "移除 {address}",
 		"spaceToAdd": "按空格添加",
 		"cancelSend": "取消发送",
-		"recalling": "撤回中…"
+		"recalling": "撤回中…",
+		"undoSending": "正在发送…",
+		"undoAction": "撤销",
+		"undoSent": "邮件已发送",
+		"undoView": "查看邮件",
+		"undoFailed": "邮件发送失败",
+		"undoLeaveWarning": "邮件仍在发送中。仍要离开吗？"
 	},
 	"thread": {
 		"close": "关闭",

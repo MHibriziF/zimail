@@ -31,6 +31,7 @@
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import { holdSend, restored, takeRestored } from '$lib/mail/undo-send';
 
 	let {
 		id,
@@ -55,6 +56,17 @@
 	};
 
 	type ReplyMode = 'reply' | 'replyAll' | 'forward' | 'forwardAll';
+
+	type ThreadSnapshot = {
+		mode: ReplyMode;
+		targetId: string;
+		to: string;
+		cc: string;
+		bcc: string;
+		html: string;
+		attachments: OutboundAttachmentInput[];
+		includeOriginalAttachments: boolean;
+	};
 
 	let thread = $state<ThreadPayload | null>(null);
 	let loading = $state(false);
@@ -383,6 +395,10 @@
 			sendError = t('thread.addRecipient');
 			return;
 		}
+		if (!scheduledAt) {
+			holdComposer(message);
+			return;
+		}
 		sending = true;
 		sendError = '';
 		try {
@@ -420,6 +436,79 @@
 			sending = false;
 		}
 	}
+
+	/** Sends after the undo window; the composer closes now and comes back on Undo. */
+	function holdComposer(message: ThreadMessage) {
+		const snapshot: ThreadSnapshot = {
+			mode: replyMode,
+			targetId: message.id,
+			to: replyTo,
+			cc: replyCc,
+			bcc: replyBcc,
+			html: replyHtml,
+			attachments,
+			includeOriginalAttachments
+		};
+		const threadId = thread?.threadId ?? null;
+		const reopenAt = `${$page.url.pathname}${$page.url.search}`;
+		holdSend<ThreadSnapshot>({
+			key: `thread:${id}`,
+			snapshot,
+			send: async () => {
+				const text = isHtmlEmpty(snapshot.html) ? undefined : htmlToPlainText(snapshot.html);
+				if (snapshot.mode === 'forward' || snapshot.mode === 'forwardAll') {
+					await forwardMessage(message.id, {
+						to: snapshot.to,
+						cc: snapshot.cc,
+						bcc: snapshot.bcc,
+						html: text === undefined ? undefined : snapshot.html,
+						text,
+						includeAttachments: snapshot.includeOriginalAttachments,
+						threadId: snapshot.mode === 'forwardAll' ? threadId : null
+					});
+				} else {
+					await sendReply(message.id, {
+						to: snapshot.to,
+						cc: snapshot.cc,
+						bcc: snapshot.bcc,
+						html: snapshot.html,
+						text: text ?? '',
+						attachments: snapshot.attachments
+					});
+				}
+				await invalidateAll();
+				return reopenAt;
+			},
+			reopen: () => void goto(reopenAt, { keepFocus: true, noScroll: true }),
+			describeError: (failure) =>
+				describeMailError(failure, forwarding ? t('thread.couldNotForward') : t('common.networkError'))
+		});
+		sendError = '';
+		replyOpen = false;
+		replyHtml = '';
+		attachments = [];
+	}
+
+	// Undo, or a send that failed, puts the composer back as it was.
+	$effect(() => {
+		void $restored;
+		if (!id || !thread) return;
+		const back = takeRestored<ThreadSnapshot>(`thread:${id}`);
+		if (!back) return;
+		const snapshot = back.snapshot;
+		const target = thread.messages.find((message) => message.id === snapshot.targetId) ?? latest;
+		if (!target) return;
+		untrack(() => startReply(snapshot.mode, target));
+		replyTo = snapshot.to;
+		replyCc = snapshot.cc;
+		replyBcc = snapshot.bcc;
+		showCc = Boolean(snapshot.cc);
+		showBcc = Boolean(snapshot.bcc);
+		replyHtml = snapshot.html;
+		attachments = snapshot.attachments;
+		includeOriginalAttachments = snapshot.includeOriginalAttachments;
+		sendError = back.error ?? '';
+	});
 
 	function visiblePeople(list: AddressPart[]): { shown: AddressPart[]; extra: number } {
 		if (list.length <= 2) return { shown: list, extra: 0 };
