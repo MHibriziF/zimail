@@ -5,11 +5,14 @@
 	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import { untrack } from 'svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
+	import { composerBody, hasSignatureBlock } from '$lib/email-signature';
+	import { isBodyEmpty, signatureFor, swapSignature } from '$lib/mail/signature';
 	import { describeMailError, sendMessage, type SendMessageInput } from '$lib/mail/client';
 	import { holdSend, peekRestored, settleRestored } from '$lib/mail/undo-send';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';
-	import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
+	import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from './ComposerActions.svelte';
 	import { t } from '$lib/i18n';
@@ -51,7 +54,21 @@
 	let cc = $state(back?.cc ?? '');
 	let bcc = $state(back?.bcc ?? '');
 	let subject = $state(back?.subject ?? '');
-	let html = $state(back?.html ?? '');
+	const accountSignature = $derived(($page.data.user as User | null | undefined)?.email_signature);
+	const signatureOf = (addressId: string) =>
+		signatureFor(addresses.find((address) => address.id === addressId), accountSignature);
+
+	/** The signature shows from the start, so nobody types a second one by hand. */
+	function withSignature(body: string): string {
+		return hasSignatureBlock(body) ? body : composerBody(signatureOf(fromAddressId), body);
+	}
+
+	let html = $state(back?.html ?? untrack(() => withSignature('')));
+
+	function chooseFrom(addressId: string) {
+		chosenAddressId = addressId;
+		html = swapSignature(html, signatureOf(fromAddressId));
+	}
 	let attachments = $state<OutboundAttachmentInput[]>(back?.attachments ?? []);
 	let showCc = $state(Boolean(back?.cc));
 	let showBcc = $state(Boolean(back?.bcc));
@@ -88,8 +105,8 @@
 				cc = draft.cc_addr ?? '';
 				bcc = draft.bcc_addr ?? '';
 				subject = draft.subject ?? '';
-				html = draft.body_html || draft.body_text || '';
 				if (draft.address_id) chosenAddressId = draft.address_id;
+				html = untrack(() => withSignature(draft.body_html || draft.body_text || ''));
 				showCc = Boolean(draft.cc_addr);
 				showBcc = Boolean(draft.bcc_addr);
 			})
@@ -98,7 +115,7 @@
 			});
 	});
 
-	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isHtmlEmpty(html)));
+	const hasDraftText = $derived(Boolean(to.trim() || subject.trim() || !isBodyEmpty(html)));
 	let startingMeeting = $state(false);
 
 	async function addMeetingLink() {
@@ -157,7 +174,7 @@
 
 	/** Send now, or hand the message to the outbox for `scheduledAt`. */
 	async function deliver(scheduledAt: string | null) {
-		if (isHtmlEmpty(html)) {
+		if (isBodyEmpty(html)) {
 			error = t('compose.writeMessage');
 			return;
 		}
@@ -276,7 +293,7 @@
 						<select
 							class="z-composer-input"
 							value={fromAddressId}
-							onchange={(event) => (chosenAddressId = event.currentTarget.value)}
+							onchange={(event) => chooseFrom(event.currentTarget.value)}
 						>
 							{#each addresses as address (address.id)}
 								<option value={address.id}>

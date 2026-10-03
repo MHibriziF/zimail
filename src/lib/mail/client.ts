@@ -100,6 +100,10 @@ export type SendMessageInput = {
 	scheduledAt?: string | null;
 };
 
+/**
+ * Every caller is a composer that already shows the signature in the body, so the sends below
+ * tell the server not to append it again.
+ */
 export async function sendMessage(input: SendMessageInput): Promise<{ id?: string }> {
 	return post<{ id?: string }>(
 		'/api/mail',
@@ -113,7 +117,8 @@ export async function sendMessage(input: SendMessageInput): Promise<{ id?: strin
 			html: input.html,
 			text: input.text,
 			attachments: input.attachments,
-			scheduledAt: input.scheduledAt ?? undefined
+			scheduledAt: input.scheduledAt ?? undefined,
+			signatureIncluded: true
 		},
 		'Failed to send'
 	);
@@ -141,7 +146,8 @@ export async function sendReply(messageId: string, input: SendReplyInput): Promi
 			html: input.html,
 			text: input.text,
 			attachments: input.attachments,
-			scheduledAt: input.scheduledAt ?? undefined
+			scheduledAt: input.scheduledAt ?? undefined,
+			signatureIncluded: true
 		},
 		'Failed to send'
 	);
@@ -171,7 +177,8 @@ export async function forwardMessage(messageId: string, input: ForwardInput): Pr
 			bcc: input.bcc?.trim() || undefined,
 			html: input.html,
 			text: input.text,
-			includeAttachments: input.includeAttachments
+			includeAttachments: input.includeAttachments,
+			signatureIncluded: true
 		},
 		'Failed to forward'
 	);

@@ -45,6 +45,11 @@ export type ComposeInput = {
 	subjectMatch?: boolean;
 	/** ISO 8601. Stored unsent and left for the cron sweep to deliver. */
 	scheduledAt?: string | null;
+	/**
+	 * The composer already shows the signature in the body, or the writer took it out, so it
+	 * is not added again. API sends leave this unset and keep the automatic one.
+	 */
+	signatureIncluded?: boolean;
 };
 
 export function assertTotalAttachmentBytes(totalBytes: number): void {
@@ -186,7 +191,9 @@ export async function sendAndStore(
 	const { text, html } = appendEmailSignature({
 		text: bodyText,
 		html: bodyHtml,
-		signature: pickEmailSignature(from.signature, await getEmailSignature(env.DB, user.id))
+		signature: input.signatureIncluded
+			? ''
+			: pickEmailSignature(from.signature, await getEmailSignature(env.DB, user.id))
 	});
 
 	const attachments = input.attachments ?? [];

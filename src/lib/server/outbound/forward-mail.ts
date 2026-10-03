@@ -14,6 +14,8 @@ export type ForwardRequest = {
 	text?: string;
 	html?: string;
 	includeAttachments?: boolean;
+	/** The composer put the signature in the note; see `ComposeInput`. */
+	signatureIncluded?: boolean;
 };
 
 export async function readForwardedAttachments(
@@ -72,7 +74,8 @@ export async function sendForwardedMessages(
 		attachments,
 		// A forwarded thread's files come from several messages at once.
 		allowCombinedAttachments: ordered.length > 1,
-		subjectMatch: false
+		subjectMatch: false,
+		signatureIncluded: input.signatureIncluded === true
 	});
 
 	return { emailId };

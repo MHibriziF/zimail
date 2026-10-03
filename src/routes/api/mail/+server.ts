@@ -21,6 +21,7 @@ type SendMailBody = {
 	html?: string;
 	attachments?: OutboundAttachmentInput[];
 	scheduledAt?: string;
+	signatureIncluded?: boolean;
 };
 
 function mailboxView(url: URL): MailboxView {
@@ -99,7 +100,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 				text: body.text,
 				html: body.html,
 				attachments: body.attachments,
-				scheduledAt: schedule.iso
+				scheduledAt: schedule.iso,
+				signatureIncluded: body.signatureIncluded === true
 			}
 		);
 

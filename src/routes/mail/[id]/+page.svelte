@@ -2,6 +2,8 @@
 	import { goto, invalidate, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { holdSend, restored, takeRestored } from '$lib/mail/undo-send';
+	import { isBodyEmpty, replyAddress, signatureFor } from '$lib/mail/signature';
+	import { composerBody } from '$lib/email-signature';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -26,7 +28,7 @@
 	} from '$lib/mail/client';
 	import { hasInAppHistory, requestSkipViewTransition } from '$lib/app-chrome';
 	import { APP_NAME } from '$lib/constants';
-	import type { OutboundAttachmentInput } from '$lib/types';
+	import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -222,16 +224,25 @@
 		goto('/trash');
 	}
 
+	/** The reply goes out from the address the conversation reached, with that address's sign-off. */
+	function replyBody(): string {
+		if (!latest) return '';
+		const addresses = ($page.data.addresses ?? []) as MailAddress[];
+		return composerBody(signatureFor(replyAddress(latest, addresses), data.user?.email_signature));
+	}
+
 	/** Reply and forward share the space below the thread, so only one is open. */
 	function openReply() {
 		forwardOpen = false;
 		replyOpen = !replyOpen;
+		if (replyOpen && isHtmlEmpty(replyHtml)) replyHtml = replyBody();
 		error = '';
 	}
 
 	function openForward() {
 		replyOpen = false;
 		forwardOpen = !forwardOpen;
+		if (forwardOpen && isHtmlEmpty(forwardHtml)) forwardHtml = replyBody();
 		error = '';
 	}
 
@@ -267,7 +278,7 @@
 
 	/** Send the reply now, or leave it in the outbox until `scheduledAt`. */
 	async function deliverReply(scheduledAt: string | null) {
-		if (!latest || isHtmlEmpty(replyHtml)) return;
+		if (!latest || isBodyEmpty(replyHtml)) return;
 
 		if (!scheduledAt) {
 			const messageId = latest.id;

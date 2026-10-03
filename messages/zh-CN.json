@@ -350,7 +350,13 @@
 		"undoSent": "邮件已发送",
 		"undoView": "查看邮件",
 		"undoFailed": "邮件发送失败",
-		"undoLeaveWarning": "邮件仍在发送中。仍要离开吗？"
+		"undoLeaveWarning": "邮件仍在发送中。仍要离开吗？",
+		"linkTitle": "链接",
+		"linkText": "文字",
+		"linkUrl": "链接",
+		"linkApply": "应用",
+		"linkRemove": "移除链接",
+		"linkInvalid": "请输入网址或邮箱地址"
 	},
 	"thread": {
 		"close": "关闭",

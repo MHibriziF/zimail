@@ -26,12 +26,14 @@
 	import { MAIL_CHANGED_MESSAGE } from '$lib/mail/sync';
 	import { initials, parseAddressList, type AddressPart } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
-	import type { MailAddress, MailboxView, OutboundAttachmentInput, ThreadMessage } from '$lib/types';
+	import type { MailAddress, MailboxView, OutboundAttachmentInput, ThreadMessage, User } from '$lib/types';
 	import type { ZeroIconName } from '../icons/names';
 	import Icon from '../icons/Icon.svelte';
 	import ComposerActions from '../overlays/ComposerActions.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { holdSend, restored, takeRestored } from '$lib/mail/undo-send';
+	import { isBodyEmpty, replyAddress, signatureFor } from '$lib/mail/signature';
+	import { composerBody } from '$lib/email-signature';
 
 	let {
 		id,
@@ -337,7 +339,10 @@
 		replyBcc = '';
 		showCc = Boolean(next.cc);
 		showBcc = false;
-		replyHtml = '';
+		// Goes out from the address the conversation reached, with that address's sign-off.
+		const addresses = ($page.data.addresses as MailAddress[] | undefined) ?? [];
+		const account = ($page.data.user as User | null | undefined)?.email_signature;
+		replyHtml = composerBody(signatureFor(replyAddress(message, addresses), account));
 		sendError = '';
 		attachments = [];
 		includeOriginalAttachments = true;
@@ -390,7 +395,7 @@
 	 */
 	async function submitComposer(scheduledAt: string | null = null) {
 		const message = replyTarget ?? latest;
-		if (!message || (!forwarding && isHtmlEmpty(replyHtml))) return;
+		if (!message || (!forwarding && isBodyEmpty(replyHtml))) return;
 		if (forwarding && !replyTo.trim()) {
 			sendError = t('thread.addRecipient');
 			return;
