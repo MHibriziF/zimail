@@ -1987,8 +1987,6 @@
 		}
 	}
 
-	/* Tiles arriving after the stage is up fade in rather than popping into the grid. */
-	.call-tile-group > :global(.call-tile),
 	:global(.call-tile-hand) {
 		position: absolute;
 		top: 0.5rem;
@@ -2079,6 +2077,8 @@
 		}
 	}
 
+	/* Tiles arriving after the stage is up fade in rather than popping into the grid. */
+	.call-tile-group > :global(.call-tile),
 	:global(.call-tile-placeholder) {
 		animation: call-tile-in 0.25s ease-out;
 	}
