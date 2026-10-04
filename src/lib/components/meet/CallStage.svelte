@@ -936,9 +936,13 @@
 				readHostScreenShareSettings(participant);
 			}
 			refreshRoster();
+			// Read both choices first: publishing the mic re-syncs cameraEnabled from LiveKit,
+			// which reports it off until the camera is published too.
+			const wantMic = micEnabled;
+			const wantCamera = cameraEnabled;
 			// A device that won't start is the caller's to fix, not a failed connection.
-			if (micEnabled) await enableMic();
-			if (cameraEnabled) await enableCamera();
+			if (wantMic) await enableMic();
+			if (wantCamera) await enableCamera();
 			playJoinChime();
 		} catch (error) {
 			connectionError = error instanceof Error ? error.message : t('meet.connectionError');
