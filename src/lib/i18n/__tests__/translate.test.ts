@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -68,6 +68,30 @@ test('locale catalogs expose the same keys as English', async () => {
 		>;
 		assert.deepEqual(flattenKeys(catalog).sort(), expected, locale);
 	}
+});
+
+function sourceFiles(dir: string): string[] {
+	return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+		const path = join(dir, entry.name);
+		if (entry.isDirectory()) return entry.name === '__tests__' ? [] : sourceFiles(path);
+		return /\.(ts|svelte)$/.test(entry.name) ? [path] : [];
+	});
+}
+
+test('every literal key the code translates exists in English', () => {
+	// An unknown key renders as itself, so a string filed under the wrong
+	// section shows up as `meet.captionsSettingLabel` in the UI (#171).
+	const root = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
+	const english = new Set(
+		flattenKeys(JSON.parse(readFileSync(join(root, 'messages/en.json'), 'utf8')) as Record<string, unknown>)
+	);
+	const missing: string[] = [];
+	for (const file of sourceFiles(join(root, 'src'))) {
+		for (const match of readFileSync(file, 'utf8').matchAll(/\bt\(\s*'([a-zA-Z]+(?:\.[a-zA-Z0-9]+)+)'/g)) {
+			if (!english.has(match[1])) missing.push(`${match[1]} (${file.slice(root.length + 1)})`);
+		}
+	}
+	assert.deepEqual(missing, []);
 });
 
 test('every catalog has the same keys and placeholders as English', () => {
