@@ -27,10 +27,7 @@ export function splitStatements(sql: string): string[] {
 			const newline = sql.indexOf('\n', index);
 			current += '\n';
 			index = newline === -1 ? sql.length : newline + 1;
-		} else if (character === ';' && insideTriggerBody(current)) {
-			current += character;
-			index += 1;
-		} else if (character === ';') {
+		} else if (character === ';' && !insideTriggerBody(current)) {
 			statements.push(current);
 			current = '';
 			index += 1;
