@@ -1,25 +1,28 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { captionLanguageLabel, captionLanguages } from '../caption-language';
+import { captionLanguages, languageNames } from '../caption-language';
 
 describe('captionLanguages', () => {
-	test('auto, missing and unknown choices leave the guess to Whisper', () => {
-		assert.deepEqual(captionLanguages('auto'), []);
+	test('nothing, or nothing known, leaves the guess to Whisper', () => {
 		assert.deepEqual(captionLanguages(null), []);
-		assert.deepEqual(captionLanguages('xx'), []);
-		assert.deepEqual(captionLanguages('en+xx'), []);
+		assert.deepEqual(captionLanguages(''), []);
+		assert.deepEqual(captionLanguages('auto'), []);
+		assert.deepEqual(captionLanguages('xx,zz'), []);
 	});
 
-	test('one language, or the English and Indonesian pair', () => {
+	test('keeps known codes in the order picked, without repeats', () => {
 		assert.deepEqual(captionLanguages('id'), ['id']);
-		assert.deepEqual(captionLanguages('en+id'), ['en', 'id']);
+		assert.deepEqual(captionLanguages('ja, en ,xx,ja'), ['ja', 'en']);
+	});
+
+	test('stops at three', () => {
+		assert.deepEqual(captionLanguages('en,id,ja,ko'), ['en', 'id', 'ja']);
 	});
 });
 
-describe('captionLanguageLabel', () => {
-	test('names languages in the reader’s locale and joins a pair', () => {
-		assert.equal(captionLanguageLabel('auto', 'en', 'Detect'), 'Detect');
-		assert.equal(captionLanguageLabel('en+id', 'en', 'Detect'), 'English + Indonesian');
-		assert.equal(captionLanguageLabel('id', 'id', 'Deteksi'), 'Indonesia');
+describe('languageNames', () => {
+	test('names languages in the reader’s locale', () => {
+		assert.equal(languageNames('en')('id'), 'Indonesian');
+		assert.equal(languageNames('id')('id'), 'Indonesia');
 	});
 });
