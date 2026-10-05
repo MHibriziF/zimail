@@ -29,6 +29,7 @@
 		type ActiveRecording
 	} from '$lib/meet/recorder';
 	import { meetingRecordingSupported, startMeetingRecording, type CompositeSource } from '$lib/meet/composite-recorder';
+	import { layoutCallTiles, type TileRect } from '$lib/meet/tile-layout';
 	import { parseRecordingAttribute, recordingChoices, type RecordingKind } from '$lib/meet/recording-kind';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
 	import {
@@ -122,6 +123,14 @@
 	let room: Room | null = null;
 	let localMediaEl = $state<HTMLDivElement>();
 	let remoteContainerEl = $state<HTMLDivElement>();
+	let gridEl = $state<HTMLDivElement>();
+	let tilePage = $state(0);
+	let tilePages = $state(1);
+	/** Level with the paged tiles, so under a screen share the arrows sit by the strip, not over the screen. */
+	let pageArrowTop = $state('50%');
+	let layoutFrame = 0;
+	let swipeStart: { x: number; y: number } | null = null;
+	const SWIPE_THRESHOLD_PX = 50;
 	let connecting = $state(true);
 	let connectionError = $state('');
 	/** Until connect() settles: a Disconnected event then means it failed, not that the call ended. */
@@ -499,6 +508,89 @@
 			tile.el.setAttribute('aria-pressed', String(isFeatured));
 		}
 	});
+
+	/** The featured share goes first, so it is the one the layout gives the stage. */
+	function stageTiles(grid: HTMLElement): HTMLElement[] {
+		const tiles = Array.from(
+			grid.querySelectorAll<HTMLElement>(':scope > .call-tile, :scope > .call-tile-group > .call-tile')
+		).filter((el) => !el.hidden);
+		const featured = tiles.find((el) => el.classList.contains('call-tile-featured'));
+		return featured ? [featured, ...tiles.filter((el) => el !== featured)] : tiles;
+	}
+
+	/** Tiles on other pages sit a page-width away, so changing page slides them in. */
+	function placeTile(el: HTMLElement, rect: TileRect | undefined, page: number, pageWidth: number) {
+		if (!rect) return;
+		const offset = rect.page === null ? 0 : (rect.page - page) * pageWidth;
+		el.style.left = `${rect.x + offset}px`;
+		el.style.top = `${rect.y}px`;
+		el.style.width = `${rect.width}px`;
+		el.style.height = `${rect.height}px`;
+		el.inert = rect.page !== null && rect.page !== page;
+	}
+
+	function layoutStage() {
+		layoutFrame = 0;
+		if (!gridEl) return;
+		const tiles = stageTiles(gridEl);
+		const featured = tiles[0]?.classList.contains('call-tile-featured') ?? false;
+		const { clientWidth: width, clientHeight: height } = gridEl;
+		const layout = layoutCallTiles(tiles.length, featured, width, height);
+		tilePages = layout.pages;
+		tilePage = Math.min(tilePage, layout.pages - 1);
+		const paged = layout.rects.find((rect) => rect.page !== null);
+		pageArrowTop = paged ? `${paged.y + paged.height / 2}px` : '50%';
+		tiles.forEach((el, index) => placeTile(el, layout.rects[index], tilePage, width));
+	}
+
+	function scheduleLayout() {
+		if (!layoutFrame) layoutFrame = requestAnimationFrame(layoutStage);
+	}
+
+	// Tiles come and go as hand-built DOM, so the layout watches the grid rather than any state.
+	$effect(() => {
+		const grid = gridEl;
+		if (!grid) return;
+		const resize = new ResizeObserver(scheduleLayout);
+		resize.observe(grid);
+		const mutations = new MutationObserver(scheduleLayout);
+		mutations.observe(grid, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
+		const cancelSwipe = () => (swipeStart = null);
+		grid.addEventListener('pointerdown', handleSwipeStart);
+		grid.addEventListener('pointerup', handleSwipeEnd);
+		grid.addEventListener('pointercancel', cancelSwipe);
+		return () => {
+			grid.removeEventListener('pointerdown', handleSwipeStart);
+			grid.removeEventListener('pointerup', handleSwipeEnd);
+			grid.removeEventListener('pointercancel', cancelSwipe);
+			resize.disconnect();
+			mutations.disconnect();
+			cancelAnimationFrame(layoutFrame);
+			layoutFrame = 0;
+		};
+	});
+
+	$effect(() => {
+		tilePage;
+		scheduleLayout();
+	});
+
+	function showTilePage(page: number) {
+		tilePage = Math.max(0, Math.min(tilePages - 1, page));
+	}
+
+	function handleSwipeStart(event: PointerEvent) {
+		swipeStart = event.pointerType === 'mouse' || tilePages < 2 ? null : { x: event.clientX, y: event.clientY };
+	}
+
+	function handleSwipeEnd(event: PointerEvent) {
+		if (!swipeStart) return;
+		const dx = event.clientX - swipeStart.x;
+		const dy = event.clientY - swipeStart.y;
+		swipeStart = null;
+		if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return;
+		showTilePage(dx < 0 ? tilePage + 1 : tilePage - 1);
+	}
 
 	/** Routes one attached remote element to the chosen output device, if a non-default one is picked. */
 	function applySinkId(el: HTMLMediaElement) {
@@ -1661,69 +1753,106 @@
 	</div>
 
 	<div class="call-body">
-		<div class="call-grid">
-			<div
-				class="call-tile call-tile-screen"
-				class:call-tile-featured={featuredShare === LOCAL_SHARE_KEY}
-				hidden={!screenShareEnabled}
-				role="button"
-				tabindex="0"
-				title={t('meet.focusScreenShare')}
-				aria-pressed={featuredShare === LOCAL_SHARE_KEY}
-				onclick={() => focusShare(LOCAL_SHARE_KEY)}
-				onkeydown={(event) => {
-					if (event.key === 'Enter' || event.key === ' ') {
-						event.preventDefault();
-						focusShare(LOCAL_SHARE_KEY);
-					}
-				}}
-			>
-				<div class="call-tile-media" bind:this={localScreenMediaEl}></div>
-				<span class="call-tile-name">
-					<span class="call-tile-label">{t('meet.you')} · {t('meet.screenShare')}</span>
-				</span>
-			</div>
-			<div
-				class="call-tile call-tile-local"
-				class:call-tile-joining={connecting || connectionError}
-				class:call-tile-hand-raised={handRaisedAt !== null}
-			>
-				<div class="call-tile-avatar" style="background: {localColor}">{localInitials}</div>
-				<div class="call-tile-media" bind:this={localMediaEl}></div>
-				<div class="call-tile-status">
-					{#if !micEnabled}<Icon name="mic-off-line" size={14} class="call-tile-status-icon" />{/if}
-					{#if !cameraEnabled}<Icon name="camera-off-line" size={14} class="call-tile-status-icon" />{/if}
-					{#if deafened}<Icon name="volume-mute-line" size={14} class="call-tile-status-icon" />{/if}
+		<div class="call-tiles">
+			<div class="call-grid" bind:this={gridEl}>
+				<div
+					class="call-tile call-tile-screen"
+					class:call-tile-featured={featuredShare === LOCAL_SHARE_KEY}
+					hidden={!screenShareEnabled}
+					role="button"
+					tabindex="0"
+					title={t('meet.focusScreenShare')}
+					aria-pressed={featuredShare === LOCAL_SHARE_KEY}
+					onclick={() => focusShare(LOCAL_SHARE_KEY)}
+					onkeydown={(event) => {
+						if (event.key === 'Enter' || event.key === ' ') {
+							event.preventDefault();
+							focusShare(LOCAL_SHARE_KEY);
+						}
+					}}
+				>
+					<div class="call-tile-media" bind:this={localScreenMediaEl}></div>
+					<span class="call-tile-name">
+						<span class="call-tile-label">{t('meet.you')} · {t('meet.screenShare')}</span>
+					</span>
 				</div>
-				{#if handRaisedAt !== null}
-					<i class="ri-hand call-tile-hand" title={t('meet.handRaised')}></i>
-				{/if}
-				<span class="call-tile-name">
-					<span class="call-tile-label">{localName} · {t('meet.you')}</span>
-					{#if isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
-				</span>
-				{#if connectionError}
-					<div class="call-joining" role="alert">
-						<Icon name="error-warning-line" size={22} />
-						<p class="call-joining-title">{t('meet.connectionError')}</p>
-						{#if connectionError !== t('meet.connectionError')}
-							<p class="call-joining-detail">{connectionError}</p>
-						{/if}
-						<button type="button" class="call-joining-retry" onclick={retryConnect}>{t('common.tryAgain')}</button>
+				<div
+					class="call-tile call-tile-local"
+					class:call-tile-joining={connecting || connectionError}
+					class:call-tile-hand-raised={handRaisedAt !== null}
+				>
+					<div class="call-tile-avatar" style="background: {localColor}">{localInitials}</div>
+					<div class="call-tile-media" bind:this={localMediaEl}></div>
+					<div class="call-tile-status">
+						{#if !micEnabled}<Icon name="mic-off-line" size={14} class="call-tile-status-icon" />{/if}
+						{#if !cameraEnabled}<Icon name="camera-off-line" size={14} class="call-tile-status-icon" />{/if}
+						{#if deafened}<Icon name="volume-mute-line" size={14} class="call-tile-status-icon" />{/if}
 					</div>
-				{:else if connecting}
-					<div class="call-joining" role="status">
-						<span class="call-joining-spinner" aria-hidden="true"></span>
-						<p class="call-joining-title">
-							{meetingCode ? t('meet.joiningCode', { code: meetingCode }) : t('meet.joining')}
-						</p>
+					{#if handRaisedAt !== null}
+						<i class="ri-hand call-tile-hand" title={t('meet.handRaised')}></i>
+					{/if}
+					<span class="call-tile-name">
+						<span class="call-tile-label">{localName} · {t('meet.you')}</span>
+						{#if isHost}<span class="call-host-badge">{t('meet.hostBadge')}</span>{/if}
+					</span>
+					{#if connectionError}
+						<div class="call-joining" role="alert">
+							<Icon name="error-warning-line" size={22} />
+							<p class="call-joining-title">{t('meet.connectionError')}</p>
+							{#if connectionError !== t('meet.connectionError')}
+								<p class="call-joining-detail">{connectionError}</p>
+							{/if}
+							<button type="button" class="call-joining-retry" onclick={retryConnect}>{t('common.tryAgain')}</button>
+						</div>
+					{:else if connecting}
+						<div class="call-joining" role="status">
+							<span class="call-joining-spinner" aria-hidden="true"></span>
+							<p class="call-joining-title">
+								{meetingCode ? t('meet.joiningCode', { code: meetingCode }) : t('meet.joining')}
+							</p>
+						</div>
+					{/if}
+				</div>
+				<div class="call-tile-group" bind:this={remoteContainerEl}></div>
+				{#if !connecting && !connectionError && remoteCount === 0}
+					<div class="call-tile call-tile-placeholder">
+						<span>{t('meet.waitingForOthers')}</span>
 					</div>
 				{/if}
 			</div>
-			<div class="call-tile-group" bind:this={remoteContainerEl}></div>
-			{#if !connecting && !connectionError && remoteCount === 0}
-				<div class="call-tile call-tile-placeholder">
-					<span>{t('meet.waitingForOthers')}</span>
+			{#if tilePages > 1}
+				<button
+					type="button"
+					class="call-page-arrow call-page-previous"
+					style:top={pageArrowTop}
+					disabled={tilePage === 0}
+					title={t('meet.tilesPreviousPage')}
+					aria-label={t('meet.tilesPreviousPage')}
+					onclick={() => showTilePage(tilePage - 1)}
+				>
+					<Icon name="arrow-left-s-line" size={22} />
+				</button>
+				<button
+					type="button"
+					class="call-page-arrow call-page-next"
+					style:top={pageArrowTop}
+					disabled={tilePage === tilePages - 1}
+					title={t('meet.tilesNextPage')}
+					aria-label={t('meet.tilesNextPage')}
+					onclick={() => showTilePage(tilePage + 1)}
+				>
+					<Icon name="arrow-right-s-line" size={22} />
+				</button>
+				<div class="call-page-dots">
+					{#each { length: tilePages } as _, page (page)}
+						<button
+							type="button"
+							class="call-page-dot"
+							aria-label={t('meet.tilesPage', { page: page + 1, total: tilePages })}
+							aria-current={page === tilePage ? 'true' : undefined}
+							onclick={() => showTilePage(page)}
+						></button>
+					{/each}
 				</div>
 			{/if}
 		</div>
@@ -1917,14 +2046,89 @@
 		min-height: 0;
 	}
 
-	.call-grid {
+	.call-tiles {
+		position: relative;
 		flex: 1;
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		justify-items: center;
-		gap: 0.75rem;
-		align-content: safe center;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
 		min-width: 0;
+		min-height: 15rem;
+	}
+
+	/* Tiles are placed absolutely by layoutStage(), which sizes them to this box. */
+	.call-grid {
+		position: relative;
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+		/* Horizontal swipes page the tiles; vertical ones still scroll the page. */
+		touch-action: pan-y;
+	}
+
+	.call-page-arrow {
+		position: absolute;
+		top: 50%;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border: none;
+		border-radius: 999px;
+		color: #fff;
+		background: rgba(0, 0, 0, 0.6);
+		transform: translateY(-50%);
+		cursor: pointer;
+	}
+
+	.call-page-arrow:disabled {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.call-page-previous {
+		left: 0.5rem;
+	}
+
+	.call-page-next {
+		right: 0.5rem;
+	}
+
+	.call-page-dots {
+		display: flex;
+		justify-content: center;
+		gap: 0.25rem;
+	}
+
+	.call-page-dot {
+		width: 1.25rem;
+		height: 1.25rem;
+		padding: 0;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+	}
+
+	.call-page-dot::before {
+		content: '';
+		display: block;
+		width: 0.5rem;
+		height: 0.5rem;
+		margin: auto;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.3);
+	}
+
+	.call-page-dot[aria-current='true']::before {
+		background: #fff;
+	}
+
+	.call-page-arrow:focus-visible,
+	.call-page-dot:focus-visible {
+		outline: 2px solid rgba(255, 255, 255, 0.6);
+		outline-offset: 2px;
 	}
 
 	.call-tile-joining .call-tile-avatar {
@@ -2119,14 +2323,27 @@
 	 * at its native size with nothing constraining it).
 	 */
 	:global(.call-tile) {
-		position: relative;
-		aspect-ratio: 16 / 9;
-		width: 100%;
-		/* auto-fit gives a lone tile the whole row; past this it reads as broken, not big. */
-		max-width: 640px;
+		position: absolute;
+		box-sizing: border-box;
 		border-radius: 0.75rem;
 		background: #1c1c1f;
 		overflow: hidden;
+		transition:
+			left 0.3s ease,
+			top 0.3s ease,
+			width 0.3s ease,
+			height 0.3s ease;
+	}
+
+	/* Until the first layout runs, so a tile never flashes at its natural size. */
+	:global(.call-tile:not([style*='width'])) {
+		visibility: hidden;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(.call-tile) {
+			transition: none;
+		}
 	}
 
 	:global(.call-tile-avatar) {
@@ -2193,12 +2410,8 @@
 		cursor: pointer;
 	}
 
-	/* The share being watched: full width and first, whatever its place in the DOM. */
+	/* The share being watched; layoutStage() gives it the stage. */
 	:global(.call-tile-featured) {
-		grid-column: 1 / -1;
-		order: -1;
-		max-width: none;
-		max-height: 65vh;
 		cursor: default;
 	}
 
