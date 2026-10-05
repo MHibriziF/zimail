@@ -123,7 +123,7 @@ describe('parseCaptionMessage', () => {
 });
 
 describe('createCaptionUploader', () => {
-	function setup(respond: (call: number) => Response | Promise<Response>) {
+	function setup(respond: (call: number) => Response | Promise<Response>, language?: () => string) {
 		const requests: { url: string; init: RequestInit }[] = [];
 		const texts: string[] = [];
 		const stops: string[] = [];
@@ -135,7 +135,8 @@ describe('createCaptionUploader', () => {
 				return respond(requests.length);
 			}) as typeof fetch,
 			onText: (text) => texts.push(text),
-			onStop: (reason) => stops.push(reason)
+			onStop: (reason) => stops.push(reason),
+			language
 		});
 		return { uploader, requests, texts, stops };
 	}
@@ -151,6 +152,21 @@ describe('createCaptionUploader', () => {
 		assert.equal(requests[0].url, '/api/meetings/join/abc-defg-hij/captions');
 		assert.equal((requests[0].init.headers as Record<string, string>).Authorization, 'Bearer tok');
 		assert.deepEqual(texts, ['Hello.']);
+		assert.equal((requests[0].init.headers as Record<string, string>)['X-Caption-Language'], 'auto');
+	});
+
+	test('sends the language chosen at the time of each segment', async () => {
+		let language = 'en';
+		const { uploader, requests } = setup(() => json({ text: 'x' }), () => language);
+		uploader.send(new Uint8Array([1]));
+		await settle();
+		await settle();
+		language = 'en+id';
+		uploader.send(new Uint8Array([2]));
+		await settle();
+		await settle();
+		const sent = requests.map((request) => (request.init.headers as Record<string, string>)['X-Caption-Language']);
+		assert.deepEqual(sent, ['en', 'en+id']);
 	});
 
 	test('when the Worker falls behind, the oldest waiting segment is dropped', async () => {

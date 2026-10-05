@@ -1,20 +1,46 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import { page } from '$app/stores';
 	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
+	import { intlLocale, parseLocale } from '$lib/i18n/locales';
 	import type { CaptionLine } from '$lib/meet/captions';
+	import {
+		CAPTION_LANGUAGE_CHOICES,
+		captionLanguageLabel,
+		isCaptionLanguageChoice,
+		type CaptionLanguageChoice
+	} from '$lib/meet/caption-language';
 
 	let {
 		lines,
 		timeZone,
+		language,
+		onSetLanguage,
 		onDownload,
 		onClose
 	}: {
 		lines: CaptionLine[];
 		timeZone?: string;
+		/** What this participant speaks, for their own captions only. */
+		language: CaptionLanguageChoice;
+		onSetLanguage: (choice: CaptionLanguageChoice) => void;
 		onDownload: (format: 'txt' | 'vtt') => void;
 		onClose: () => void;
 	} = $props();
+
+	const locale = $derived(intlLocale(parseLocale(($page.data as { locale?: string }).locale)));
+	const languageOptions = $derived(
+		CAPTION_LANGUAGE_CHOICES.map((choice) => ({
+			choice,
+			label: captionLanguageLabel(choice, locale, t('meet.captionLanguageAuto'))
+		}))
+	);
+
+	function onLanguageChange(event: Event) {
+		const value = (event.currentTarget as HTMLSelectElement).value;
+		if (isCaptionLanguageChoice(value)) onSetLanguage(value);
+	}
 
 	let bodyEl = $state<HTMLDivElement>();
 	/** Follows new lines only while the reader is already at the bottom, so scrolling back to reread isn't yanked away. */
@@ -41,6 +67,14 @@
 			<Icon name="close-line" size={18} />
 		</button>
 	</div>
+	<label class="call-transcript-language">
+		<span>{t('meet.captionLanguage')}</span>
+		<select value={language} onchange={onLanguageChange}>
+			{#each languageOptions as option (option.choice)}
+				<option value={option.choice}>{option.label}</option>
+			{/each}
+		</select>
+	</label>
 	<div class="call-transcript-body" bind:this={bodyEl} onscroll={onScroll} aria-live="polite">
 		{#if lines.length === 0}
 			<p class="call-transcript-empty">{t('meet.transcriptEmpty')}</p>
@@ -89,6 +123,26 @@
 		background: transparent;
 		color: rgba(255, 255, 255, 0.7);
 		cursor: pointer;
+	}
+
+	.call-transcript-language {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 0.625rem 1rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+		font-size: 0.6875rem;
+		font-weight: 600;
+		color: rgba(255, 255, 255, 0.55);
+	}
+
+	.call-transcript-language select {
+		padding: 0.375rem 0.5rem;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		color: #fff;
+		background: #26262b;
 	}
 
 	.call-transcript-body {

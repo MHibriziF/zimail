@@ -59,13 +59,16 @@
 		createCaptionUploader,
 		parseCaptionMessage,
 		recentCaptions,
-		transcriptFilename,
-		transcriptText,
-		transcriptVtt,
+		transcriptFile,
 		type CaptionLine,
 		type CaptionStopReason
 	} from '$lib/meet/captions';
 	import { captionCaptureSupported, startCaptionCapture } from '$lib/meet/caption-capture';
+	import {
+		CAPTION_LANGUAGE_STORAGE_KEY,
+		isCaptionLanguageChoice,
+		type CaptionLanguageChoice
+	} from '$lib/meet/caption-language';
 
 	let {
 		url,
@@ -83,6 +86,7 @@
 		initialScreenShare = DEFAULT_SCREEN_SHARE,
 		initialCaptionsAllowed = false,
 		captionToken = '',
+		initialTranscript = [],
 		onleave
 	}: {
 		url: string;
@@ -105,7 +109,10 @@
 		initialCaptionsAllowed?: boolean;
 		/** Lets this participant have their own speech transcribed for the whole call. */
 		captionToken?: string;
-		onleave: () => void;
+		/** From before a rejoin, so leaving and coming back doesn't lose it. */
+		initialTranscript?: CaptionLine[];
+		/** Gets the call's transcript, so the page can still offer it once the call is gone. */
+		onleave: (transcript: CaptionLine[]) => void;
 	} = $props();
 
 	// getDisplayMedia has no mobile browser support (iOS/WebKit or Chrome
@@ -256,7 +263,7 @@
 	let captionsAllowed = $state(untrack(() => initialCaptionsAllowed));
 	/** This viewer's own captions strip; turning it on affects nobody else's screen. */
 	let captionsOn = $state(false);
-	let captionLines = $state<CaptionLine[]>([]);
+	let captionLines = $state<CaptionLine[]>(untrack(() => initialTranscript));
 	/** Set once the Worker refuses: out of allowance, captions turned off, or a bad token. */
 	let captionsStopped = $state(false);
 	let captionClock = $state(Date.now());
@@ -268,6 +275,25 @@
 		someoneWantsCaptions && micEnabled && !captionsStopped && canCaption && Boolean(captionToken && meetingCode)
 	);
 	const shownCaptions = $derived(captionsOn ? recentCaptions(captionLines, captionClock) : []);
+	let captionLanguage = $state<CaptionLanguageChoice>(loadCaptionLanguage());
+
+	function loadCaptionLanguage(): CaptionLanguageChoice {
+		try {
+			const stored = localStorage.getItem(CAPTION_LANGUAGE_STORAGE_KEY);
+			return isCaptionLanguageChoice(stored) ? stored : 'auto';
+		} catch {
+			return 'auto';
+		}
+	}
+
+	function setCaptionLanguage(choice: CaptionLanguageChoice) {
+		captionLanguage = choice;
+		try {
+			localStorage.setItem(CAPTION_LANGUAGE_STORAGE_KEY, choice);
+		} catch {
+			// Private mode: the choice lasts for this call only.
+		}
+	}
 
 	function initialsFor(name: string): string {
 		return (
@@ -1091,7 +1117,7 @@
 
 	/** A failed connect fires Disconnected too; that one stays on the stage as an error with Retry. */
 	function handleDisconnected() {
-		if (!awaitingConnect) onleave();
+		if (!awaitingConnect) onleave(captionLines);
 	}
 
 	function retryConnect() {
@@ -1627,9 +1653,8 @@
 
 	function downloadTranscript(format: 'txt' | 'vtt') {
 		if (captionLines.length === 0) return;
-		const content = format === 'vtt' ? transcriptVtt(captionLines) : transcriptText(captionLines);
-		const filename = transcriptFilename(meetingCode, new Date(captionLines[0].at), format);
-		downloadBlob(new Blob([content], { type: format === 'vtt' ? 'text/vtt' : 'text/plain' }), filename);
+		const { blob, filename } = transcriptFile(captionLines, meetingCode, format);
+		downloadBlob(blob, filename);
 	}
 
 	// Speakers only transcribe while someone has captions or the transcript open.
@@ -1650,7 +1675,8 @@
 			token: captionToken,
 			fetch: (input, init) => fetch(input, init),
 			onText: publishOwnCaption,
-			onStop: stopCaptions
+			onStop: stopCaptions,
+			language: () => captionLanguage
 		});
 		let stop: (() => void) | null = null;
 		let cancelled = false;
@@ -1876,7 +1902,7 @@
 		playLeaveChime();
 		stopAdmissionsPolling();
 		room?.disconnect();
-		onleave();
+		onleave(captionLines);
 	}
 </script>
 
@@ -2070,7 +2096,13 @@
 				onClose={() => (panel = 'none')}
 			/>
 		{:else if panel === 'transcript'}
-			<CallTranscriptPanel lines={captionLines} onDownload={downloadTranscript} onClose={() => (panel = 'none')} />
+			<CallTranscriptPanel
+				lines={captionLines}
+				language={captionLanguage}
+				onSetLanguage={setCaptionLanguage}
+				onDownload={downloadTranscript}
+				onClose={() => (panel = 'none')}
+			/>
 		{/if}
 	</div>
 

@@ -5,6 +5,8 @@
  * `CAPTION_TOPIC`. This file is the pure part — segmenting, WAV, transcript.
  */
 
+import { CAPTION_LANGUAGE_HEADER } from './caption-language';
+
 export const CAPTION_TOPIC = 'captions';
 export const CAPTION_SAMPLE_RATE = 16_000;
 /** The host's attribute carrying whether captions are allowed, like the screen-share settings. */
@@ -190,6 +192,8 @@ export function createCaptionUploader(options: {
 	fetch: typeof fetch;
 	onText: (text: string) => void;
 	onStop: (reason: CaptionStopReason) => void;
+	/** Read per segment, so changing it mid-call doesn't restart the mic capture. */
+	language?: () => string;
 	maxWaiting?: number;
 }) {
 	const maxWaiting = options.maxWaiting ?? 2;
@@ -201,7 +205,11 @@ export function createCaptionUploader(options: {
 		try {
 			const response = await options.fetch(`/api/meetings/join/${encodeURIComponent(options.code)}/captions`, {
 				method: 'POST',
-				headers: { Authorization: `Bearer ${options.token}`, 'Content-Type': 'audio/wav' },
+				headers: {
+					Authorization: `Bearer ${options.token}`,
+					'Content-Type': 'audio/wav',
+					[CAPTION_LANGUAGE_HEADER]: options.language?.() ?? 'auto'
+				},
 				body: wav as Uint8Array<ArrayBuffer>
 			});
 			const reason = STOP_REASONS[response.status];
@@ -278,6 +286,13 @@ export function transcriptVtt(lines: readonly CaptionLine[], maxCueMs = 5_000): 
 		return `${vttTime(line.at - start)} --> ${vttTime(end - start)}\n<v ${line.name.replaceAll('>', '')}>${text}`;
 	});
 	return ['WEBVTT', ...cues].join('\n\n') + '\n';
+}
+
+/** The transcript as a file to download, named after the meeting and its first line. */
+export function transcriptFile(lines: readonly CaptionLine[], code: string, format: 'txt' | 'vtt'): { blob: Blob; filename: string } {
+	const content = format === 'vtt' ? transcriptVtt(lines) : transcriptText(lines);
+	const blob = new Blob([content], { type: format === 'vtt' ? 'text/vtt' : 'text/plain' });
+	return { blob, filename: transcriptFilename(code, new Date(lines[0]?.at ?? Date.now()), format) };
 }
 
 /** `transcript-abc-defg-hij-2026-09-24-1405.txt`, in local time like recordings. */

@@ -11,6 +11,8 @@
 	import { APP_NAME } from '$lib/constants';
 	import { initials } from '$lib/mail/folders';
 	import { DEFAULT_SCREEN_SHARE, type ScreenShareSettings } from '$lib/meet/screen-share';
+	import { transcriptFile, type CaptionLine } from '$lib/meet/captions';
+	import { downloadBlob } from '$lib/meet/recorder';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -28,6 +30,8 @@
 		captionToken: string;
 	} | null>(null);
 	let left = $state(false);
+	/** Kept across leaving, so it can be saved afterwards and carries on if they rejoin. */
+	let transcript = $state.raw<CaptionLine[]>([]);
 	let waitingAdmissionId = $state('');
 	let waitingDenied = $state(false);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -280,9 +284,15 @@
 		waitingAdmissionId = '';
 	}
 
-	function onleave() {
+	function onleave(lines: CaptionLine[]) {
+		transcript = $state.snapshot(lines);
 		session = null;
 		left = true;
+	}
+
+	function downloadTranscript(format: 'txt' | 'vtt') {
+		const { blob, filename } = transcriptFile(transcript, data.code, format);
+		downloadBlob(blob, filename);
 	}
 
 	function rejoin() {
@@ -311,6 +321,7 @@
 		initialScreenShare={session.screenShare}
 		initialCaptionsAllowed={session.captions}
 		captionToken={session.captionToken}
+		initialTranscript={transcript}
 		{onleave}
 	/>
 {:else}
@@ -324,6 +335,17 @@
 			{#if !data.code}
 				<p class="note">{t('meet.invalidLink')}</p>
 			{:else if left}
+				{#if transcript.length > 0}
+					<p class="note">{t('meet.leftTranscript')}</p>
+					<div class="left-actions">
+						<button type="button" class="btn-secondary" onclick={() => downloadTranscript('txt')}>
+							<Icon name="download-2-line" size={16} />{t('meet.transcriptDownloadText')}
+						</button>
+						<button type="button" class="btn-secondary" onclick={() => downloadTranscript('vtt')}>
+							<Icon name="closed-captioning-line" size={16} />{t('meet.transcriptDownloadSubtitles')}
+						</button>
+					</div>
+				{/if}
 				<div class="left-actions">
 					<button type="button" class="btn-secondary" onclick={rejoin}>{t('meet.rejoin')}</button>
 					<a href="/" class="btn-primary">{t('meet.returnHome')}</a>
@@ -594,6 +616,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		gap: 0.375rem;
 		padding: 0.5rem 1rem;
 		border: 1px solid var(--color-line, rgba(255, 255, 255, 0.15));
 		border-radius: 0.625rem;
