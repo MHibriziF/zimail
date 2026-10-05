@@ -1003,6 +1003,22 @@
 		"nothingThisDay": "Nada programado.",
 		"nothingThisMonth": "Nada programado para el resto del mes.",
 		"comingUp": "Próximamente",
+		"publish": {
+			"heading": "Compartir este calendario",
+			"hint": "Un enlace privado al que Google Calendar, Apple Calendar u Outlook pueden suscribirse, para que tus eventos también aparezcan allí. Lo actualizan según su propio horario: Google cada pocas horas o una vez al día.",
+			"create": "Crear enlace",
+			"linkLabel": "Dirección privada de tu calendario",
+			"copy": "Copiar",
+			"copied": "Copiado",
+			"linkOnce": "Cópialo ahora: solo se muestra una vez. Si lo pierdes, restablece el enlace para obtener uno nuevo.",
+			"howTo": "En Google Calendar, ve a Otros calendarios → + → Desde URL y pégalo.",
+			"published": "Tu calendario está publicado. Cualquiera con el enlace puede ver sus eventos.",
+			"includeFeeds": "Incluir los otros calendarios a los que te suscribes aquí",
+			"busyOnly": "Mostrar solo las horas ocupadas, sin títulos ni detalles",
+			"reset": "Restablecer enlace",
+			"resetHint": "Crea un enlace nuevo. El anterior deja de funcionar y los calendarios suscritos a él dejan de actualizarse.",
+			"stop": "Dejar de compartir"
+		},
 		"feeds": {
 			"heading": "Otros calendarios",
 			"hint": "Suscríbete a calendarios de Google, Outlook o iCloud con su dirección iCal privada. Sus eventos aparecen aquí y cuentan como tiempo ocupado. No se les envía nada: la dirección solo se lee.",

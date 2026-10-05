@@ -1003,6 +1003,22 @@
 		"nothingThisDay": "Tidak ada jadwal.",
 		"nothingThisMonth": "Tidak ada jadwal untuk sisa bulan ini.",
 		"comingUp": "Akan datang",
+		"publish": {
+			"heading": "Bagikan kalender ini",
+			"hint": "Tautan pribadi yang bisa dilanggan oleh Google Calendar, Apple Calendar, atau Outlook, sehingga acara Anda juga muncul di sana. Mereka memperbaruinya sesuai jadwal masing-masing — Google setiap beberapa jam hingga sekali sehari.",
+			"create": "Buat tautan",
+			"linkLabel": "Alamat kalender pribadi Anda",
+			"copy": "Salin",
+			"copied": "Disalin",
+			"linkOnce": "Salin sekarang: tautan ini hanya ditampilkan sekali. Jika hilang, setel ulang tautan untuk mendapatkan yang baru.",
+			"howTo": "Di Google Calendar, buka Kalender lainnya → + → Dari URL lalu tempelkan.",
+			"published": "Kalender Anda dipublikasikan. Siapa pun yang memiliki tautan dapat melihat acaranya.",
+			"includeFeeds": "Sertakan kalender lain yang Anda langgani di sini",
+			"busyOnly": "Tampilkan hanya waktu sibuk, tanpa judul atau detail",
+			"reset": "Setel ulang tautan",
+			"resetHint": "Membuat tautan baru. Tautan lama berhenti berfungsi, dan kalender yang berlangganan ke tautan itu berhenti diperbarui.",
+			"stop": "Berhenti berbagi"
+		},
 		"feeds": {
 			"heading": "Kalender lain",
 			"hint": "Berlangganan kalender Google, Outlook, atau iCloud lewat alamat iCal pribadinya. Acaranya tampil di sini dan dihitung sebagai waktu sibuk. Tidak ada yang dikirim ke sana — alamatnya hanya dibaca.",

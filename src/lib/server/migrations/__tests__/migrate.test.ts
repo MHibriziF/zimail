@@ -37,6 +37,18 @@ describe('splitting a migration into statements', () => {
 		assert.match(statements[0], /it''s here; really/);
 	});
 
+	test('a trigger stays one statement, body and all', () => {
+		const statements = splitStatements(`CREATE TRIGGER t_evict AFTER INSERT ON t
+			BEGIN
+				UPDATE u SET cache = NULL WHERE id = NEW.u_id;
+				DELETE FROM v WHERE id = NEW.id;
+			END;
+			CREATE INDEX i ON t(id);`);
+		assert.equal(statements.length, 2);
+		assert.match(statements[0], /^CREATE TRIGGER[\s\S]*NEW\.u_id;[\s\S]*NEW\.id;\s*END$/);
+		assert.equal(statements[1], 'CREATE INDEX i ON t(id)');
+	});
+
 	test('a file with no statements yields none', () => {
 		assert.deepEqual(splitStatements('-- comment only\n\n'), []);
 	});

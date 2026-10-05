@@ -67,6 +67,12 @@ export type CalendarRepository = {
 	/** Events overlapping `[from, to)`, by the stored instants. */
 	listOverlapping(userId: string, from: string, to: string, limit: number): Promise<CalendarEvent[]>;
 	/**
+	 * Events starting in `[from, to)`. Bounded on both sides of the
+	 * `(user_id, starts_at)` index, so it reads only that window's rows — unlike
+	 * `listOverlapping`, which scans everything that started before `to`.
+	 */
+	listStarting(userId: string, from: string, to: string, options: { includeFeeds: boolean; limit: number }): Promise<CalendarEvent[]>;
+	/**
 	 * Events with a meeting room that still exists — the event's own, or its
 	 * booking's — not yet over at `now` and starting between `since` and `until`.
 	 * `since` only bounds the index scan; `now` decides what has ended.
@@ -102,6 +108,18 @@ export function createD1CalendarRepository(db: D1Database): CalendarRepository {
 					 ORDER BY e.starts_at LIMIT ?`
 				)
 				.bind(userId, to, from, limit)
+				.all<EventRow>();
+			return results.map(toEvent);
+		},
+
+		async listStarting(userId, from, to, { includeFeeds, limit }) {
+			const { results } = await db
+				.prepare(
+					`SELECT ${COLUMNS} FROM ${FROM}
+					 WHERE e.user_id = ? AND e.starts_at >= ? AND e.starts_at < ? AND (? = 1 OR e.source <> 'feed')
+					 ORDER BY e.starts_at LIMIT ?`
+				)
+				.bind(userId, from, to, includeFeeds ? 1 : 0, limit)
 				.all<EventRow>();
 			return results.map(toEvent);
 		},

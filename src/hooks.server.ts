@@ -3,6 +3,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-access';
 import { getApiTokenService, readBearerToken } from '$lib/server/api-tokens';
 import { getAuthService, readSessionToken } from '$lib/server/auth';
+import { PUBLISHED_FEED_PREFIX } from '$lib/server/calendar-publish/paths';
 import { DOMAIN_COOKIE, UI_THEME_COOKIE, UI_THEME_COOKIE_MAX_AGE } from '$lib/server/constants';
 import { getDomainsService } from '$lib/server/domains';
 import { ensureSchema } from '$lib/server/migrations/migrate';
@@ -169,6 +170,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const db = event.platform?.env.DB;
 	const { pathname } = event.url;
 	resetLocals(event);
+
+	// Polled by other calendar apps a few times a day, so nearly always on a
+	// cold isolate, where the migration check alone would read every row of
+	// d1_migrations. A feed only exists once its migration has run, and its
+	// token is its only credential, so it needs neither.
+	if (pathname.startsWith(PUBLISHED_FEED_PREFIX)) return render(event, resolve);
 
 	if (db) {
 		await migrate(db);
