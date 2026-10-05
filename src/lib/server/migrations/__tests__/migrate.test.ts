@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -56,11 +56,17 @@ describe('splitting a migration into statements', () => {
 
 describe('the migrations this repo ships', () => {
 	const files = readdirSync(join(root, 'migrations')).filter((name) => name.endsWith('.sql'));
+	const archiveDir = join(root, 'migrations', 'archive');
+	const archived = existsSync(archiveDir)
+		? readdirSync(archiveDir)
+				.filter((name) => name.endsWith('.sql'))
+				.map((name) => join('archive', name))
+		: [];
 
 	test('every one parses into at least one statement', () => {
 		assert.ok(files.length > 0, 'expected migrations to exist');
 
-		for (const file of files) {
+		for (const file of [...files, ...archived]) {
 			const sql = readFileSync(join(root, 'migrations', file), 'utf8');
 			const statements = splitStatements(sql);
 			assert.ok(statements.length > 0, `${file} produced no statements`);
