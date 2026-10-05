@@ -39,6 +39,35 @@ describe('transcribeSpeech', () => {
 		assert.deepEqual(await transcribeSpeech(ai, new Uint8Array(1)), { kind: 'text', text: '' });
 	});
 
+	test('without a language Whisper guesses, and one language is passed outright', async () => {
+		const guessed = scripted(() => ({ text: 'Halo' }));
+		await transcribeSpeech(guessed.ai, new Uint8Array(1));
+		assert.equal('language' in guessed.calls[0].inputs, false);
+
+		const fixed = scripted(() => ({ text: 'Halo' }));
+		await transcribeSpeech(fixed.ai, new Uint8Array(1), ['id']);
+		assert.equal(fixed.calls.length, 1);
+		assert.equal(fixed.calls[0].inputs.language, 'id');
+	});
+
+	test('with two languages, a guess within them is kept as is', async () => {
+		const { ai, calls } = scripted(() => ({ text: 'Okay', transcription_info: { language: 'en' } }));
+		assert.deepEqual(await transcribeSpeech(ai, new Uint8Array(1), ['en', 'id']), { kind: 'text', text: 'Okay' });
+		assert.equal(calls.length, 1);
+		assert.equal('language' in calls[0].inputs, false);
+	});
+
+	test('a guess outside both is transcribed again in the nearest one', async () => {
+		const answers = [{ text: 'あー', transcription_info: { language: 'ja' } }, { text: 'Uh' }];
+		const stray = scripted(() => answers.shift());
+		assert.deepEqual(await transcribeSpeech(stray.ai, new Uint8Array(1), ['en', 'id']), { kind: 'text', text: 'Uh' });
+		assert.equal(stray.calls[1].inputs.language, 'en');
+
+		const malay = scripted(() => ({ text: 'x', transcription_info: { language: 'ms' } }));
+		await transcribeSpeech(malay.ai, new Uint8Array(1), ['en', 'id']);
+		assert.equal(malay.calls[1].inputs.language, 'id');
+	});
+
 	test('tells the daily limit apart from other failures', async () => {
 		const limited = scripted(() => {
 			throw new Error('4006: you have used up your daily free allocation of 10,000 neurons');
