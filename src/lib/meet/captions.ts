@@ -284,5 +284,6 @@ export function transcriptVtt(lines: readonly CaptionLine[], maxCueMs = 5_000): 
 export function transcriptFilename(code: string, startedAt: Date, extension: 'txt' | 'vtt'): string {
 	const stamp = `${startedAt.getFullYear()}-${pad(startedAt.getMonth() + 1)}-${pad(startedAt.getDate())}-${pad(startedAt.getHours())}${pad(startedAt.getMinutes())}`;
 	const safeCode = code.replaceAll(/[^a-z0-9-]/gi, '');
-	return `${safeCode ? `transcript-${safeCode}` : 'transcript'}-${stamp}.${extension}`;
+	const name = safeCode ? `transcript-${safeCode}` : 'transcript';
+	return `${name}-${stamp}.${extension}`;
 }
