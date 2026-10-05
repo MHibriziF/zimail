@@ -41,7 +41,7 @@
 </script>
 
 <div
-	class="z-palette-scrim"
+	class="z-palette-scrim centered"
 	role="presentation"
 	onclick={(event) => {
 		if (event.target === event.currentTarget) onClose();

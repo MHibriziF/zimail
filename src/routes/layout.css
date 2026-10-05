@@ -98,6 +98,11 @@ body {
 	-webkit-tap-highlight-color: transparent;
 }
 
+/* Preflight's `margin: 0` removes the auto margin browsers centre modal dialogs with. */
+dialog:modal {
+	margin: auto;
+}
+
 @media (max-width: 900px) {
 	:root {
 		--font-sans: -apple-system, blinkmacsystemfont, 'Segoe UI', roboto, system-ui, sans-serif;

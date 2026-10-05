@@ -1594,6 +1594,11 @@
 	padding-top: 12vh;
 }
 
+[data-ui-theme='zero'] .z-palette-scrim.centered {
+	align-items: center;
+	padding: 1rem;
+}
+
 [data-ui-theme='zero'] .z-palette {
 	width: min(36rem, calc(100vw - 2rem));
 	border-radius: 0.85rem;
