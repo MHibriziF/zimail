@@ -28,7 +28,9 @@
 	let overrides = $state<
 		Record<
 			string,
-			Partial<Pick<Meeting, 'code' | 'title' | 'require_approval' | 'screen_share_policy' | 'screen_share_mode'>>
+			Partial<
+				Pick<Meeting, 'code' | 'title' | 'require_approval' | 'screen_share_policy' | 'screen_share_mode' | 'captions_enabled'>
+			>
 		>
 	>({});
 	const rows = $derived(
@@ -50,6 +52,7 @@
 	let editRequireApproval = $state(false);
 	let editScreenSharePolicy = $state<ScreenSharePolicy>(DEFAULT_SCREEN_SHARE.policy);
 	let editScreenShareMode = $state<ScreenShareMode>(DEFAULT_SCREEN_SHARE.mode);
+	let editCaptions = $state(false);
 	let savingEdit = $state(false);
 
 	// The app's language and saved time zone, not the browser's — and the same on
@@ -106,6 +109,7 @@
 					require_approval: meeting.requireApproval,
 					screen_share_policy: DEFAULT_SCREEN_SHARE.policy,
 					screen_share_mode: DEFAULT_SCREEN_SHARE.mode,
+					captions_enabled: false,
 					created_at: new Date().toISOString()
 				},
 				...created
@@ -162,6 +166,7 @@
 		editRequireApproval = meeting.require_approval;
 		editScreenSharePolicy = meeting.screen_share_policy;
 		editScreenShareMode = meeting.screen_share_mode;
+		editCaptions = meeting.captions_enabled;
 	}
 
 	function cancelEdit() {
@@ -205,7 +210,8 @@
 					title: editTitle,
 					requireApproval: editRequireApproval,
 					screenSharePolicy: editScreenSharePolicy,
-					screenShareMode: editScreenShareMode
+					screenShareMode: editScreenShareMode,
+					captionsEnabled: editCaptions
 				})
 			});
 			const body = (await response.json().catch(() => ({}))) as {
@@ -214,6 +220,7 @@
 					require_approval: boolean;
 					screen_share_policy: ScreenSharePolicy;
 					screen_share_mode: ScreenShareMode;
+					captions_enabled: boolean;
 				};
 				error?: string;
 			};
@@ -228,7 +235,8 @@
 					title: body.meeting.title,
 					require_approval: body.meeting.require_approval,
 					screen_share_policy: body.meeting.screen_share_policy,
-					screen_share_mode: body.meeting.screen_share_mode
+					screen_share_mode: body.meeting.screen_share_mode,
+					captions_enabled: body.meeting.captions_enabled
 				}
 			};
 			editingId = '';
@@ -463,6 +471,14 @@
 										/>
 										{t('meet.screenShareModeMultiple')}
 									</label>
+								</fieldset>
+								<fieldset class="meetings-edit-field">
+									<legend>{t('meet.captionsSettingLabel')}</legend>
+									<label class="meetings-edit-radio">
+										<input type="checkbox" bind:checked={editCaptions} />
+										{t('meet.captionsSettingAllow')}
+									</label>
+									<p class="meetings-edit-hint">{t('meet.captionsSettingHint')}</p>
 								</fieldset>
 								<div class="meetings-edit-actions">
 									<button type="button" class="btn-ghost" onclick={cancelEdit}>{t('common.cancel')}</button>
@@ -756,6 +772,12 @@
 		align-items: center;
 		gap: 0.5rem;
 		color: var(--color-text);
+	}
+
+	.meetings-edit-hint {
+		margin: 0;
+		font-size: 0.75rem;
+		color: var(--color-muted);
 	}
 
 	.meetings-edit-actions {

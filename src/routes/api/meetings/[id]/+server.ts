@@ -8,6 +8,7 @@ type UpdateMeetingBody = {
 	requireApproval?: unknown;
 	screenSharePolicy?: unknown;
 	screenShareMode?: unknown;
+	captionsEnabled?: unknown;
 };
 
 /** Owner-only — used by the in-call host settings panel to know the meeting's current admission mode. */
@@ -44,7 +45,8 @@ export const PATCH: RequestHandler = async ({ params, request, locals, platform 
 			title: typeof body.title === 'string' ? body.title : undefined,
 			requireApproval: typeof body.requireApproval === 'boolean' ? body.requireApproval : undefined,
 			screenSharePolicy: parseScreenSharePolicy(body.screenSharePolicy),
-			screenShareMode: parseScreenShareMode(body.screenShareMode)
+			screenShareMode: parseScreenShareMode(body.screenShareMode),
+			captionsEnabled: typeof body.captionsEnabled === 'boolean' ? body.captionsEnabled : undefined
 		});
 
 		if (!meeting) return json({ error: 'Meeting not found' }, { status: 404 });

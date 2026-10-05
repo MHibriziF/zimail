@@ -50,6 +50,21 @@
 	import CallChatPanel from '$lib/components/meet/CallChatPanel.svelte';
 	import CallSettingsPanel from '$lib/components/meet/CallSettingsPanel.svelte';
 	import CallControls from '$lib/components/meet/CallControls.svelte';
+	import CallTranscriptPanel from '$lib/components/meet/CallTranscriptPanel.svelte';
+	import {
+		CAPTIONS_ALLOWED_ATTRIBUTE,
+		CAPTIONS_WANTED_ATTRIBUTE,
+		CAPTION_TOPIC,
+		createCaptionUploader,
+		parseCaptionMessage,
+		recentCaptions,
+		transcriptFilename,
+		transcriptText,
+		transcriptVtt,
+		type CaptionLine,
+		type CaptionStopReason
+	} from '$lib/meet/captions';
+	import { captionCaptureSupported, startCaptionCapture } from '$lib/meet/caption-capture';
 
 	let {
 		url,
@@ -65,6 +80,8 @@
 		meetingId = '',
 		meetingCode = '',
 		initialScreenShare = DEFAULT_SCREEN_SHARE,
+		initialCaptionsAllowed = false,
+		captionToken = '',
 		onleave
 	}: {
 		url: string;
@@ -83,6 +100,10 @@
 		meetingCode?: string;
 		/** As of joining — the host's attributes carry any change made after that. */
 		initialScreenShare?: ScreenShareSettings;
+		/** As of joining, like the screen-share settings. */
+		initialCaptionsAllowed?: boolean;
+		/** Lets this participant have their own speech transcribed for the whole call. */
+		captionToken?: string;
 		onleave: () => void;
 	} = $props();
 
@@ -200,7 +221,7 @@
 	const reactionLimiter = createReactionLimiter();
 	const LOCAL_REACTION_KEY = 'local';
 
-	let panel = $state<'none' | 'participants' | 'chat' | 'settings'>('none');
+	let panel = $state<'none' | 'participants' | 'chat' | 'settings' | 'transcript'>('none');
 	let roster = $state<
 		{
 			identity: string;
@@ -211,6 +232,7 @@
 			/** Self-reported through the `recording` attribute — a consent notice, not a permission. */
 			recording: RecordingKind | null;
 			handRaisedAt: number | null;
+			wantsCaptions: boolean;
 		}[]
 	>([]);
 	const othersRecording = $derived(
@@ -219,6 +241,24 @@
 	const raisedHandCount = $derived(roster.filter((entry) => entry.handRaisedAt !== null).length);
 	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean; isHost: boolean }[]>([]);
 	let unread = $state(0);
+
+	const canCaption = typeof window !== 'undefined' && captionCaptureSupported();
+	const MAX_CAPTION_LINES = 2_000;
+	let captionsAllowed = $state(untrack(() => initialCaptionsAllowed));
+	/** This viewer's own captions strip; turning it on affects nobody else's screen. */
+	let captionsOn = $state(false);
+	let captionLines = $state<CaptionLine[]>([]);
+	/** Set once the Worker refuses: out of allowance, captions turned off, or a bad token. */
+	let captionsStopped = $state(false);
+	let captionClock = $state(Date.now());
+	/** Bumped whenever the mic's underlying track may have been replaced, so capture follows it. */
+	let micTrackVersion = $state(0);
+	const wantsCaptions = $derived(captionsAllowed && (captionsOn || panel === 'transcript'));
+	const someoneWantsCaptions = $derived(captionsAllowed && roster.some((entry) => entry.wantsCaptions));
+	const transcribing = $derived(
+		someoneWantsCaptions && micEnabled && !captionsStopped && canCaption && Boolean(captionToken && meetingCode)
+	);
+	const shownCaptions = $derived(captionsOn ? recentCaptions(captionLines, captionClock) : []);
 
 	function initialsFor(name: string): string {
 		return (
@@ -431,7 +471,7 @@
 		const tile = remoteTiles.get(participant.identity);
 		if (tile) updateTileStatus(tile, participant);
 		if (room && participant !== room.localParticipant) {
-			readHostScreenShareSettings(participant);
+			readHostSettings(participant);
 			if (HAND_ATTRIBUTE in changed) announceRaisedHand(participant, changed[HAND_ATTRIBUTE]);
 		}
 		refreshRoster();
@@ -552,7 +592,7 @@
 	function handleParticipantConnected(participant: RemoteParticipant) {
 		playJoinChime();
 		ensureRemoteTile(participant);
-		readHostScreenShareSettings(participant);
+		readHostSettings(participant);
 		refreshRoster();
 	}
 
@@ -581,7 +621,8 @@
 			isHost: isHostIdentity(p.identity),
 			canShareScreen: mayShareScreen(p),
 			recording: parseRecordingAttribute(p.attributes.recording),
-			handRaisedAt: parseHandRaisedAt(p.attributes[HAND_ATTRIBUTE])
+			handRaisedAt: parseHandRaisedAt(p.attributes[HAND_ATTRIBUTE]),
+			wantsCaptions: p.attributes[CAPTIONS_WANTED_ATTRIBUTE] === '1'
 		}));
 		roster = [
 			{
@@ -591,7 +632,8 @@
 				isHost: isHostIdentity(room.localParticipant.identity),
 				canShareScreen,
 				recording: recording ? recordingKind : null,
-				handRaisedAt
+				handRaisedAt,
+				wantsCaptions
 			},
 			...remote
 		];
@@ -661,11 +703,13 @@
 	}
 
 	/**
-	 * The host re-broadcasts the meeting's screen-share settings as its own attributes,
+	 * The host re-broadcasts the meeting's screen-share and captions settings as its own attributes,
 	 * so a change made mid-call reaches everyone without another server round trip.
 	 */
-	function readHostScreenShareSettings(participant: Participant) {
+	function readHostSettings(participant: Participant) {
 		if (!isHostIdentity(participant.identity)) return;
+		const captions = participant.attributes[CAPTIONS_ALLOWED_ATTRIBUTE];
+		if (captions === '1' || captions === '0') applyCaptionsAllowed(captions === '1');
 		const policy = parseScreenSharePolicy(participant.attributes.screenSharePolicy);
 		const mode = parseScreenShareMode(participant.attributes.screenShareMode);
 		if (policy || mode) applyScreenShareSettings({ policy: policy ?? screenShareSettings.policy, mode: mode ?? screenShareSettings.mode });
@@ -832,6 +876,7 @@
 		// A mic first turned on after recording started still belongs in it.
 		if (publication.source === Track.Source.Microphone && publication.track) {
 			activeRecording?.addAudioTrack(publication.track.mediaStreamTrack);
+			micTrackVersion += 1;
 		}
 		if (publication.source !== Track.Source.ScreenShare || !publication.track) return;
 		screenShareEnabled = true;
@@ -933,7 +978,7 @@
 			// Who's already here shows while our own devices are still starting.
 			for (const participant of instance.remoteParticipants.values()) {
 				ensureRemoteTile(participant);
-				readHostScreenShareSettings(participant);
+				readHostSettings(participant);
 			}
 			refreshRoster();
 			// Read both choices first: publishing the mic re-syncs cameraEnabled from LiveKit,
@@ -998,6 +1043,9 @@
 		instance.registerTextStreamHandler(REACTION_TOPIC, async (reader, participantInfo) => {
 			receiveReaction(await reader.readAll(), participantInfo.identity);
 		});
+		instance.registerTextStreamHandler(CAPTION_TOPIC, async (reader, participantInfo) => {
+			receiveCaption(await reader.readAll(), participantInfo.identity);
+		});
 		instance.registerTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC, async (reader, participantInfo) => {
 			await reader.readAll();
 			screenShareRequests = screenShareRequests.filter((request) => request.identity !== participantInfo.identity);
@@ -1024,6 +1072,7 @@
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC);
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC);
 			instance.unregisterTextStreamHandler(REACTION_TOPIC);
+			instance.unregisterTextStreamHandler(CAPTION_TOPIC);
 		};
 	});
 
@@ -1190,6 +1239,7 @@
 	async function selectMic(id: string) {
 		micDeviceId = id;
 		if (room) await room.switchActiveDevice('audioinput', id);
+		micTrackVersion += 1;
 	}
 
 	async function selectCamera(id: string) {
@@ -1417,7 +1467,121 @@
 		}
 	}
 
-	function togglePanel(next: 'participants' | 'chat' | 'settings') {
+	function applyCaptionsAllowed(next: boolean) {
+		if (next === captionsAllowed) return;
+		if (!next && !isHost && wantsCaptions) showNotice(t('meet.captionsHostDisabled'));
+		captionsAllowed = next;
+		if (next) captionsStopped = false;
+		else captionsOn = false;
+	}
+
+	function broadcastCaptionsSetting() {
+		if (!room || !isHost) return;
+		room.localParticipant.setAttributes({ [CAPTIONS_ALLOWED_ATTRIBUTE]: captionsAllowed ? '1' : '0' }).catch(() => {});
+	}
+
+	async function setCaptionsAllowed(next: boolean) {
+		if (!meetingId || settingsBusy) return;
+		settingsBusy = true;
+		settingsError = '';
+		try {
+			const response = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ captionsEnabled: next })
+			});
+			if (!response.ok) {
+				settingsError = t('meetings.couldNotSave');
+				return;
+			}
+			applyCaptionsAllowed(next);
+			broadcastCaptionsSetting();
+		} catch {
+			settingsError = t('common.networkError');
+		} finally {
+			settingsBusy = false;
+		}
+	}
+
+	function addCaptionLine(identity: string, name: string, text: string) {
+		const at = Date.now();
+		captionLines = [...captionLines.slice(1 - MAX_CAPTION_LINES), { id: crypto.randomUUID(), identity, name, text, at }];
+		captionClock = at;
+	}
+
+	function publishOwnCaption(text: string) {
+		if (!room) return;
+		addCaptionLine(room.localParticipant.identity, localName, text);
+		room.localParticipant.sendText(JSON.stringify({ type: 'line', text }), { topic: CAPTION_TOPIC }).catch(() => {});
+	}
+
+	function receiveCaption(raw: string, identity: string) {
+		const message = parseCaptionMessage(raw);
+		if (!message) return;
+		if (message.type === 'paused') {
+			if (wantsCaptions) showNotice(t('meet.captionsPaused'));
+			return;
+		}
+		addCaptionLine(identity, roster.find((entry) => entry.identity === identity)?.name || t('meet.guest'), message.text);
+	}
+
+	/** Out of allowance is everyone's business, since it stops every speaker; the rest only stop this one. */
+	function stopCaptions(reason: CaptionStopReason) {
+		captionsStopped = true;
+		if (reason !== 'limit' || !room) return;
+		showNotice(t('meet.captionsPaused'));
+		room.localParticipant.sendText(JSON.stringify({ type: 'paused' }), { topic: CAPTION_TOPIC }).catch(() => {});
+	}
+
+	function downloadTranscript(format: 'txt' | 'vtt') {
+		if (captionLines.length === 0) return;
+		const content = format === 'vtt' ? transcriptVtt(captionLines) : transcriptText(captionLines);
+		const filename = transcriptFilename(meetingCode, new Date(captionLines[0].at), format);
+		downloadBlob(new Blob([content], { type: format === 'vtt' ? 'text/vtt' : 'text/plain' }), filename);
+	}
+
+	// Speakers only transcribe while someone has captions or the transcript open.
+	$effect(() => {
+		const wanted = wantsCaptions;
+		if (connecting || connectionError || !room) return;
+		room.localParticipant.setAttributes({ [CAPTIONS_WANTED_ATTRIBUTE]: wanted ? '1' : '' }).catch(() => {});
+		untrack(refreshRoster);
+	});
+
+	$effect(() => {
+		if (!transcribing) return;
+		void micTrackVersion;
+		const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+		if (!track) return;
+		const uploader = createCaptionUploader({
+			code: meetingCode,
+			token: captionToken,
+			fetch: (input, init) => fetch(input, init),
+			onText: publishOwnCaption,
+			onStop: stopCaptions
+		});
+		let stop: (() => void) | null = null;
+		let cancelled = false;
+		startCaptionCapture(track, (wav) => uploader.send(wav))
+			.then((stopCapture) => {
+				if (cancelled) stopCapture();
+				else stop = stopCapture;
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+			stop?.();
+		};
+	});
+
+	// Captions fade a few seconds after they're spoken, so the strip needs a clock.
+	$effect(() => {
+		if (!captionsOn) return;
+		const timer = setInterval(() => (captionClock = Date.now()), 1000);
+		return () => clearInterval(timer);
+	});
+
+	function togglePanel(next: 'participants' | 'chat' | 'settings' | 'transcript') {
 		panel = panel === next ? 'none' : next;
 		if (panel === 'chat') unread = 0;
 	}
@@ -1441,6 +1605,7 @@
 					require_approval: boolean;
 					screen_share_policy: ScreenSharePolicy;
 					screen_share_mode: ScreenShareMode;
+					captions_enabled: boolean;
 				};
 			};
 			if (response.ok && body.meeting) {
@@ -1448,6 +1613,8 @@
 				if (requireApproval) startAdmissionsPolling();
 				applyScreenShareSettings({ policy: body.meeting.screen_share_policy, mode: body.meeting.screen_share_mode });
 				broadcastScreenShareSettings();
+				applyCaptionsAllowed(body.meeting.captions_enabled);
+				broadcastCaptionsSetting();
 			}
 		} catch {
 			// The settings panel just shows the last-known (default) value — not worth surfacing an error for.
@@ -1658,6 +1825,12 @@
 					: t('meet.recordingBy', { name: other.name })}
 			</span>
 		{/each}
+		{#if someoneWantsCaptions}
+			<span class="call-header-notice call-header-captions" role="status">
+				<Icon name="closed-captioning-line" size={14} />
+				{t('meet.captionsActive')}
+			</span>
+		{/if}
 	</div>
 
 	<div class="call-body">
@@ -1763,10 +1936,22 @@
 				{screenShareBusyIdentity}
 				onUpdateScreenShare={updateScreenShareSettings}
 				onRespondToScreenShare={respondToScreenShare}
+				{captionsAllowed}
+				onSetCaptionsAllowed={setCaptionsAllowed}
 				onClose={() => (panel = 'none')}
 			/>
+		{:else if panel === 'transcript'}
+			<CallTranscriptPanel lines={captionLines} onDownload={downloadTranscript} onClose={() => (panel = 'none')} />
 		{/if}
 	</div>
+
+	{#if captionsOn}
+		<div class="call-captions" aria-live="polite">
+			{#each shownCaptions as line (line.id)}
+				<p class="call-caption"><span class="call-caption-name">{line.name}</span> {line.text}</p>
+			{/each}
+		</div>
+	{/if}
 
 	<CallControls
 		{deafened}
@@ -1796,6 +1981,9 @@
 		{unread}
 		{isHost}
 		pendingAdmissionsCount={pendingAdmissions.length + screenShareRequests.length}
+		{captionsAllowed}
+		{captionsOn}
+		onToggleCaptions={() => (captionsOn = !captionsOn)}
 		onToggleDeafen={toggleDeafen}
 		onSelectMic={selectMic}
 		onToggleMic={toggleMic}
@@ -1867,8 +2055,42 @@
 	}
 
 	.call-header-recording + .call-header-recording,
-	.call-header-notice + .call-header-recording {
+	.call-header-notice + .call-header-recording,
+	.call-header-notice + .call-header-captions {
 		margin-left: 0.5rem;
+	}
+
+	.call-header-captions {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+	}
+
+	/* Above the control bar, where Meet puts them: never over a tile or an open panel. */
+	.call-captions {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 0.25rem;
+		min-height: 4.5rem;
+		padding: 0 1rem;
+	}
+
+	.call-caption {
+		max-width: 48rem;
+		margin: 0;
+		padding: 0.25rem 0.75rem;
+		border-radius: 0.5rem;
+		font-size: 1rem;
+		line-height: 1.4;
+		text-align: center;
+		background: rgba(0, 0, 0, 0.6);
+	}
+
+	.call-caption-name {
+		font-weight: 600;
+		color: rgba(255, 255, 255, 0.7);
 	}
 
 	.call-recording-dot {
