@@ -2147,8 +2147,8 @@
 		flex-direction: column;
 		gap: 0.75rem;
 		width: 100%;
-		height: 100%;
-		min-height: 100dvh;
+		/* A fixed height, not a minimum: a long chat or transcript then scrolls in its panel instead of growing the page. */
+		height: 100dvh;
 		padding: 1rem;
 		background: #0b0b0d;
 		color: #fff;

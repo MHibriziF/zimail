@@ -239,6 +239,20 @@
 			</button>
 		{/if}
 
+		{#if captionsAllowed}
+			<button
+				type="button"
+				class="call-btn desktop-only"
+				class:call-btn-active={captionsOn}
+				onclick={onToggleCaptions}
+				aria-label={captionsOn ? t('meet.captionsTurnOff') : t('meet.captionsTurnOn')}
+				aria-pressed={captionsOn}
+				title={captionsOn ? t('meet.captionsTurnOff') : t('meet.captionsTurnOn')}
+			>
+				<Icon name="closed-captioning-line" size={20} />
+			</button>
+		{/if}
+
 		<button
 			type="button"
 			class="call-btn desktop-only"
@@ -314,6 +328,22 @@
 							<span>{t('meet.chat')}</span>
 							{#if unread > 0}<span class="call-menu-count call-menu-count-alert">{unread}</span>{/if}
 						</button>
+						{#if captionsAllowed}
+							<button
+								type="button"
+								role="menuitemcheckbox"
+								aria-checked={captionsOn}
+								class:call-menu-on={captionsOn}
+								onclick={() => fromMore(onToggleCaptions)}
+							>
+								<Icon name="closed-captioning-line" size={18} />
+								<span>{captionsOn ? t('meet.captionsTurnOff') : t('meet.captionsTurnOn')}</span>
+							</button>
+							<button type="button" role="menuitem" onclick={() => fromMore(() => onTogglePanel('transcript'))}>
+								<Icon name="file-text-line" size={18} />
+								<span>{t('meet.transcript')}</span>
+							</button>
+						{/if}
 						{#if isHost}
 							<button type="button" role="menuitem" onclick={() => fromMore(() => onTogglePanel('settings'))}>
 								<Icon name="settings-3-line" size={18} />
@@ -338,22 +368,6 @@
 									</span>
 								</button>
 							{/each}
-						{/if}
-						{#if captionsAllowed}
-							<button
-								type="button"
-								role="menuitemcheckbox"
-								aria-checked={captionsOn}
-								class:call-menu-on={captionsOn}
-								onclick={() => fromMore(onToggleCaptions)}
-							>
-								<Icon name="closed-captioning-line" size={18} />
-								<span>{captionsOn ? t('meet.captionsTurnOff') : t('meet.captionsTurnOn')}</span>
-							</button>
-							<button type="button" role="menuitem" onclick={() => fromMore(() => onTogglePanel('transcript'))}>
-								<Icon name="file-text-line" size={18} />
-								<span>{t('meet.transcript')}</span>
-							</button>
 						{/if}
 						{#if pipSupported}
 							<button type="button" role="menuitem" onclick={() => fromMore(onTogglePip)}>
@@ -409,6 +423,18 @@
 			<Icon name="chat-3-line" size={20} />
 			{#if unread > 0}<span class="call-btn-badge call-btn-badge-alert">{unread}</span>{/if}
 		</button>
+		{#if captionsAllowed}
+			<button
+				type="button"
+				class="call-btn"
+				class:call-btn-active={panel === 'transcript'}
+				onclick={() => onTogglePanel('transcript')}
+				aria-label={t('meet.transcript')}
+				title={t('meet.transcript')}
+			>
+				<Icon name="file-text-line" size={20} />
+			</button>
+		{/if}
 		{#if isHost}
 			<button
 				type="button"
