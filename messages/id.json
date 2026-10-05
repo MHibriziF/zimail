@@ -793,6 +793,7 @@
 		"handRaisedBy": "{name} mengangkat tangan",
 		"raisedHandsCount": "Tangan terangkat: {count}",
 		"react": "Kirim reaksi",
+		"more": "Opsi lainnya",
 		"deviceError": "Tidak dapat mengakses kamera atau mikrofon Anda. Anda tetap bisa bergabung.",
 		"deviceErrorBlocked": "Akses kamera atau mikrofon diblokir untuk situs ini. Izinkan lewat ikon di kiri bilah alamat, lalu coba lagi.",
 		"deviceErrorBusy": "Kamera atau mikrofon Anda tidak dapat dimulai. Mungkin sedang dipakai aplikasi lain — tutup aplikasi itu dan coba lagi.",

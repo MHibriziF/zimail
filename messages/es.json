@@ -793,6 +793,7 @@
 		"handRaisedBy": "{name} levantó la mano",
 		"raisedHandsCount": "Manos levantadas: {count}",
 		"react": "Enviar una reacción",
+		"more": "Más opciones",
 		"deviceError": "No se pudo acceder a tu cámara o micrófono. Aún puedes unirte.",
 		"deviceErrorBlocked": "El acceso a la cámara o al micrófono está bloqueado para este sitio. Permítelo desde el icono a la izquierda de la barra de direcciones e inténtalo de nuevo.",
 		"deviceErrorBusy": "No se pudo iniciar tu cámara o micrófono. Puede que otra aplicación lo esté usando: ciérrala e inténtalo de nuevo.",
