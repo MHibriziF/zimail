@@ -27,6 +27,9 @@ export function splitStatements(sql: string): string[] {
 			const newline = sql.indexOf('\n', index);
 			current += '\n';
 			index = newline === -1 ? sql.length : newline + 1;
+		} else if (character === ';' && insideTriggerBody(current)) {
+			current += character;
+			index += 1;
 		} else if (character === ';') {
 			statements.push(current);
 			current = '';
@@ -39,6 +42,18 @@ export function splitStatements(sql: string): string[] {
 
 	statements.push(current);
 	return statements.map((statement) => statement.trim()).filter(Boolean);
+}
+
+/**
+ * A trigger's body is statements of its own, each ending in `;`, between
+ * BEGIN and END — only the `;` after END closes the CREATE TRIGGER.
+ */
+function insideTriggerBody(statement: string): boolean {
+	const words = statement.trim().toUpperCase().split(/\s+/);
+	if (words[0] !== 'CREATE') return false;
+	const trigger = words.indexOf('TRIGGER');
+	if (trigger < 1 || trigger > 2) return false;
+	return words.at(-1) !== 'END';
 }
 
 /** Index just past the string literal opening at `start`; '' inside it is an escaped quote. */

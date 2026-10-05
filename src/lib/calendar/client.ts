@@ -1,5 +1,6 @@
 import type { ReservationPage, ReservationPageSettings } from './reservations';
 import type { CalendarFeed } from './feeds';
+import type { PublishOptions, PublishStatus } from './publish';
 import type { LabelColor } from '../mail/labels';
 import type { CalendarEvent, CalendarEventInput, EventGuest } from './events';
 import type { RoomSettings } from '../meet/room-settings';
@@ -68,6 +69,28 @@ export async function syncFeed(id: string): Promise<CalendarFeed> {
 export async function removeFeed(id: string): Promise<void> {
 	const response = await fetch(`/api/calendar/feeds/${encodeURIComponent(id)}`, { method: 'DELETE' });
 	await readJson(response, 'Could not remove the calendar');
+}
+
+export async function fetchPublishStatus(): Promise<PublishStatus> {
+	return readJson<PublishStatus>(await fetch('/api/calendar/publish'), 'Could not load the published calendar');
+}
+
+/** Starts publishing or resets the link; the link is only ever returned here. */
+export async function publishCalendar(): Promise<{ url: string; status: PublishStatus }> {
+	return readJson(await fetch('/api/calendar/publish', { method: 'POST' }), 'Could not publish the calendar');
+}
+
+export async function savePublishOptions(options: PublishOptions): Promise<PublishStatus> {
+	const response = await fetch('/api/calendar/publish', {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(options)
+	});
+	return readJson<PublishStatus>(response, 'Could not save');
+}
+
+export async function unpublishCalendar(): Promise<void> {
+	await readJson(await fetch('/api/calendar/publish', { method: 'DELETE' }), 'Could not stop publishing');
 }
 
 /** What a message's calendar part is: an invitation to the user, a guest's answer to theirs, or neither. */

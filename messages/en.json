@@ -1003,6 +1003,22 @@
 		"nothingThisDay": "Nothing scheduled.",
 		"nothingThisMonth": "Nothing scheduled for the rest of this month.",
 		"comingUp": "Coming up",
+		"publish": {
+			"heading": "Share this calendar",
+			"hint": "A private link that Google Calendar, Apple Calendar or Outlook can subscribe to, so your events show there too. They refresh it on their own schedule — Google every few hours to once a day.",
+			"create": "Create link",
+			"linkLabel": "Your private calendar address",
+			"copy": "Copy",
+			"copied": "Copied",
+			"linkOnce": "Copy it now: it is only shown once. If you lose it, reset the link to get a new one.",
+			"howTo": "In Google Calendar, go to Other calendars → + → From URL and paste it.",
+			"published": "Your calendar is published. Anyone with the link can see the events in it.",
+			"includeFeeds": "Include the other calendars you subscribe to here",
+			"busyOnly": "Show only busy times, without titles or details",
+			"reset": "Reset link",
+			"resetHint": "Makes a new link. The old one stops working, and calendars subscribed to it stop updating.",
+			"stop": "Stop sharing"
+		},
 		"feeds": {
 			"heading": "Other calendars",
 			"hint": "Subscribe to Google, Outlook or iCloud calendars by their private iCal address. Their events show here and count as busy time. Nothing is sent to them — the address is only read.",

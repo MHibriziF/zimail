@@ -22,7 +22,10 @@ const PUBLIC_PREFIXES = [
 	// A reservation page is shared with people who have no account. It only
 	// ever reveals free slots, and a booking can only take one of them.
 	'/book',
-	'/api/book'
+	'/api/book',
+	// A published calendar is polled by Google, Apple or Outlook, which send no
+	// cookies: the unguessable token in the path is the credential.
+	'/api/calendar/ics'
 ];
 
 export function isPublicPath(pathname: string): boolean {

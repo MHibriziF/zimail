@@ -15,6 +15,12 @@ function fakeRepo(seed: Row[] = [], seedGuests: Record<string, EventGuest[]> = {
 		async listOverlapping(userId, from, to) {
 			return rows.filter((row) => row.userId === userId && row.start < to && row.end > from).map(strip);
 		},
+		async listStarting(userId, from, to, { includeFeeds, limit }) {
+			return rows
+				.filter((row) => row.userId === userId && row.start >= from && row.start < to && (includeFeeds || row.source !== 'feed'))
+				.slice(0, limit)
+				.map(strip);
+		},
 		async listWithMeetings(userId, { since, now, until }, limit) {
 			return rows
 				.filter((row) => row.userId === userId && row.meetingCode && row.start >= since && row.start < until && row.end > now)

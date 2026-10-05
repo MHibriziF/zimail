@@ -10,6 +10,7 @@
 	import Icon from '../Icon.svelte';
 	import EventEditor from './EventEditor.svelte';
 	import CalendarFeeds from './CalendarFeeds.svelte';
+	import CalendarPublish from './CalendarPublish.svelte';
 	import ReservationPages from './ReservationPages.svelte';
 	import { LABEL_SWATCH } from '$lib/mail/labels';
 	import { addDays, dateKeyToUtc, isDeletableEvent, isReadOnlyEvent, type CalendarEvent, type EventGuest } from '$lib/calendar/events';
@@ -321,6 +322,8 @@
 			invalidate('app:calendar');
 		}}
 	/>
+
+	<CalendarPublish />
 </div>
 
 {#if editing}

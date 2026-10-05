@@ -1003,6 +1003,22 @@
 		"nothingThisDay": "Rien de prévu.",
 		"nothingThisMonth": "Rien de prévu pour le reste du mois.",
 		"comingUp": "À venir",
+		"publish": {
+			"heading": "Partager cet agenda",
+			"hint": "Un lien privé auquel Google Agenda, Apple Calendrier ou Outlook peuvent s’abonner, pour y voir aussi vos événements. Ils l’actualisent à leur propre rythme — Google toutes les quelques heures, au plus une fois par jour.",
+			"create": "Créer un lien",
+			"linkLabel": "Adresse privée de votre agenda",
+			"copy": "Copier",
+			"copied": "Copié",
+			"linkOnce": "Copiez-le maintenant : il n’est affiché qu’une fois. Si vous le perdez, réinitialisez le lien pour en obtenir un nouveau.",
+			"howTo": "Dans Google Agenda, allez dans Autres agendas → + → À partir de l’URL et collez-le.",
+			"published": "Votre agenda est publié. Toute personne disposant du lien peut voir ses événements.",
+			"includeFeeds": "Inclure les autres agendas auxquels vous êtes abonné ici",
+			"busyOnly": "Afficher seulement les créneaux occupés, sans titres ni détails",
+			"reset": "Réinitialiser le lien",
+			"resetHint": "Crée un nouveau lien. L’ancien cesse de fonctionner et les agendas abonnés ne se mettent plus à jour.",
+			"stop": "Arrêter le partage"
+		},
 		"feeds": {
 			"heading": "Autres agendas",
 			"hint": "Abonnez-vous à des agendas Google, Outlook ou iCloud grâce à leur adresse iCal privée. Leurs événements s'affichent ici et comptent comme occupés. Rien ne leur est envoyé : l'adresse est seulement lue.",
