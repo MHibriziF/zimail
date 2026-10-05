@@ -96,27 +96,41 @@
 		onLeave: () => void;
 	} = $props();
 
-	let recordMenuOpen = $state(false);
 	let reactionMenuOpen = $state(false);
 	let reactionEl = $state<HTMLDivElement>();
+	let moreMenuOpen = $state(false);
+	let moreEl = $state<HTMLDivElement>();
 
-	/** The picker stays open for a burst of reactions; a click elsewhere or Escape closes it. */
-	function closeReactionMenuOutside(event: PointerEvent) {
-		if (reactionMenuOpen && !reactionEl?.contains(event.target as Node)) reactionMenuOpen = false;
+	/** The pickers stay open for a burst of choices; a click elsewhere or Escape closes them. */
+	function closeMenusOutside(event: PointerEvent) {
+		const target = event.target as Node;
+		if (reactionMenuOpen && !reactionEl?.contains(target)) reactionMenuOpen = false;
+		if (moreMenuOpen && !moreEl?.contains(target)) moreMenuOpen = false;
+	}
+
+	function closeMenus() {
+		reactionMenuOpen = false;
+		moreMenuOpen = false;
 	}
 
 	const handLabel = $derived(`${handRaised ? t('meet.lowerHand') : t('meet.raiseHand')} (Ctrl+Alt+H)`);
 
-	/** One choice starts straight away; two (the host's) ask which. */
-	function pressRecord() {
-		if (recording) onStopRecording();
-		else if (recordChoices.length === 1) onRecord(recordChoices[0]);
-		else recordMenuOpen = !recordMenuOpen;
-	}
+	/** On a phone the panels live in the More menu, so its button carries their alerts. */
+	const moreAlert = $derived(unread > 0 || pendingAdmissionsCount > 0 || raisedHandCount > 0);
 
-	function choose(kind: RecordingKind) {
-		recordMenuOpen = false;
-		onRecord(kind);
+	/** Unmuting while deafened also brings the audio back, so the mic doubles as "resume audio". */
+	const micLabel = $derived.by(() => {
+		if (deafened) return t('meet.undeafen');
+		return micEnabled ? t('meet.micOn') : t('meet.micOff');
+	});
+	const micIcon = $derived.by(() => {
+		if (deafened) return 'volume-mute-line';
+		return micEnabled ? 'mic-line' : 'mic-off-line';
+	});
+
+	function fromMore(action: () => void) {
+		moreMenuOpen = false;
+		action();
 	}
 
 	const screenShareLabel = $derived.by(() => {
@@ -128,220 +142,317 @@
 </script>
 
 <svelte:window
-	onpointerdown={closeReactionMenuOutside}
-	onkeydown={(event) => event.key === 'Escape' && (reactionMenuOpen = false)}
+	onpointerdown={closeMenusOutside}
+	onkeydown={(event) => event.key === 'Escape' && closeMenus()}
 />
 
 <div class="call-controls">
-	<button
-		type="button"
-		class="call-btn"
-		class:call-btn-danger-active={deafened}
-		onclick={onToggleDeafen}
-		aria-label={deafened ? t('meet.undeafen') : t('meet.deafen')}
-	>
-		<Icon name={deafened ? 'volume-mute-line' : 'headphone-line'} size={20} />
-	</button>
-	<div class="call-btn-pill" class:call-btn-pill-off={!micEnabled}>
-		<DeviceSelect kind="audioinput" deviceId={micDeviceId} label={t('meet.chooseMic')} onselect={onSelectMic} menuAlign="start">
-			{#snippet extra()}
-				{#if speakerSelectionSupported}
-					<div class="pill-extra-section">
-						<span class="pill-extra-label">{t('meet.chooseSpeaker')}</span>
-						{#if speakerDevices.length === 0}
-							<span class="pill-extra-empty">{t('meet.chooseSpeaker')}</span>
-						{:else}
-							{#each speakerDevices as device (device.deviceId)}
-								<button
-									type="button"
-									class="pill-extra-option"
-									class:selected={device.deviceId === speakerDeviceId}
-									onclick={() => onSelectSpeaker(device.deviceId)}
-								>
-									{device.label || t('meet.chooseSpeaker')}
-								</button>
-							{/each}
-						{/if}
-					</div>
-				{/if}
-			{/snippet}
-		</DeviceSelect>
-		<button
-			type="button"
-			class="call-btn-pill-main"
-			onclick={onToggleMic}
-			aria-label={micEnabled ? t('meet.micOn') : t('meet.micOff')}
-		>
-			<Icon name={micEnabled ? 'mic-line' : 'mic-off-line'} size={20} />
-		</button>
-	</div>
-	<div class="call-btn-pill" class:call-btn-pill-off={!cameraEnabled}>
-		<DeviceSelect kind="videoinput" deviceId={cameraDeviceId} label={t('meet.chooseCamera')} onselect={onSelectCamera} menuAlign="start">
-			{#snippet extra()}
-				{#if backgroundSupported}
-					<div class="pill-extra-section">
-						<span class="pill-extra-label">{t('meet.background')}</span>
-						<button type="button" class="pill-extra-option" onclick={onShowBackgroundPicker}>
-							<span
-								class="background-current-swatch"
-								style={backgroundOption === 'none'
-									? ''
-									: backgroundOption === 'blur'
-										? 'background: rgba(255, 255, 255, 0.3)'
-										: `background-image: url(${backgroundOption})`}
-							></span>
-							{t('meet.backgroundChange')}
-						</button>
-					</div>
-				{/if}
-			{/snippet}
-		</DeviceSelect>
-		<button
-			type="button"
-			class="call-btn-pill-main"
-			onclick={onToggleCamera}
-			aria-label={cameraEnabled ? t('meet.cameraOn') : t('meet.cameraOff')}
-		>
-			<Icon name={cameraEnabled ? 'camera-line' : 'camera-off-line'} size={20} />
-		</button>
-	</div>
-	{#if screenShareSupported}
-		<button
-			type="button"
-			class="call-btn"
-			class:call-btn-active={screenShareEnabled}
-			class:call-btn-pending={screenShareRequested}
-			disabled={!screenShareEnabled && shareCooldownSeconds > 0}
-			onclick={onToggleScreenShare}
-			aria-label={screenShareLabel}
-			title={screenShareLabel}
-		>
-			<Icon name="computer-line" size={20} />
-		</button>
-	{/if}
-	{#if recordChoices.length > 0}
-		<div class="call-record">
+	<div class="call-group call-group-main">
+		<div class="call-btn-pill" class:call-btn-pill-off={!micEnabled}>
+			<DeviceSelect kind="audioinput" deviceId={micDeviceId} label={t('meet.chooseMic')} onselect={onSelectMic} menuAlign="start">
+				{#snippet extra()}
+					{#if speakerSelectionSupported}
+						<div class="pill-extra-section">
+							<span class="pill-extra-label">{t('meet.chooseSpeaker')}</span>
+							{#if speakerDevices.length === 0}
+								<span class="pill-extra-empty">{t('meet.chooseSpeaker')}</span>
+							{:else}
+								{#each speakerDevices as device (device.deviceId)}
+									<button
+										type="button"
+										class="pill-extra-option"
+										class:selected={device.deviceId === speakerDeviceId}
+										onclick={() => onSelectSpeaker(device.deviceId)}
+									>
+										{device.label || t('meet.chooseSpeaker')}
+									</button>
+								{/each}
+							{/if}
+						</div>
+					{/if}
+				{/snippet}
+			</DeviceSelect>
+			<button
+				type="button"
+				class="call-btn-pill-main"
+				onclick={onToggleMic}
+				aria-label={micLabel}
+				title={micLabel}
+			>
+				<Icon name={micIcon} size={20} />
+			</button>
+		</div>
+
+		<div class="call-btn-pill" class:call-btn-pill-off={!cameraEnabled}>
+			<DeviceSelect kind="videoinput" deviceId={cameraDeviceId} label={t('meet.chooseCamera')} onselect={onSelectCamera} menuAlign="start">
+				{#snippet extra()}
+					{#if backgroundSupported}
+						<div class="pill-extra-section">
+							<span class="pill-extra-label">{t('meet.background')}</span>
+							<button type="button" class="pill-extra-option" onclick={onShowBackgroundPicker}>
+								<span
+									class="background-current-swatch"
+									style={backgroundOption === 'none'
+										? ''
+										: backgroundOption === 'blur'
+											? 'background: rgba(255, 255, 255, 0.3)'
+											: `background-image: url(${backgroundOption})`}
+								></span>
+								{t('meet.backgroundChange')}
+							</button>
+						</div>
+					{/if}
+				{/snippet}
+			</DeviceSelect>
+			<button
+				type="button"
+				class="call-btn-pill-main"
+				onclick={onToggleCamera}
+				aria-label={cameraEnabled ? t('meet.cameraOn') : t('meet.cameraOff')}
+				title={cameraEnabled ? t('meet.cameraOn') : t('meet.cameraOff')}
+			>
+				<Icon name={cameraEnabled ? 'camera-line' : 'camera-off-line'} size={20} />
+			</button>
+		</div>
+
+		{#if screenShareSupported}
 			<button
 				type="button"
 				class="call-btn"
-				class:call-btn-recording={recording}
-				disabled={recordingSaving}
-				onclick={pressRecord}
-				aria-label={recording ? t('meet.stopRecording') : t('meet.record')}
-				aria-haspopup={recordChoices.length > 1 && !recording ? 'menu' : undefined}
-				aria-expanded={recordChoices.length > 1 && !recording ? recordMenuOpen : undefined}
-				title={recording ? t('meet.stopRecording') : t('meet.record')}
+				class:call-btn-active={screenShareEnabled}
+				class:call-btn-pending={screenShareRequested}
+				disabled={!screenShareEnabled && shareCooldownSeconds > 0}
+				onclick={onToggleScreenShare}
+				aria-label={screenShareLabel}
+				title={screenShareLabel}
 			>
-				<Icon name={recording ? 'stop-circle-line' : 'record-circle-line'} size={20} />
+				<Icon name="computer-line" size={20} />
 			</button>
-			{#if recordMenuOpen && !recording}
-				<div class="call-record-menu" role="menu">
-					{#each recordChoices as kind (kind)}
-						<button type="button" role="menuitem" onclick={() => choose(kind)}>
-							<Icon name={kind === 'meeting' ? 'group-line' : 'computer-line'} size={16} />
-							<span>
-								{kind === 'meeting' ? t('meet.recordMeeting') : t('meet.recordView')}
-								<small>{kind === 'meeting' ? t('meet.recordMeetingHint') : t('meet.recordViewHint')}</small>
-							</span>
-						</button>
+		{/if}
+
+		<button
+			type="button"
+			class="call-btn desktop-only"
+			class:call-btn-hand={handRaised}
+			onclick={onToggleHand}
+			aria-label={handLabel}
+			aria-pressed={handRaised}
+			title={handLabel}
+		>
+			<Icon name="hand" size={20} />
+		</button>
+
+		<div class="call-menu-anchor desktop-only" bind:this={reactionEl}>
+			<button
+				type="button"
+				class="call-btn"
+				class:call-btn-active={reactionMenuOpen}
+				onclick={() => (reactionMenuOpen = !reactionMenuOpen)}
+				aria-label={t('meet.react')}
+				aria-haspopup="menu"
+				aria-expanded={reactionMenuOpen}
+				title={t('meet.react')}
+			>
+				<Icon name="emotion-line" size={20} />
+			</button>
+			{#if reactionMenuOpen}
+				<div class="call-reaction-menu" role="menu">
+					{#each REACTIONS as emoji (emoji)}
+						<button type="button" role="menuitem" onclick={() => onSendReaction(emoji)}>{emoji}</button>
 					{/each}
 				</div>
 			{/if}
 		</div>
-	{/if}
-	<button
-		type="button"
-		class="call-btn"
-		class:call-btn-hand={handRaised}
-		onclick={onToggleHand}
-		aria-label={handLabel}
-		aria-pressed={handRaised}
-		title={handLabel}
-	>
-		<Icon name="hand" size={20} />
-	</button>
-	<div class="call-reaction-picker" bind:this={reactionEl}>
+
+		<div class="call-menu-anchor" bind:this={moreEl}>
+			<button
+				type="button"
+				class="call-btn"
+				class:call-btn-active={moreMenuOpen}
+				onclick={() => (moreMenuOpen = !moreMenuOpen)}
+				aria-label={t('meet.more')}
+				aria-haspopup="menu"
+				aria-expanded={moreMenuOpen}
+				title={t('meet.more')}
+			>
+				<Icon name="more-2-fill" size={20} />
+				{#if moreAlert}<span class="call-btn-dot mobile-only" aria-hidden="true"></span>{/if}
+			</button>
+			{#if moreMenuOpen}
+				<div class="call-menu" role="menu">
+					<div class="call-menu-section mobile-only">
+						<div class="call-menu-reactions">
+							{#each REACTIONS as emoji (emoji)}
+								<button
+									type="button"
+									role="menuitem"
+									aria-label={`${t('meet.react')} ${emoji}`}
+									onclick={() => fromMore(() => onSendReaction(emoji))}>{emoji}</button
+								>
+							{/each}
+						</div>
+						<button type="button" role="menuitem" class:call-menu-on={handRaised} onclick={() => fromMore(onToggleHand)}>
+							<Icon name="hand" size={18} />
+							<span>{handRaised ? t('meet.lowerHand') : t('meet.raiseHand')}</span>
+						</button>
+						<button type="button" role="menuitem" onclick={() => fromMore(() => onTogglePanel('participants'))}>
+							<Icon name="group-line" size={18} />
+							<span>{t('meet.participants')}</span>
+							{#if rosterCount > 0}<span class="call-menu-count">{rosterCount}</span>{/if}
+						</button>
+						<button type="button" role="menuitem" onclick={() => fromMore(() => onTogglePanel('chat'))}>
+							<Icon name="chat-3-line" size={18} />
+							<span>{t('meet.chat')}</span>
+							{#if unread > 0}<span class="call-menu-count call-menu-count-alert">{unread}</span>{/if}
+						</button>
+						{#if isHost}
+							<button type="button" role="menuitem" onclick={() => fromMore(() => onTogglePanel('settings'))}>
+								<Icon name="settings-3-line" size={18} />
+								<span>{t('meet.settings')}</span>
+								{#if pendingAdmissionsCount > 0}<span class="call-menu-count">{pendingAdmissionsCount}</span>{/if}
+							</button>
+						{/if}
+					</div>
+					<div class="call-menu-section">
+						{#if recording}
+							<button type="button" role="menuitem" class="call-menu-alert" onclick={() => fromMore(onStopRecording)}>
+								<Icon name="stop-circle-line" size={18} />
+								<span>{t('meet.stopRecording')}</span>
+							</button>
+						{:else if !recordingSaving}
+							{#each recordChoices as kind (kind)}
+								<button type="button" role="menuitem" onclick={() => fromMore(() => onRecord(kind))}>
+									<Icon name="record-circle-line" size={18} />
+									<span>
+										{kind === 'meeting' ? t('meet.recordMeeting') : t('meet.recordView')}
+										<small>{kind === 'meeting' ? t('meet.recordMeetingHint') : t('meet.recordViewHint')}</small>
+									</span>
+								</button>
+							{/each}
+						{/if}
+						{#if pipSupported}
+							<button type="button" role="menuitem" onclick={() => fromMore(onTogglePip)}>
+								<Icon name={pipActive ? 'picture-in-picture-exit-line' : 'picture-in-picture-2-line'} size={18} />
+								<span>{pipActive ? t('meet.pipOff') : t('meet.pipOn')}</span>
+							</button>
+						{/if}
+						{#if backgroundSupported}
+							<button type="button" role="menuitem" onclick={() => fromMore(onShowBackgroundPicker)}>
+								<Icon name="image-line" size={18} />
+								<span>{t('meet.backgroundChange')}</span>
+							</button>
+						{/if}
+						<button type="button" role="menuitem" onclick={() => fromMore(onToggleDeafen)}>
+							<Icon name={deafened ? 'volume-up-line' : 'headphone-line'} size={18} />
+							<span>{deafened ? t('meet.undeafen') : t('meet.deafen')}</span>
+						</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<button type="button" class="call-btn call-btn-leave" onclick={onLeave} aria-label={t('meet.leave')} title={t('meet.leave')}>
+			<Icon name="phone-line" size={20} />
+		</button>
+	</div>
+
+	<div class="call-group call-group-panels desktop-only">
 		<button
 			type="button"
 			class="call-btn"
-			class:call-btn-active={reactionMenuOpen}
-			onclick={() => (reactionMenuOpen = !reactionMenuOpen)}
-			aria-label={t('meet.react')}
-			aria-haspopup="menu"
-			aria-expanded={reactionMenuOpen}
-			title={t('meet.react')}
+			class:call-btn-active={panel === 'participants'}
+			onclick={() => onTogglePanel('participants')}
+			aria-label={t('meet.participants')}
+			title={t('meet.participants')}
 		>
-			<Icon name="emotion-line" size={20} />
+			<Icon name="group-line" size={20} />
+			{#if rosterCount > 0}<span class="call-btn-badge">{rosterCount}</span>{/if}
+			{#if raisedHandCount > 0}
+				<span class="call-btn-badge call-btn-badge-hand" title={t('meet.raisedHandsCount', { count: raisedHandCount })}>
+					<Icon name="hand" size={10} />{raisedHandCount}
+				</span>
+			{/if}
 		</button>
-		{#if reactionMenuOpen}
-			<div class="call-reaction-menu" role="menu">
-				{#each REACTIONS as emoji (emoji)}
-					<button type="button" role="menuitem" onclick={() => onSendReaction(emoji)}>{emoji}</button>
-				{/each}
-			</div>
+		<button
+			type="button"
+			class="call-btn"
+			class:call-btn-active={panel === 'chat'}
+			onclick={() => onTogglePanel('chat')}
+			aria-label={t('meet.chat')}
+			title={t('meet.chat')}
+		>
+			<Icon name="chat-3-line" size={20} />
+			{#if unread > 0}<span class="call-btn-badge call-btn-badge-alert">{unread}</span>{/if}
+		</button>
+		{#if isHost}
+			<button
+				type="button"
+				class="call-btn"
+				class:call-btn-active={panel === 'settings'}
+				onclick={() => onTogglePanel('settings')}
+				aria-label={t('meet.settings')}
+				title={t('meet.settings')}
+			>
+				<Icon name="settings-3-line" size={20} />
+				{#if pendingAdmissionsCount > 0}<span class="call-btn-badge">{pendingAdmissionsCount}</span>{/if}
+			</button>
 		{/if}
 	</div>
-	{#if pipSupported}
-		<button
-			type="button"
-			class="call-btn"
-			class:call-btn-active={pipActive}
-			onclick={onTogglePip}
-			aria-label={pipActive ? t('meet.pipOff') : t('meet.pipOn')}
-		>
-			<Icon name={pipActive ? 'picture-in-picture-exit-line' : 'picture-in-picture-2-line'} size={20} />
-		</button>
-	{/if}
-	<button
-		type="button"
-		class="call-btn"
-		class:call-btn-active={panel === 'participants'}
-		onclick={() => onTogglePanel('participants')}
-		aria-label={t('meet.participants')}
-	>
-		<Icon name="group-line" size={20} />
-		{#if rosterCount > 0}<span class="call-btn-badge">{rosterCount}</span>{/if}
-		{#if raisedHandCount > 0}
-			<span class="call-btn-badge call-btn-badge-hand" title={t('meet.raisedHandsCount', { count: raisedHandCount })}>
-				<Icon name="hand" size={10} />{raisedHandCount}
-			</span>
-		{/if}
-	</button>
-	<button
-		type="button"
-		class="call-btn"
-		class:call-btn-active={panel === 'chat'}
-		onclick={() => onTogglePanel('chat')}
-		aria-label={t('meet.chat')}
-	>
-		<Icon name="chat-3-line" size={20} />
-		{#if unread > 0}<span class="call-btn-badge call-btn-badge-alert">{unread}</span>{/if}
-	</button>
-	{#if isHost}
-		<button
-			type="button"
-			class="call-btn"
-			class:call-btn-active={panel === 'settings'}
-			onclick={() => onTogglePanel('settings')}
-			aria-label={t('meet.settings')}
-		>
-			<Icon name="settings-3-line" size={20} />
-			{#if pendingAdmissionsCount > 0}<span class="call-btn-badge">{pendingAdmissionsCount}</span>{/if}
-		</button>
-	{/if}
-	<button type="button" class="call-btn call-btn-leave" onclick={onLeave} aria-label={t('meet.leave')}>
-		<Icon name="phone-line" size={20} />
-	</button>
 </div>
 
 <style>
+	/* Call actions in the middle, panels apart on the right, as Meet does. */
 	.call-controls {
 		position: relative;
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: center;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+		align-items: center;
 		gap: 0.75rem;
 		padding-bottom: 0.5rem;
+	}
+
+	.call-group {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.call-group-main {
+		grid-column: 2;
+	}
+
+	.call-group-panels {
+		grid-column: 3;
+		justify-self: end;
+	}
+
+	/* Scoped under .call-controls so they outrank each element's own display. */
+	.call-controls .mobile-only {
+		display: none;
+	}
+
+	/* A phone gets one row: mic, camera, share, More and leave; the rest moves into More. */
+	@media (max-width: 760px) {
+		.call-controls {
+			display: flex;
+			justify-content: center;
+		}
+
+		.call-group {
+			gap: 0.5rem;
+		}
+
+		.call-controls .desktop-only {
+			display: none;
+		}
+
+		.call-controls .mobile-only {
+			display: block;
+		}
+
+		.call-controls .call-menu-section.mobile-only {
+			display: flex;
+		}
 	}
 
 	/*
@@ -409,19 +520,20 @@
 		box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
 	}
 
-	.call-record {
+	.call-menu-anchor {
 		position: relative;
 	}
 
-	.call-record-menu {
+	.call-menu {
 		position: absolute;
 		bottom: calc(100% + 0.5rem);
 		left: 50%;
 		z-index: 20;
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
-		width: 16rem;
+		width: 17rem;
+		max-height: calc(100dvh - 8rem);
+		overflow-y: auto;
 		padding: 0.375rem;
 		border-radius: 0.75rem;
 		background: #1f1f23;
@@ -429,7 +541,19 @@
 		transform: translateX(-50%);
 	}
 
-	.call-record-menu button {
+	.call-menu-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.125rem;
+	}
+
+	.call-menu-section.mobile-only {
+		margin-bottom: 0.375rem;
+		padding-bottom: 0.375rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.call-menu-section > button {
 		display: flex;
 		align-items: flex-start;
 		gap: 0.625rem;
@@ -441,15 +565,72 @@
 		background: transparent;
 	}
 
-	.call-record-menu button:hover {
+	.call-menu-section > button:hover,
+	.call-menu-section > button:focus-visible {
 		background: #34343a;
 	}
 
-	.call-record-menu small {
+	.call-menu-section > button > span:first-of-type {
+		flex: 1;
+	}
+
+	.call-menu-section > .call-menu-on {
+		color: #fbbf24;
+	}
+
+	.call-menu-section > .call-menu-alert {
+		color: #f87171;
+	}
+
+	.call-menu small {
 		display: block;
 		margin-top: 0.125rem;
 		font-size: 0.75rem;
 		color: #a1a1aa;
+	}
+
+	.call-menu-count {
+		padding: 0 0.375rem;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		background: #52525b;
+	}
+
+	.call-menu-count-alert {
+		background: #dc2626;
+	}
+
+	.call-menu-reactions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		padding-bottom: 0.25rem;
+	}
+
+	.call-menu-reactions button {
+		width: 2.5rem;
+		height: 2.5rem;
+		border-radius: 999px;
+		font-size: 1.375rem;
+		line-height: 1;
+		background: transparent;
+	}
+
+	.call-menu-reactions button:hover,
+	.call-menu-reactions button:focus-visible {
+		background: #34343a;
+	}
+
+	.call-btn-dot {
+		position: absolute;
+		top: 4px;
+		right: 4px;
+		width: 0.625rem;
+		height: 0.625rem;
+		border-radius: 999px;
+		background: #dc2626;
+		box-shadow: 0 0 0 2px #26262b;
 	}
 
 	.call-btn-hand {
@@ -459,10 +640,6 @@
 
 	.call-btn-hand:hover {
 		background: #fcd34d;
-	}
-
-	.call-reaction-picker {
-		position: relative;
 	}
 
 	.call-reaction-menu {
@@ -495,27 +672,13 @@
 		background: #34343a;
 	}
 
-	/* The button can sit near either edge once the bar wraps, so center the picker on the bar instead. */
-	@media (max-width: 640px) {
-		.call-reaction-picker {
-			position: static;
+	/* More sits right of centre on a phone, so its menu lines up with Leave's right edge to stay on screen. */
+	@media (max-width: 760px) {
+		.call-menu {
+			left: auto;
+			right: calc(-48px - 0.5rem);
+			transform: none;
 		}
-
-		.call-reaction-menu {
-			flex-wrap: wrap;
-			justify-content: center;
-			width: 11.5rem;
-			border-radius: 1.25rem;
-		}
-	}
-
-	.call-btn-recording {
-		color: #fff;
-		background: #dc2626;
-	}
-
-	.call-btn-recording:hover {
-		background: #b91c1c;
 	}
 
 	/* Waiting on the host: a pulsing ring, and pressing again withdraws the request. */
@@ -534,15 +697,6 @@
 		.call-btn-pending {
 			animation: none;
 		}
-	}
-
-	/* Same warning color as a muted mic/camera — deafened means you can't speak or hear either. */
-	.call-btn-danger-active {
-		background: #7f1d1d;
-	}
-
-	.call-btn-danger-active:hover {
-		background: #932222;
 	}
 
 	.call-btn-badge {
