@@ -53,7 +53,8 @@ function sqlLiteral(value: unknown): string {
 	if (value === null || value === undefined) return 'NULL';
 	if (typeof value === 'number' || typeof value === 'bigint') return String(value);
 	if (value instanceof Uint8Array) return `X'${Buffer.from(value).toString('hex')}'`;
-	return `'${String(value).replaceAll("'", "''")}'`;
+	if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`;
+	throw new Error(`SQLite returned a value of an unexpected type: ${typeof value}`);
 }
 
 function quoteIdentifier(name: string): string {
@@ -106,7 +107,9 @@ export function replacedBy(sql: string): string[] {
 export function snapshot(db: DatabaseSync): { schema: string[]; rows: Record<string, unknown[]> } {
 	const objects = schemaObjects(db);
 	const normalize = (sql: string) => sql.replaceAll(/\s+/g, ' ').replace(/ IF NOT EXISTS /i, ' ').trim();
-	const schema = objects.map((object) => `${object.type} ${object.name} ON ${object.tbl_name}: ${normalize(object.sql)}`).sort();
+	const schema = objects
+		.map((object) => `${object.type} ${object.name} ON ${object.tbl_name}: ${normalize(object.sql)}`)
+		.sort((a, b) => a.localeCompare(b));
 	const rows: Record<string, unknown[]> = {};
 	for (const object of objects.filter((entry) => entry.type === 'table')) {
 		rows[object.name] = db.prepare(`SELECT * FROM ${quoteIdentifier(object.name)}`).all();

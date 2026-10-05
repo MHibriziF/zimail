@@ -44,7 +44,8 @@ function entry(folder, name, archived) {
 		...(archived ? ['archived: true'] : []),
 		`sql: ${JSON.stringify(sql)}`
 	];
-	return `\t{\n${fields.map((field) => `\t\t${field}`).join(',\n')}\n\t}`;
+	const body = fields.map((field) => '\t\t' + field).join(',\n');
+	return `\t{\n${body}\n\t}`;
 }
 
 const current = sqlFiles(dir);

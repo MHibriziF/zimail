@@ -37,7 +37,7 @@ function latestMigration(): string | null {
 	const current = listMigrations()
 		.filter((migration) => !migration.archived)
 		.map((migration) => migration.name)
-		.sort();
+		.sort((a, b) => a.localeCompare(b));
 	return current.at(-1) ?? null;
 }
 
