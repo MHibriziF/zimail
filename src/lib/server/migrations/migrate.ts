@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { splitStatements } from './migrate-sql';
 import { MIGRATIONS } from './migrations.generated';
+import { planMigrations, type PlannedMigration } from './plan';
 
 /**
  * Applies pending D1 migrations from inside the Worker.
@@ -21,17 +22,39 @@ const CREATE_TRACKING_TABLE = `CREATE TABLE IF NOT EXISTS d1_migrations(
 		applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 )`;
 
-export type Migration = { name: string; sql: string };
+/**
+ * Every migration, current and archived, read from a generated module rather
+ * than `import.meta.glob`, because `src/worker.ts` is bundled by wrangler's
+ * esbuild and never sees Vite's transforms — the glob survived as a literal
+ * call there and threw on upload.
+ */
+export function listMigrations(): PlannedMigration[] {
+	return [...MIGRATIONS];
+}
+
+/** The newest current migration: if it is recorded, so is everything before it. */
+function latestMigration(): string | null {
+	const current = listMigrations()
+		.filter((migration) => !migration.archived)
+		.map((migration) => migration.name)
+		.sort((a, b) => a.localeCompare(b));
+	return current.at(-1) ?? null;
+}
 
 /**
- * Migrations in the order wrangler would apply them: by filename.
- *
- * Read from a generated module rather than `import.meta.glob`, because
- * `src/worker.ts` is bundled by wrangler's esbuild and never sees Vite's
- * transforms — the glob survived as a literal call there and threw on upload.
+ * One row instead of every row of `d1_migrations`. Every cold isolate checks
+ * — every minute's cron tick included — so the full read only happens when a
+ * deploy brought something new.
  */
-export function listMigrations(): Migration[] {
-	return [...MIGRATIONS].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+async function isUpToDate(db: D1Database): Promise<boolean> {
+	const latest = latestMigration();
+	if (!latest) return true;
+	try {
+		return (await db.prepare('SELECT 1 AS ok FROM d1_migrations WHERE name = ?').bind(latest).first()) !== null;
+	} catch {
+		// No tracking table yet: a brand-new database.
+		return false;
+	}
 }
 
 async function appliedNames(db: D1Database): Promise<Set<string>> {
@@ -41,35 +64,34 @@ async function appliedNames(db: D1Database): Promise<Set<string>> {
 }
 
 /**
- * Applies whatever has not run yet, oldest first.
+ * Applies whatever has not run yet, oldest first — see `planMigrations` for
+ * how a squash stands in for the migrations it replaces.
  *
- * Each migration goes to D1 as one batch — its statements plus the row
- * recording it — so it either lands whole or not at all. That is also what
- * makes it safe for two requests to arrive at once on a cold deploy: the
- * second batch fails on the name's UNIQUE constraint and rolls back rather
- * than applying anything twice.
+ * Each step goes to D1 as one batch — its statements plus the row recording
+ * it — so it either lands whole or not at all. That is also what makes it safe
+ * for two requests to arrive at once on a cold deploy: the second batch fails
+ * on the name's UNIQUE constraint and rolls back rather than applying anything
+ * twice.
  */
 export async function applyPendingMigrations(db: D1Database): Promise<string[]> {
-	const applied = await appliedNames(db);
-	const pending = listMigrations().filter((migration) => !applied.has(migration.name));
-	if (pending.length === 0) return [];
+	if (await isUpToDate(db)) return [];
+	const steps = planMigrations(listMigrations(), await appliedNames(db));
 
 	const ran: string[] = [];
 
-	for (const migration of pending) {
-		const statements = splitStatements(migration.sql).map((statement) => db.prepare(statement));
-		if (statements.length === 0) continue;
+	for (const step of steps) {
+		const statements = splitStatements(step.sql ?? '').map((statement) => db.prepare(statement));
 
 		try {
 			await db.batch([
 				...statements,
-				db.prepare('INSERT INTO d1_migrations (name) VALUES (?)').bind(migration.name)
+				db.prepare('INSERT INTO d1_migrations (name) VALUES (?)').bind(step.name)
 			]);
-			ran.push(migration.name);
+			ran.push(step.name);
 		} catch (error) {
 			// Another request got there first: it is applied, not broken.
-			if ((await appliedNames(db)).has(migration.name)) continue;
-			throw new Error(`Migration ${migration.name} failed: ${describe(error)}`);
+			if ((await appliedNames(db)).has(step.name)) continue;
+			throw new Error(`Migration ${step.name} failed: ${describe(error)}`);
 		}
 	}
 

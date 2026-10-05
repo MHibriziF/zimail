@@ -22,7 +22,16 @@ bun run build        # regenerates migrations, then vite build
 `bun scripts/generate-migrations.mjs`. The Worker applies its own migrations at
 runtime (the Cloudflare deploy button never migrates), so the SQL has to be
 inlined into `src/lib/server/migrations/migrations.generated.ts`. That file is
-committed, and `migrations.generated.test.ts` fails if it drifts.
+committed, and `migrations.generated.test.ts` fails if it drifts. Number new
+migrations on from the last one squashed, not from the top-level file count.
+
+**Squashing.** `bun run db:squash` folds `migrations/` into one
+`0001_squashed_NNNN.sql` and moves the originals to `migrations/archive/`
+(#175). Never edit or delete the archive: an install that is only part of the
+way through still runs from it (`plan.ts`, Django's `replaces`), and a test
+checks each squash rebuilds exactly what its history did. Wrangler's
+`db:migrate:*` scripts don't know about `replaces`; they're fine on a fresh or
+up-to-date database, but a half-migrated one must be migrated by the Worker.
 
 **`allowJs`/`checkJs` are off on purpose.** The repo has no `.js` sources, and
 enabling them let svelte-check follow `src/worker.ts`'s import into
