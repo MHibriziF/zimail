@@ -208,7 +208,7 @@ export function createCaptionUploader(options: {
 				headers: {
 					Authorization: `Bearer ${options.token}`,
 					'Content-Type': 'audio/wav',
-					[CAPTION_LANGUAGE_HEADER]: options.language?.() ?? 'auto'
+					[CAPTION_LANGUAGE_HEADER]: options.language?.() ?? ''
 				},
 				body: wav as Uint8Array<ArrayBuffer>
 			});
