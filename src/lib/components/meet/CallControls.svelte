@@ -5,6 +5,8 @@
 	import type { RecordingKind } from '$lib/meet/recording-kind';
 	import { REACTIONS, type Reaction } from '$lib/meet/reactions';
 
+	type CallPanel = 'participants' | 'chat' | 'settings' | 'transcript';
+
 	let {
 		deafened,
 		micEnabled,
@@ -33,6 +35,9 @@
 		unread,
 		isHost,
 		pendingAdmissionsCount,
+		captionsAllowed,
+		captionsOn,
+		onToggleCaptions,
 		onToggleDeafen,
 		onSelectMic,
 		onToggleMic,
@@ -72,13 +77,17 @@
 		recordChoices: RecordingKind[];
 		recording: boolean;
 		recordingSaving: boolean;
-		panel: 'none' | 'participants' | 'chat' | 'settings';
+		panel: 'none' | CallPanel;
 		rosterCount: number;
 		handRaised: boolean;
 		raisedHandCount: number;
 		unread: number;
 		isHost: boolean;
 		pendingAdmissionsCount: number;
+		/** The host lets people turn captions on; the transcript comes with it. */
+		captionsAllowed: boolean;
+		captionsOn: boolean;
+		onToggleCaptions: () => void;
 		onToggleDeafen: () => void;
 		onSelectMic: (id: string) => void;
 		onToggleMic: () => void;
@@ -90,7 +99,7 @@
 		onTogglePip: () => void;
 		onRecord: (kind: RecordingKind) => void;
 		onStopRecording: () => void;
-		onTogglePanel: (next: 'participants' | 'chat' | 'settings') => void;
+		onTogglePanel: (next: CallPanel) => void;
 		onToggleHand: () => void;
 		onSendReaction: (emoji: Reaction) => void;
 		onLeave: () => void;
@@ -329,6 +338,22 @@
 									</span>
 								</button>
 							{/each}
+						{/if}
+						{#if captionsAllowed}
+							<button
+								type="button"
+								role="menuitemcheckbox"
+								aria-checked={captionsOn}
+								class:call-menu-on={captionsOn}
+								onclick={() => fromMore(onToggleCaptions)}
+							>
+								<Icon name="closed-captioning-line" size={18} />
+								<span>{captionsOn ? t('meet.captionsTurnOff') : t('meet.captionsTurnOn')}</span>
+							</button>
+							<button type="button" role="menuitem" onclick={() => fromMore(() => onTogglePanel('transcript'))}>
+								<Icon name="file-text-line" size={18} />
+								<span>{t('meet.transcript')}</span>
+							</button>
 						{/if}
 						{#if pipSupported}
 							<button type="button" role="menuitem" onclick={() => fromMore(onTogglePip)}>

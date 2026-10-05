@@ -16,6 +16,8 @@
 		screenShareBusyIdentity,
 		onUpdateScreenShare,
 		onRespondToScreenShare,
+		captionsAllowed,
+		onSetCaptionsAllowed,
 		onClose
 	}: {
 		requireApproval: boolean;
@@ -30,6 +32,8 @@
 		screenShareBusyIdentity: string;
 		onUpdateScreenShare: (changes: { screenSharePolicy?: ScreenSharePolicy; screenShareMode?: ScreenShareMode }) => void;
 		onRespondToScreenShare: (identity: string, allow: boolean) => void;
+		captionsAllowed: boolean;
+		onSetCaptionsAllowed: (next: boolean) => void;
 		onClose: () => void;
 	} = $props();
 </script>
@@ -112,6 +116,20 @@
 				/>
 				{t('meet.screenShareModeMultiple')}
 			</label>
+		</fieldset>
+
+		<fieldset class="call-settings-field">
+			<legend>{t('meet.captionsSettingLabel')}</legend>
+			<label class="call-settings-radio">
+				<input
+					type="checkbox"
+					checked={captionsAllowed}
+					disabled={settingsBusy}
+					onchange={(event) => onSetCaptionsAllowed(event.currentTarget.checked)}
+				/>
+				{t('meet.captionsSettingAllow')}
+			</label>
+			<p class="call-settings-hint">{t('meet.captionsSettingHint')}</p>
 		</fieldset>
 
 		{#if settingsError}<p class="call-settings-error">{settingsError}</p>{/if}
@@ -260,6 +278,12 @@
 		align-items: center;
 		gap: 0.5rem;
 		font-size: 0.8125rem;
+	}
+
+	.call-settings-hint {
+		margin: 0;
+		font-size: 0.75rem;
+		color: rgba(255, 255, 255, 0.5);
 	}
 
 	.call-settings-error {

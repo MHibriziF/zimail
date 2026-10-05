@@ -14,6 +14,7 @@ function meeting(overrides: Partial<Meeting> = {}): Meeting {
 		require_approval: false,
 		screen_share_policy: 'open',
 		screen_share_mode: 'multiple',
+		captions_enabled: false,
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -44,6 +45,7 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 				require_approval: input.requireApproval,
 				screen_share_policy: input.screenSharePolicy,
 				screen_share_mode: input.screenShareMode,
+				captions_enabled: input.captionsEnabled,
 				created_at: input.createdAt
 			});
 		},
@@ -71,6 +73,7 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 			if (patch.requireApproval !== undefined) row.require_approval = patch.requireApproval;
 			if (patch.screenSharePolicy !== undefined) row.screen_share_policy = patch.screenSharePolicy;
 			if (patch.screenShareMode !== undefined) row.screen_share_mode = patch.screenShareMode;
+			if (patch.captionsEnabled !== undefined) row.captions_enabled = patch.captionsEnabled;
 			return true;
 		},
 		async updateCode(userId, id, code) {
@@ -133,7 +136,14 @@ function fakeLiveKit(): LiveKitClient {
 			return [];
 		},
 		async setPublishSources() {},
-		async muteTrack() {}
+		async muteTrack() {},
+		async createCaptionToken(identity, room) {
+			return `captions:${identity}:${room}`;
+		},
+		async verifyCaptionToken(token) {
+			const [use, identity, room] = token.split(':');
+			return use === 'captions' && identity && room ? { identity, room } : null;
+		}
 	};
 }
 
@@ -161,7 +171,9 @@ function recordingLiveKit(inRoom: RoomParticipant[] = []) {
 		},
 		async muteTrack(room, identity, trackSid) {
 			mutedTracks.push({ room, identity, trackSid });
-		}
+		},
+		createCaptionToken: fakeLiveKit().createCaptionToken,
+		verifyCaptionToken: fakeLiveKit().verifyCaptionToken
 	};
 	return { client, tokens, permissionChanges, mutedTracks };
 }
@@ -418,6 +430,38 @@ describe('checkAdmission', () => {
 		await admissionsRepo.setStatus('meeting-1', id, 'admitted');
 		const outcome = await service.checkAdmission('aaa-aaaa-aaa', id, 'Ada');
 		assert.equal(outcome.type, 'admitted');
+	});
+});
+
+describe('captions', () => {
+	test('joining hands out a caption token for the same identity, even while captions are off', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		const outcome = await service.requestJoin('aaa-aaaa-aaa', {});
+		assert.equal(outcome.type, 'admitted');
+		if (outcome.type !== 'admitted') return;
+		assert.equal(outcome.captions, false);
+		const identity = outcome.token.replace('token-for-', '');
+		assert.equal(outcome.captionToken, `captions:${identity}:meeting-1`);
+	});
+
+	test('access needs a token for this meeting, and the host to allow captions', async () => {
+		const { repo } = fakeMeetingsRepo([meeting(), meeting({ id: 'meeting-2', code: 'bbb-bbbb-bbb', captions_enabled: true })]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+
+		assert.equal(await service.checkCaptionsAccess('no-such-code', 'captions:a:meeting-1'), 'meeting_not_found');
+		assert.equal(await service.checkCaptionsAccess('aaa-aaaa-aaa', 'forged'), 'unauthorized');
+		assert.equal(await service.checkCaptionsAccess('bbb-bbbb-bbb', 'captions:a:meeting-1'), 'unauthorized');
+		assert.equal(await service.checkCaptionsAccess('aaa-aaaa-aaa', 'captions:a:meeting-1'), 'disabled');
+		assert.equal(await service.checkCaptionsAccess('bbb-bbbb-bbb', 'captions:a:meeting-2'), 'ok');
+	});
+
+	test('the host can turn captions on and off', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		assert.equal((await service.update('user-1', 'meeting-1', { captionsEnabled: true }))?.captions_enabled, true);
+		assert.equal(await service.checkCaptionsAccess('aaa-aaaa-aaa', 'captions:a:meeting-1'), 'ok');
+		assert.equal((await service.update('user-1', 'meeting-1', { captionsEnabled: false }))?.captions_enabled, false);
 	});
 });
 

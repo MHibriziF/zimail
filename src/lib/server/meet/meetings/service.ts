@@ -32,7 +32,13 @@ type AdmittedOutcome = {
 	token: string;
 	roomName: string;
 	screenShare: ScreenShareSettings;
+	/** Whether the host allows captions, as of joining; the host's attributes carry later changes. */
+	captions: boolean;
+	/** Always minted, so captions work if the host turns them on mid-call. */
+	captionToken: string;
 };
+
+export type CaptionsAccess = 'meeting_not_found' | 'unauthorized' | 'disabled' | 'ok';
 
 export type AdmissionCheckOutcome =
 	| { type: 'meeting_not_found' }
@@ -47,6 +53,7 @@ export type MeetingChanges = {
 	requireApproval?: boolean;
 	screenSharePolicy?: ScreenSharePolicy;
 	screenShareMode?: ScreenShareMode;
+	captionsEnabled?: boolean;
 };
 
 /** What a participant may publish under the meeting's policy — the host is never restricted. */
@@ -99,6 +106,7 @@ export type MeetingsService = {
 			requireApproval?: boolean;
 			screenSharePolicy?: ScreenSharePolicy;
 			screenShareMode?: ScreenShareMode;
+			captionsEnabled?: boolean;
 		}
 	): Promise<CreatedMeeting>;
 	list(userId: string, limit?: number): Promise<Meeting[]>;
@@ -139,6 +147,8 @@ export type MeetingsService = {
 		admissionId: string,
 		status: Exclude<AdmissionStatus, 'pending'>
 	): Promise<DecideAdmissionOutcome>;
+	/** Whether a caption token's holder may have speech transcribed in the meeting behind `code` right now. */
+	checkCaptionsAccess(code: string, captionToken: string): Promise<CaptionsAccess>;
 };
 
 export type MeetingsServiceDeps = {
@@ -148,8 +158,29 @@ export type MeetingsServiceDeps = {
 	getLiveKit: () => LiveKitClient;
 };
 
-function admitted(liveKit: LiveKitClient, token: string, meeting: Meeting): AdmittedOutcome {
-	return { type: 'admitted', url: liveKit.url, token, roomName: meeting.id, screenShare: screenShareSettingsOf(meeting) };
+async function admitted(
+	liveKit: LiveKitClient,
+	meeting: Meeting,
+	participant: { identity: string; name: string | undefined; isOwner: boolean }
+): Promise<AdmittedOutcome> {
+	const [token, captionToken] = await Promise.all([
+		liveKit.createAccessToken({
+			identity: participant.identity,
+			name: participant.name,
+			room: meeting.id,
+			canPublishSources: publishSourcesFor(meeting, participant.isOwner)
+		}),
+		liveKit.createCaptionToken(participant.identity, meeting.id)
+	]);
+	return {
+		type: 'admitted',
+		url: liveKit.url,
+		token,
+		roomName: meeting.id,
+		screenShare: screenShareSettingsOf(meeting),
+		captions: meeting.captions_enabled,
+		captionToken
+	};
 }
 
 export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsService {
@@ -183,6 +214,7 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			const requireApproval = options.requireApproval ?? false;
 			const screenSharePolicy = options.screenSharePolicy ?? DEFAULT_SCREEN_SHARE.policy;
 			const screenShareMode = options.screenShareMode ?? DEFAULT_SCREEN_SHARE.mode;
+			const captionsEnabled = options.captionsEnabled ?? false;
 			const createdAt = new Date().toISOString();
 
 			for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
@@ -197,6 +229,7 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 						requireApproval,
 						screenSharePolicy,
 						screenShareMode,
+						captionsEnabled,
 						createdAt
 					});
 
@@ -210,6 +243,7 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 							require_approval: requireApproval,
 							screen_share_policy: screenSharePolicy,
 							screen_share_mode: screenShareMode,
+							captions_enabled: captionsEnabled,
 							created_at: createdAt
 						}
 					};
@@ -233,6 +267,7 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			if (changes.requireApproval !== undefined) patch.requireApproval = changes.requireApproval;
 			if (changes.screenSharePolicy !== undefined) patch.screenSharePolicy = changes.screenSharePolicy;
 			if (changes.screenShareMode !== undefined) patch.screenShareMode = changes.screenShareMode;
+			if (changes.captionsEnabled !== undefined) patch.captionsEnabled = changes.captionsEnabled;
 
 			if (Object.keys(patch).length === 0) return repo.getForUser(userId, id);
 
@@ -310,15 +345,11 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 				return { type: 'pending', admissionId: admission.id };
 			}
 
-			const liveKit = getLiveKit();
-			const token = await liveKit.createAccessToken({
+			return admitted(getLiveKit(), meeting, {
 				identity: isOwner ? createHostIdentity() : crypto.randomUUID(),
 				name,
-				room: meeting.id,
-				canPublishSources: publishSourcesFor(meeting, isOwner)
+				isOwner
 			});
-
-			return admitted(liveKit, token, meeting);
 		},
 
 		/** Polled by a guest waiting to be let in — the second half of `requestJoin`. */
@@ -333,15 +364,7 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 				return { type: 'waiting', status: admission.status };
 			}
 
-			const liveKit = getLiveKit();
-			const token = await liveKit.createAccessToken({
-				identity: crypto.randomUUID(),
-				name,
-				room: meeting.id,
-				canPublishSources: publishSourcesFor(meeting, false)
-			});
-
-			return admitted(liveKit, token, meeting);
+			return admitted(getLiveKit(), meeting, { identity: crypto.randomUUID(), name, isOwner: false });
 		},
 
 		/** Admit or deny one pending join request — owner-only. */
@@ -351,6 +374,14 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 
 			const updated = await admissionsRepo.setStatus(meetingId, admissionId, status);
 			return updated ? 'ok' : 'admission_not_found';
+		},
+
+		async checkCaptionsAccess(code, captionToken) {
+			const meeting = await repo.findByCode(code);
+			if (!meeting) return 'meeting_not_found';
+			const holder = await getLiveKit().verifyCaptionToken(captionToken);
+			if (holder?.room !== meeting.id) return 'unauthorized';
+			return meeting.captions_enabled ? 'ok' : 'disabled';
 		}
 	};
 }

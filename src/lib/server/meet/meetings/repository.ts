@@ -15,19 +15,22 @@ export type Meeting = {
 	require_approval: boolean;
 	screen_share_policy: ScreenSharePolicy;
 	screen_share_mode: ScreenShareMode;
+	captions_enabled: boolean;
 	created_at: string;
 };
 
-type MeetingRow = Omit<Meeting, 'require_approval' | 'screen_share_policy' | 'screen_share_mode'> & {
+type MeetingRow = Omit<Meeting, 'require_approval' | 'screen_share_policy' | 'screen_share_mode' | 'captions_enabled'> & {
 	require_approval: number;
 	screen_share_policy: string;
 	screen_share_mode: string;
+	captions_enabled: number;
 };
 
 function toMeeting(row: MeetingRow): Meeting {
 	return {
 		...row,
 		require_approval: !!row.require_approval,
+		captions_enabled: !!row.captions_enabled,
 		screen_share_policy: parseScreenSharePolicy(row.screen_share_policy) ?? DEFAULT_SCREEN_SHARE.policy,
 		screen_share_mode: parseScreenShareMode(row.screen_share_mode) ?? DEFAULT_SCREEN_SHARE.mode
 	};
@@ -42,6 +45,7 @@ export type NewMeeting = {
 	requireApproval: boolean;
 	screenSharePolicy: ScreenSharePolicy;
 	screenShareMode: ScreenShareMode;
+	captionsEnabled: boolean;
 	createdAt: string;
 };
 
@@ -50,6 +54,7 @@ export type MeetingFieldPatch = {
 	requireApproval?: boolean;
 	screenSharePolicy?: ScreenSharePolicy;
 	screenShareMode?: ScreenShareMode;
+	captionsEnabled?: boolean;
 };
 
 /**
@@ -71,7 +76,7 @@ export type MeetingsRepository = {
 };
 
 const SELECT_FIELDS =
-	'id, user_id, code, title, require_approval, screen_share_policy, screen_share_mode, created_at';
+	'id, user_id, code, title, require_approval, screen_share_policy, screen_share_mode, captions_enabled, created_at';
 
 export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 	return {
@@ -86,8 +91,8 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 		async insert(meeting) {
 			await db
 				.prepare(
-					`INSERT INTO meetings (id, user_id, domain_id, title, code, require_approval, screen_share_policy, screen_share_mode, created_at)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					`INSERT INTO meetings (id, user_id, domain_id, title, code, require_approval, screen_share_policy, screen_share_mode, captions_enabled, created_at)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(
 					meeting.id,
@@ -98,6 +103,7 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 					meeting.requireApproval ? 1 : 0,
 					meeting.screenSharePolicy,
 					meeting.screenShareMode,
+					meeting.captionsEnabled ? 1 : 0,
 					meeting.createdAt
 				)
 				.run();
@@ -156,6 +162,10 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 			if (patch.screenShareMode !== undefined) {
 				sets.push('screen_share_mode = ?');
 				values.push(patch.screenShareMode);
+			}
+			if (patch.captionsEnabled !== undefined) {
+				sets.push('captions_enabled = ?');
+				values.push(patch.captionsEnabled ? 1 : 0);
 			}
 			if (sets.length === 0) return false;
 

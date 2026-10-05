@@ -89,7 +89,19 @@ export type LiveKitClient = {
   ): Promise<void>;
   /** Mutes one published track at the server, whatever the publisher's client does. */
   muteTrack(room: string, identity: string, trackSid: string): Promise<void>;
+  /**
+   * Proves its holder was admitted to `room`, for the captions endpoint. A
+   * LiveKit token only lives long enough to connect, so this one lasts the
+   * meeting. It has no `video` grant, so LiveKit won't accept it for anything.
+   */
+  createCaptionToken(identity: string, room: string): Promise<string>;
+  /** `null` unless the token is ours, unexpired and a caption token. */
+  verifyCaptionToken(
+    token: string,
+  ): Promise<{ identity: string; room: string } | null>;
 };
+
+export const CAPTION_TOKEN_TTL_SECONDS = 12 * 60 * 60;
 
 export function createLiveKitClient(
   apiKey: string,
@@ -234,7 +246,50 @@ export function createLiveKitClient(
         muted: true,
       });
     },
+
+    createCaptionToken(identity, room) {
+      return signClaims(
+        { sub: identity, room, use: "captions" },
+        CAPTION_TOKEN_TTL_SECONDS,
+      );
+    },
+
+    async verifyCaptionToken(token) {
+      const [header, payload, signature] = token.split(".");
+      if (!header || !payload || !signature) return null;
+      const valid = await verify(
+        `${header}.${payload}`,
+        signature,
+        apiSecret,
+      ).catch(() => false);
+      if (!valid) return null;
+      const claims = parseClaims(payload);
+      const now = Math.floor(Date.now() / 1000);
+      if (
+        claims?.use !== "captions" ||
+        typeof claims.sub !== "string" ||
+        typeof claims.room !== "string" ||
+        typeof claims.exp !== "number" ||
+        claims.exp < now
+      ) {
+        return null;
+      }
+      return { identity: claims.sub, room: claims.room };
+    },
   };
+}
+
+function parseClaims(payload: string): Record<string, unknown> | null {
+  try {
+    const claims = JSON.parse(
+      new TextDecoder().decode(fromBase64url(payload)),
+    ) as unknown;
+    return claims && typeof claims === "object"
+      ? (claims as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The browser connects over wss://, but RoomService is plain HTTPS on the same host. */
@@ -258,6 +313,33 @@ async function sign(data: string, secret: string): Promise<string> {
     new TextEncoder().encode(data),
   );
   return base64url(signature);
+}
+
+/** HMAC verification compares in constant time, unlike comparing the strings. */
+async function verify(
+  data: string,
+  signature: string,
+  secret: string,
+): Promise<boolean> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"],
+  );
+  return crypto.subtle.verify(
+    "HMAC",
+    key,
+    fromBase64url(signature),
+    new TextEncoder().encode(data),
+  );
+}
+
+function fromBase64url(input: string): Uint8Array<ArrayBuffer> {
+  const base64 = input.replaceAll("-", "+").replaceAll("_", "/");
+  const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
+  return Uint8Array.from(binary, (char) => char.codePointAt(0) ?? 0);
 }
 
 function base64url(input: string | ArrayBuffer): string {

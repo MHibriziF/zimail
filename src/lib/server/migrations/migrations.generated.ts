@@ -204,5 +204,9 @@ export const MIGRATIONS: GeneratedMigration[] = [
 	{
 		name: "0050_ai_inbox_tabs_always_on.sql",
 		sql: "-- Clef now sorts inbox tabs whenever tabs are on, like Gmail, with no separate switch, so the\n-- per-user flag from 0049 goes.\nALTER TABLE users DROP COLUMN ai_inbox_tabs;\n"
+	},
+	{
+		name: "0051_meeting_captions.sql",
+		sql: "-- Live captions and a transcript (#149), off until the host allows them. Speech\n-- is transcribed by Workers AI, so this is also what lets a meeting spend neurons.\nALTER TABLE meetings ADD COLUMN captions_enabled INTEGER NOT NULL DEFAULT 0;\n"
 	}
 ];

@@ -92,6 +92,39 @@ describe('minting a LiveKit access token', () => {
 	});
 });
 
+describe('caption tokens', () => {
+	const client = createLiveKitClient('the-key', 'the-secret', 'wss://example.livekit.cloud');
+
+	test('round-trip to the identity and room, and grant nothing in LiveKit', async () => {
+		const token = await client.createCaptionToken('guest-1', 'room-1');
+		assert.deepEqual(await client.verifyCaptionToken(token), { identity: 'guest-1', room: 'room-1' });
+		assert.equal(decodeJson(token.split('.')[1]).video, undefined);
+	});
+
+	test('reject a changed payload, another secret, or a join token', async () => {
+		const [header, payload, signature] = (await client.createCaptionToken('guest-1', 'room-1')).split('.');
+		const claims = { ...decodeJson(payload), room: 'room-2' };
+		const forged = `${header}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${signature}`;
+		assert.equal(await client.verifyCaptionToken(forged), null);
+
+		const other = createLiveKitClient('the-key', 'another-secret', 'wss://example.livekit.cloud');
+		assert.equal(await client.verifyCaptionToken(await other.createCaptionToken('guest-1', 'room-1')), null);
+
+		const joinToken = await client.createAccessToken({ identity: 'guest-1', room: 'room-1' });
+		assert.equal(await client.verifyCaptionToken(joinToken), null);
+		assert.equal(await client.verifyCaptionToken('not-a-token'), null);
+	});
+
+	test('reject an expired token', async () => {
+		const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+		const payload = Buffer.from(
+			JSON.stringify({ sub: 'guest-1', room: 'room-1', use: 'captions', exp: Math.floor(Date.now() / 1000) - 1 })
+		).toString('base64url');
+		const expired = `${header}.${payload}.${await sign(`${header}.${payload}`, 'the-secret')}`;
+		assert.equal(await client.verifyCaptionToken(expired), null);
+	});
+});
+
 describe('screen-share permissions', () => {
 	type Call = { url: string; auth: string; body: Record<string, unknown> };
 

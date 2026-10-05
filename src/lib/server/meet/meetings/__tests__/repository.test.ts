@@ -12,6 +12,7 @@ type Row = {
 	require_approval: number;
 	screen_share_policy: string;
 	screen_share_mode: string;
+	captions_enabled: number;
 	created_at: string;
 };
 
@@ -25,6 +26,7 @@ function row(overrides: Partial<Row> = {}): Row {
 		require_approval: 0,
 		screen_share_policy: 'open',
 		screen_share_mode: 'multiple',
+		captions_enabled: 0,
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -46,7 +48,7 @@ function setup(seed: Row[] = []) {
 			return [{ count: rows.filter((entry) => entry.user_id === userId).length }];
 		}
 		if (sql.startsWith('INSERT INTO meetings')) {
-			const [id, userId, domainId, title, code, requireApproval, policy, mode, createdAt] = args as [
+			const [id, userId, domainId, title, code, requireApproval, policy, mode, captions, createdAt] = args as [
 				string,
 				string,
 				string | null,
@@ -55,10 +57,11 @@ function setup(seed: Row[] = []) {
 				number,
 				string,
 				string,
+				number,
 				string
 			];
 			assertCodeFree(code);
-			rows.push({ id, user_id: userId, domain_id: domainId, title, code, require_approval: requireApproval, screen_share_policy: policy, screen_share_mode: mode, created_at: createdAt });
+			rows.push({ id, user_id: userId, domain_id: domainId, title, code, require_approval: requireApproval, screen_share_policy: policy, screen_share_mode: mode, captions_enabled: captions, created_at: createdAt });
 			return [];
 		}
 		if (sql.includes('WHERE code = ?')) {
@@ -91,6 +94,7 @@ function setup(seed: Row[] = []) {
 			if (sql.includes('require_approval = ?')) entry.require_approval = args[cursor++] as number;
 			if (sql.includes('screen_share_policy = ?')) entry.screen_share_policy = args[cursor++] as string;
 			if (sql.includes('screen_share_mode = ?')) entry.screen_share_mode = args[cursor++] as string;
+			if (sql.includes('captions_enabled = ?')) entry.captions_enabled = args[cursor++] as number;
 			return [entry];
 		}
 		throw new Error(`Unhandled query in fake D1: ${sql}`);
@@ -108,17 +112,18 @@ describe('MeetingsRepository', () => {
 
 	test('insert then findByCode round-trips, and rejects a duplicate code', async () => {
 		const { repo } = setup();
-		await repo.insert({ id: 'a', userId: 'user-1', domainId: null, title: 'Standup', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'approval', screenShareMode: 'single', createdAt: '2026-01-01' });
+		await repo.insert({ id: 'a', userId: 'user-1', domainId: null, title: 'Standup', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'approval', screenShareMode: 'single', captionsEnabled: true, createdAt: '2026-01-01' });
 
 		const found = await repo.findByCode('aaa-aaaa-aaa');
 		assert.equal(found?.id, 'a');
 		assert.equal(found?.screen_share_policy, 'approval');
 		assert.equal(found?.screen_share_mode, 'single');
+		assert.equal(found?.captions_enabled, true);
 		assert.equal(found?.created_at, '2026-01-01');
 		assert.equal(await repo.findByCode('missing'), null);
 
 		await assert.rejects(
-			repo.insert({ id: 'b', userId: 'user-1', domainId: null, title: 'Other', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'open', screenShareMode: 'multiple', createdAt: '2026-01-01' }),
+			repo.insert({ id: 'b', userId: 'user-1', domainId: null, title: 'Other', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'open', screenShareMode: 'multiple', captionsEnabled: false, createdAt: '2026-01-01' }),
 			/unique constraint/i
 		);
 	});

@@ -24,6 +24,8 @@
 		displayName: string;
 		meetingId: string;
 		screenShare: ScreenShareSettings;
+		captions: boolean;
+		captionToken: string;
 	} | null>(null);
 	let left = $state(false);
 	let waitingAdmissionId = $state('');
@@ -199,6 +201,8 @@
 				token?: string;
 				roomName?: string;
 				screenShare?: ScreenShareSettings;
+				captions?: boolean;
+				captionToken?: string;
 				pending?: boolean;
 				admissionId?: string;
 				error?: string;
@@ -219,7 +223,9 @@
 				token: body.token,
 				displayName,
 				meetingId: body.roomName,
-				screenShare: body.screenShare ?? DEFAULT_SCREEN_SHARE
+				screenShare: body.screenShare ?? DEFAULT_SCREEN_SHARE,
+				captions: body.captions ?? false,
+				captionToken: body.captionToken ?? ''
 			};
 		} catch {
 			error = t('common.networkError');
@@ -241,6 +247,8 @@
 					token?: string;
 					roomName?: string;
 					screenShare?: ScreenShareSettings;
+					captions?: boolean;
+					captionToken?: string;
 				};
 				if (body.status === 'admitted' && body.url && body.token && body.roomName) {
 					stopWaiting();
@@ -250,7 +258,9 @@
 						token: body.token,
 						displayName,
 						meetingId: body.roomName,
-						screenShare: body.screenShare ?? DEFAULT_SCREEN_SHARE
+						screenShare: body.screenShare ?? DEFAULT_SCREEN_SHARE,
+						captions: body.captions ?? false,
+						captionToken: body.captionToken ?? ''
 					};
 				} else if (body.status === 'denied') {
 					stopWaiting();
@@ -299,6 +309,8 @@
 		meetingId={session.meetingId}
 		meetingCode={data.code}
 		initialScreenShare={session.screenShare}
+		initialCaptionsAllowed={session.captions}
+		captionToken={session.captionToken}
 		{onleave}
 	/>
 {:else}
