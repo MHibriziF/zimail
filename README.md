@@ -38,12 +38,14 @@ no servers to maintain.
 On top of everything upstream ships:
 
 - **[AI assistant](#ai-assistant)** — **Write with AI** drafts and polishes emails and replies, **Ask AI** answers questions about your mail and calendar and prepares events for you to add, and inbox tabs are sorted by Cloudflare's own model, **Clef**, the way Gmail does it. Free on Cloudflare Workers AI, no API key, and it never sends or saves anything by itself.
-- **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat, and [recording](#recording-a-meeting) in the browser. **Compose → New meeting**, or the **Meetings** view.
-- **[Calendar](#calendar)** — month and agenda views next to the mailbox, with today's and tomorrow's events in the sidebar. Pull in [Google, Outlook or iCloud calendars](#other-calendars) by their iCal address, and share [reservation pages](#reservation-pages) where people book a free slot — checked against every calendar you have, sent as a real calendar invitation, and optionally with its own meeting room. **Calendar** in the sidebar.
+- **[Video meetings](#video-meetings-optional)** — LiveKit calls joined with a short, reusable code (`abc-defg-hij`) or its link, no account needed for guests. Camera and mic preview before joining, an optional waiting room where the host lets people in, screen sharing, background blur or replacement, picture-in-picture, a participants list and chat, raised hands and emoji reactions, a grid that fits the stage and pages through bigger calls, [live captions and a transcript](#captions-and-transcript), and [recording](#recording-a-meeting) in the browser. **Compose → New meeting**, or the **Meetings** view.
+- **[Calendar](#calendar)** — month and agenda views next to the mailbox, with today's and tomorrow's events in the sidebar. Pull in [Google, Outlook or iCloud calendars](#other-calendars) by their iCal address, [publish yours](#sharing-your-calendar) as a private link they can subscribe to, and share [reservation pages](#reservation-pages) where people book a free slot — checked against every calendar you have, sent as a real calendar invitation, and optionally with its own meeting room. **Calendar** in the sidebar.
 - **Scheduled send** — pick any future date and time, or one of the presets, from the caret beside **Send**. The message waits in your own outbox and a [cron trigger](#scheduled-send) delivers it, so it works on either mail provider and is not capped at a provider's hold-until horizon. Recall it back to a draft any time before it goes.
+- **Undo send** — every message waits 10 seconds after **Send**, with an **Undo** that brings it back to the composer.
+- **Composer** — your signature sits in the editor where you can see and change it before sending, links are added and edited from a small popover, and the toolbar keeps your cursor where it was.
 - **Two-factor authentication** — TOTP from any authenticator app, with single-use backup codes, asked for at sign-in. **Settings → Two-factor authentication**.
 - **Recovery address** — link a second mailbox you already own to the account. It is where security notices land and where forgotten-password links are sent, so losing access to this inbox does not lock you out of it. **Settings → Recovery address**.
-- **Broader deletion** — trash that empties itself on a retention period you choose, and moving mail older than a given age to the trash, once or automatically every day. Drafts and scheduled messages are never touched. **Settings → Cleanup**.
+- **Broader deletion** — trash that empties itself on a retention period you choose, and moving mail older than a given age to the trash, once or automatically every day. Drafts and scheduled messages are never touched, and deleting anything for good asks first. **Settings → Cleanup**.
 - **Recipient chips** — To, Cc and Bcc turn what you have typed into a chip on space, comma, semicolon, <kbd>Enter</kbd> or <kbd>Tab</kbd>, so a mistyped address is visible before you send rather than after.
 - **Recipient suggestions** — the composer offers addresses you have written to before as you type.
 - **Time zone** — pick the zone your mail and your scheduled sends are read in, rather than trusting whatever the browser reports. **Settings → Time zone**.
@@ -305,6 +307,26 @@ needs screen capture, which phone browsers don't offer, so on a phone only the
 host's *Record the meeting* is available — and only where the browser supports
 `MediaRecorder`.
 
+#### Captions and transcript
+
+The host turns captions on for a meeting under **Settings → Captions and
+transcript** in the call. Then anyone can press **CC** for live captions, or
+open the **Transcript** panel to read the whole call so far and download it as
+`.txt` or `.vtt` subtitles. The download is also offered on the *You left the
+meeting* screen, and a rejoin carries the transcript on.
+
+Each person's browser transcribes only their own mic, and only while they
+speak and someone has captions or the transcript open, on
+[Workers AI](#ai-assistant) (Whisper). So under **Language** in the transcript
+panel, everyone ticks the languages *they* speak, up to three: one language is
+transcribed as exactly that, several keep Whisper's guess within them, and none
+lets it detect the language. Speech never goes anywhere but your own Cloudflare
+account.
+
+Captions share the free daily AI allowance: about 47 neurons a minute of
+speech, so roughly three and a half hours of talk a day if nothing else uses
+it. When it runs out, captions pause for everyone until the next day.
+
 ## Calendar
 
 *Added by this fork.*
@@ -320,8 +342,9 @@ interfaces, and all five languages.
 Busy time in another calendar should count here too — so a Google meeting
 blocks a reservation slot. **Calendar → Other calendars → Add calendar** takes a
 calendar's **iCal address**; Zimail reads it (nothing is ever sent to it) and
-re-syncs every 30 minutes from the [cron trigger](#scheduled-send), or right
-away with **Sync now**.
+re-syncs every 6 hours from the [cron trigger](#scheduled-send) (Google only
+republishes every few hours, so sooner buys nothing), or right away with **Sync
+now**.
 
 | Calendar | Where the address is |
 | --- | --- |
@@ -344,6 +367,21 @@ Recurring events (weekly, monthly, "last Friday", exceptions and moved
 instances), time zones including Outlook's Windows names, and all-day events
 are handled. Events marked *free* in the source calendar show here but don't
 block anything.
+
+### Sharing your calendar
+
+The other way round: **Calendar → Share this calendar → Create link** gives a
+private `.ics` address that Google Calendar, Apple Calendar or Outlook can
+subscribe to, so your Zimail events show there too (in Google: **Other
+calendars → + → From URL**). Choose whether it also carries the
+[other calendars](#other-calendars) you pull in here, and whether it shows only
+busy times, without titles or details.
+
+The address is shown once and works like a password. **Reset link** makes a new
+one and the old one stops working; **Stop sharing** turns it off. Subscribed
+apps refresh on their own schedule (Google every few hours to once a day).
+Zimail keeps a built copy of the feed and answers an unchanged one with
+`304 Not Modified`, so a subscription costs almost nothing.
 
 ### Reservation pages
 
@@ -432,6 +470,8 @@ Cloudflare account. There's no API key and nothing to set up.
   receipts in Updates. Replies follow their conversation, and when you move a
   conversation to another tab, that sender's mail follows it there. Turn tabs
   on or off, or re-sort recent mail, in **Settings → Inbox tabs**.
+- **Meeting captions**, transcribed with Whisper while someone in a call has
+  them open. See [Captions and transcript](#captions-and-transcript).
 
 **Free:** the Workers Free plan includes 10,000 neurons a day, shared by all of
 this: enough for several hundred questions or drafts, with tab sorting taking a
@@ -462,6 +502,7 @@ bun run dev
 | `bun run check`   | svelte-check                                             |
 | `bun run test`    | Unit tests                                               |
 | `bun run deploy`  | Build, wrap the Worker with `email()`, deploy            |
+| `bun run db:squash` | Fold `migrations/` into one file; the originals move to `migrations/archive/` and half-migrated installs still finish from them |
 
 **Testing inbound with Resend:** webhooks can't reach `localhost`, so tunnel it
 (`cloudflared tunnel --url http://localhost:5173`) and point a **throwaway**

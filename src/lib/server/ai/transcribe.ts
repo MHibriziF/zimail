@@ -33,8 +33,8 @@ function retryLanguage(heard: string, languages: readonly string[]): string {
  * continuing the last one, which is what lets a hallucination repeat.
  *
  * `languages` is what the speaker said they speak. One is passed to Whisper
- * outright. With two, Whisper still guesses between them, and a guess outside
- * both is transcribed again in the nearest, so only a misfire costs twice.
+ * outright. With several, Whisper still guesses among them, and a guess outside
+ * them is transcribed again in the nearest, so only a misfire costs twice.
  */
 export async function transcribeSpeech(
 	ai: AiBinding,

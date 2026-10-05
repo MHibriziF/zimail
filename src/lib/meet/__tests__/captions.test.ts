@@ -152,7 +152,7 @@ describe('createCaptionUploader', () => {
 		assert.equal(requests[0].url, '/api/meetings/join/abc-defg-hij/captions');
 		assert.equal((requests[0].init.headers as Record<string, string>).Authorization, 'Bearer tok');
 		assert.deepEqual(texts, ['Hello.']);
-		assert.equal((requests[0].init.headers as Record<string, string>)['X-Caption-Language'], 'auto');
+		assert.equal((requests[0].init.headers as Record<string, string>)['X-Caption-Language'], '');
 	});
 
 	test('sends the language chosen at the time of each segment', async () => {
@@ -161,12 +161,12 @@ describe('createCaptionUploader', () => {
 		uploader.send(new Uint8Array([1]));
 		await settle();
 		await settle();
-		language = 'en+id';
+		language = 'en,id';
 		uploader.send(new Uint8Array([2]));
 		await settle();
 		await settle();
 		const sent = requests.map((request) => (request.init.headers as Record<string, string>)['X-Caption-Language']);
-		assert.deepEqual(sent, ['en', 'en+id']);
+		assert.deepEqual(sent, ['en', 'en,id']);
 	});
 
 	test('when the Worker falls behind, the oldest waiting segment is dropped', async () => {

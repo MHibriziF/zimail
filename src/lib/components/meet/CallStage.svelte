@@ -64,11 +64,7 @@
 		type CaptionStopReason
 	} from '$lib/meet/captions';
 	import { captionCaptureSupported, startCaptionCapture } from '$lib/meet/caption-capture';
-	import {
-		CAPTION_LANGUAGE_STORAGE_KEY,
-		isCaptionLanguageChoice,
-		type CaptionLanguageChoice
-	} from '$lib/meet/caption-language';
+	import { CAPTION_LANGUAGE_STORAGE_KEY, captionLanguages } from '$lib/meet/caption-language';
 
 	let {
 		url,
@@ -275,21 +271,21 @@
 		someoneWantsCaptions && micEnabled && !captionsStopped && canCaption && Boolean(captionToken && meetingCode)
 	);
 	const shownCaptions = $derived(captionsOn ? recentCaptions(captionLines, captionClock) : []);
-	let captionLanguage = $state<CaptionLanguageChoice>(loadCaptionLanguage());
+	/** The languages this participant speaks, for their own captions; empty lets Whisper guess. */
+	let spokenLanguages = $state<string[]>(loadSpokenLanguages());
 
-	function loadCaptionLanguage(): CaptionLanguageChoice {
+	function loadSpokenLanguages(): string[] {
 		try {
-			const stored = localStorage.getItem(CAPTION_LANGUAGE_STORAGE_KEY);
-			return isCaptionLanguageChoice(stored) ? stored : 'auto';
+			return captionLanguages(localStorage.getItem(CAPTION_LANGUAGE_STORAGE_KEY));
 		} catch {
-			return 'auto';
+			return [];
 		}
 	}
 
-	function setCaptionLanguage(choice: CaptionLanguageChoice) {
-		captionLanguage = choice;
+	function setSpokenLanguages(codes: string[]) {
+		spokenLanguages = captionLanguages(codes.join(','));
 		try {
-			localStorage.setItem(CAPTION_LANGUAGE_STORAGE_KEY, choice);
+			localStorage.setItem(CAPTION_LANGUAGE_STORAGE_KEY, spokenLanguages.join(','));
 		} catch {
 			// Private mode: the choice lasts for this call only.
 		}
@@ -1676,7 +1672,7 @@
 			fetch: (input, init) => fetch(input, init),
 			onText: publishOwnCaption,
 			onStop: stopCaptions,
-			language: () => captionLanguage
+			language: () => spokenLanguages.join(',')
 		});
 		let stop: (() => void) | null = null;
 		let cancelled = false;
@@ -2098,8 +2094,8 @@
 		{:else if panel === 'transcript'}
 			<CallTranscriptPanel
 				lines={captionLines}
-				language={captionLanguage}
-				onSetLanguage={setCaptionLanguage}
+				languages={spokenLanguages}
+				onSetLanguages={setSpokenLanguages}
 				onDownload={downloadTranscript}
 				onClose={() => (panel = 'none')}
 			/>
