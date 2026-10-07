@@ -857,7 +857,7 @@
 		"transcriptDownloadSubtitles": "Télécharger .vtt",
 		"captionLanguage": "Langue",
 		"captionLanguageAuto": "Détecter automatiquement",
-		"captionLanguageHint": "Pour votre propre voix uniquement ; chacun règle la sienne. Jusqu’à {max}.",
+		"captionLanguageHint": "Pour votre propre voix uniquement ; chacun règle la sienne.",
 		"leftTranscript": "Enregistrer la transcription de cet appel :",
 		"screenShareAsk": "Demander à partager votre écran",
 		"screenShareWaiting": "En attente de l’accord de l’hôte pour partager votre écran",

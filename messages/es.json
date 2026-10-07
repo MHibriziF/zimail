@@ -857,7 +857,7 @@
 		"transcriptDownloadSubtitles": "Descargar .vtt",
 		"captionLanguage": "Idioma",
 		"captionLanguageAuto": "Detectar automáticamente",
-		"captionLanguageHint": "Solo para tu propia voz; cada persona elige la suya. Elige hasta {max}.",
+		"captionLanguageHint": "Solo para tu propia voz; cada persona elige la suya.",
 		"leftTranscript": "Guarda la transcripción de esta llamada:",
 		"screenShareAsk": "Pedir permiso para compartir pantalla",
 		"screenShareWaiting": "Esperando a que el anfitrión te deje compartir pantalla",
