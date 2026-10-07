@@ -107,8 +107,8 @@ export function createSpeechSegmenter(onSegment: (samples: Float32Array) => void
 	const sampleRate = options.sampleRate ?? CAPTION_SAMPLE_RATE;
 	const threshold = options.threshold ?? 0.01;
 	const samplesFor = (ms: number) => Math.round((ms / 1000) * sampleRate);
-	const hangover = samplesFor(options.hangoverMs ?? 700);
-	const max = samplesFor(options.maxMs ?? 12_000);
+	const hangover = samplesFor(options.hangoverMs ?? 400);
+	const max = samplesFor(options.maxMs ?? 5_000);
 	const minSpeech = samplesFor(options.minSpeechMs ?? 400);
 	const preRoll = samplesFor(options.preRollMs ?? 300);
 
