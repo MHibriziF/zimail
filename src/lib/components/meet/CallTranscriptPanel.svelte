@@ -4,11 +4,12 @@
 	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
 	import { intlLocale, parseLocale } from '$lib/i18n/locales';
-	import type { CaptionLine } from '$lib/meet/captions';
+	import type { CaptionLine, CaptionPartial } from '$lib/meet/captions';
 	import { CAPTION_LANGUAGE_CODES, languageNames } from '$lib/meet/caption-language';
 
 	let {
 		lines,
+		partials = [],
 		timeZone,
 		language,
 		onSetLanguage,
@@ -16,6 +17,8 @@
 		onClose
 	}: {
 		lines: CaptionLine[];
+		/** Shown after the lines while people are still talking; never part of the download. */
+		partials?: CaptionPartial[];
 		timeZone?: string;
 		/** What this participant speaks, for their own captions only; `''` lets Whisper guess. */
 		language: string;
@@ -42,6 +45,7 @@
 
 	$effect(() => {
 		lines;
+		partials;
 		if (!following) return;
 		void tick().then(() => bodyEl?.scrollTo({ top: bodyEl.scrollHeight }));
 	});
@@ -65,13 +69,19 @@
 		<span class="call-transcript-language-hint">{t('meet.captionLanguageHint')}</span>
 	</label>
 	<div class="call-transcript-body" bind:this={bodyEl} onscroll={onScroll} aria-live="polite">
-		{#if lines.length === 0}
+		{#if lines.length === 0 && partials.length === 0}
 			<p class="call-transcript-empty">{t('meet.transcriptEmpty')}</p>
 		{:else}
 			{#each lines as line (line.id)}
 				<p class="call-transcript-line">
 					<span class="call-transcript-meta">{line.name} · {time.format(line.at)}</span>
 					<span>{line.text}</span>
+				</p>
+			{/each}
+			{#each partials as partial (partial.identity)}
+				<p class="call-transcript-line call-transcript-partial">
+					<span class="call-transcript-meta">{partial.name}</span>
+					<span>{partial.text}</span>
 				</p>
 			{/each}
 		{/if}
@@ -167,6 +177,10 @@
 		font-size: 0.8125rem;
 		line-height: 1.45;
 		word-break: break-word;
+	}
+
+	.call-transcript-partial {
+		color: rgba(255, 255, 255, 0.55);
 	}
 
 	.call-transcript-meta {
