@@ -323,9 +323,15 @@ transcribed as exactly that; **Detect automatically** lets Whisper guess, which
 can slip into another language on a word or two. Speech never goes anywhere but
 your own Cloudflare account.
 
-Captions share the free daily AI allowance: about 47 neurons a minute of
-speech, so roughly three and a half hours of talk a day if nothing else uses
-it. When it runs out, captions pause for everyone until the next day.
+Words show up greyed while someone is still talking, about two to three
+seconds behind them, and settle into the finished line when they pause. Only
+finished lines go into the transcript and its downloads.
+
+Captions share the free daily AI allowance. Whisper bills about 47 neurons a
+minute of audio, and the words-so-far updates send the same speech several
+times, so a minute of talk costs roughly 100–140 neurons: about an hour and a
+quarter to an hour and a half of captioned talk a day if nothing else uses it.
+When it runs out, captions pause for everyone until the next day.
 
 ## Calendar
 

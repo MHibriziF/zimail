@@ -16,7 +16,11 @@ export const CAPTIONS_WANTED_ATTRIBUTE = 'captionsWanted';
 
 export type CaptionLine = { id: string; identity: string; name: string; text: string; at: number };
 
-export type CaptionMessage = { type: 'line'; text: string } | { type: 'paused' };
+/** A speaker's words so far, shown until their line replaces them. */
+export type CaptionPartial = { identity: string; name: string; text: string; at: number };
+
+/** `partial` with empty text takes the speaker's partial down. */
+export type CaptionMessage = { type: 'line'; text: string } | { type: 'partial'; text: string } | { type: 'paused' };
 
 const MAX_LINE_CHARS = 1_000;
 
@@ -24,9 +28,10 @@ export function parseCaptionMessage(raw: string): CaptionMessage | null {
 	try {
 		const message = JSON.parse(raw) as { type?: unknown; text?: unknown };
 		if (message.type === 'paused') return { type: 'paused' };
-		if (message.type === 'line' && typeof message.text === 'string' && message.text.trim()) {
-			return { type: 'line', text: message.text.trim().slice(0, MAX_LINE_CHARS) };
-		}
+		if (typeof message.text !== 'string') return null;
+		const text = message.text.trim().slice(0, MAX_LINE_CHARS);
+		if (message.type === 'partial') return { type: 'partial', text };
+		if (message.type === 'line' && text) return { type: 'line', text };
 	} catch {
 		// Not ours, or garbled: ignore it like any other unknown message.
 	}
@@ -96,6 +101,9 @@ export type SegmenterOptions = {
 	minSpeechMs?: number;
 	/** Audio kept from just before speech starts, so the first syllable isn't clipped. */
 	preRollMs?: number;
+	/** Called with the segment so far this often while it's still going, for interim captions. */
+	onPartial?: (samples: Float32Array) => void;
+	partialEveryMs?: number;
 };
 
 /**
@@ -111,6 +119,7 @@ export function createSpeechSegmenter(onSegment: (samples: Float32Array) => void
 	const max = samplesFor(options.maxMs ?? 5_000);
 	const minSpeech = samplesFor(options.minSpeechMs ?? 400);
 	const preRoll = samplesFor(options.preRollMs ?? 300);
+	const partialEvery = samplesFor(options.partialEveryMs ?? 750);
 
 	let recent: Float32Array[] = [];
 	let recentLength = 0;
@@ -118,23 +127,26 @@ export function createSpeechSegmenter(onSegment: (samples: Float32Array) => void
 	let segmentLength = 0;
 	let speech = 0;
 	let silence = 0;
+	let sincePartial = 0;
+
+	function joined(): Float32Array {
+		const samples = new Float32Array(segmentLength);
+		let offset = 0;
+		for (const chunk of segment) {
+			samples.set(chunk, offset);
+			offset += chunk.length;
+		}
+		return samples;
+	}
 
 	function emit() {
-		const keep = speech >= minSpeech;
-		const chunks = segment;
-		const length = segmentLength;
+		const samples = speech >= minSpeech ? joined() : null;
 		segment = [];
 		segmentLength = 0;
 		speech = 0;
 		silence = 0;
-		if (!keep) return;
-		const samples = new Float32Array(length);
-		let offset = 0;
-		for (const chunk of chunks) {
-			samples.set(chunk, offset);
-			offset += chunk.length;
-		}
-		onSegment(samples);
+		sincePartial = 0;
+		if (samples) onSegment(samples);
 	}
 
 	function remember(frame: Float32Array) {
@@ -161,13 +173,19 @@ export function createSpeechSegmenter(onSegment: (samples: Float32Array) => void
 			}
 			segment.push(frame);
 			segmentLength += frame.length;
+			sincePartial += frame.length;
 			if (voiced) {
 				speech += frame.length;
 				silence = 0;
 			} else {
 				silence += frame.length;
 			}
-			if (silence >= hangover || segmentLength >= max) emit();
+			if (silence >= hangover || segmentLength >= max) {
+				emit();
+			} else if (options.onPartial && voiced && sincePartial >= partialEvery && speech >= minSpeech) {
+				sincePartial = 0;
+				options.onPartial(joined());
+			}
 		},
 		/** Ends whatever is in progress, e.g. when the mic goes off. */
 		flush() {
@@ -182,26 +200,52 @@ export type CaptionStopReason = 'limit' | 'disabled' | 'unauthorized';
 const STOP_REASONS: Record<number, CaptionStopReason> = { 429: 'limit', 403: 'disabled', 401: 'unauthorized', 404: 'unauthorized' };
 
 /**
- * Sends segments one at a time, in order. If the Worker falls behind, the
- * oldest waiting segment is dropped rather than letting captions lag further
- * and further behind the speaker.
+ * Sends finished segments one at a time, in order. If the Worker falls behind,
+ * the oldest waiting segment is dropped rather than letting captions lag
+ * further and further behind the speaker.
+ *
+ * Partials, the segment so far while it's still being spoken, go alongside:
+ * never queued, at most `maxPartialsInFlight` at once (the rest are skipped,
+ * which also caps their cost), and only the newest answer is passed on, up to
+ * the moment the segment's own line arrives and replaces it.
  */
 export function createCaptionUploader(options: {
 	code: string;
 	token: string;
 	fetch: typeof fetch;
+	/** A finished line; it replaces the speaker's partial. */
 	onText: (text: string) => void;
+	/** The words so far, or `''` to take the partial down. */
+	onPartial?: (text: string) => void;
 	onStop: (reason: CaptionStopReason) => void;
 	/** Read per segment, so changing it mid-call doesn't restart the mic capture. */
 	language?: () => string;
 	maxWaiting?: number;
+	maxPartialsInFlight?: number;
 }) {
 	const maxWaiting = options.maxWaiting ?? 2;
-	const waiting: Uint8Array[] = [];
+	// A Whisper round trip takes ~2.5 s, so three at once keep a fresh partial coming about every second.
+	const maxPartials = options.maxPartialsInFlight ?? 3;
+	const waiting: { wav: Uint8Array; segment: number }[] = [];
 	let busy = false;
 	let stopped = false;
+	/** The segment speech is still filling. */
+	let segment = 0;
+	/** The last segment whose line has come back; partials for it or earlier are stale. */
+	let answered = -1;
+	let revision = 0;
+	let partialsInFlight = 0;
+	let shown = { segment: -1, revision: 0, text: '' };
 
-	async function sendOne(wav: Uint8Array) {
+	function stop(reason: CaptionStopReason) {
+		if (stopped) return;
+		stopped = true;
+		waiting.length = 0;
+		options.onStop(reason);
+	}
+
+	/** The text, `''` for no speech, or `null` when there's no answer to use. */
+	async function transcribe(wav: Uint8Array): Promise<string | null> {
 		try {
 			const response = await options.fetch(`/api/meetings/join/${encodeURIComponent(options.code)}/captions`, {
 				method: 'POST',
@@ -213,33 +257,65 @@ export function createCaptionUploader(options: {
 				body: wav as Uint8Array<ArrayBuffer>
 			});
 			const reason = STOP_REASONS[response.status];
-			if (reason) {
-				stopped = true;
-				waiting.length = 0;
-				options.onStop(reason);
-				return;
-			}
-			if (!response.ok) return;
+			if (reason) stop(reason);
+			if (!response.ok) return null;
 			const body = (await response.json().catch(() => ({}))) as { text?: unknown };
-			if (typeof body.text === 'string' && body.text.trim()) options.onText(body.text.trim());
+			return typeof body.text === 'string' ? body.text.trim() : '';
 		} catch {
 			// A dropped request loses one segment; the next one tries again.
+			return null;
 		}
+	}
+
+	async function sendFinal(id: number, wav: Uint8Array) {
+		const text = await transcribe(wav);
+		answered = id;
+		if (shown.segment > id) {
+			// Speech has moved on: the line goes in, and the newer partial stays up.
+			if (text) {
+				options.onText(text);
+				if (shown.text) options.onPartial?.(shown.text);
+			}
+			return;
+		}
+		const hadPartial = Boolean(shown.text);
+		shown = { ...shown, text: '' };
+		if (text) options.onText(text);
+		else if (hadPartial) options.onPartial?.('');
 	}
 
 	async function drain() {
 		if (busy) return;
 		busy = true;
-		while (waiting.length > 0 && !stopped) await sendOne(waiting.shift() as Uint8Array);
+		while (waiting.length > 0 && !stopped) {
+			const next = waiting.shift() as { wav: Uint8Array; segment: number };
+			await sendFinal(next.segment, next.wav);
+		}
 		busy = false;
 	}
 
 	return {
 		send(wav: Uint8Array) {
 			if (stopped) return;
-			waiting.push(wav);
+			waiting.push({ wav, segment });
+			segment += 1;
+			revision = 0;
 			if (waiting.length > maxWaiting) waiting.shift();
 			void drain();
+		},
+		sendPartial(wav: Uint8Array) {
+			if (stopped || !options.onPartial || partialsInFlight >= maxPartials) return;
+			const id = segment;
+			const rev = ++revision;
+			partialsInFlight += 1;
+			void transcribe(wav).then((text) => {
+				partialsInFlight -= 1;
+				// A segment that has ended still shows its partial until its own line arrives.
+				const newer = shown.segment < id || (shown.segment === id && rev > shown.revision);
+				if (stopped || !text || id <= answered || !newer) return;
+				shown = { segment: id, revision: rev, text };
+				options.onPartial?.(text);
+			});
 		}
 	};
 }
@@ -252,6 +328,14 @@ export function recentCaptions(lines: readonly CaptionLine[], now: number, windo
 		shown.unshift(lines[i]);
 	}
 	return shown;
+}
+
+/**
+ * Partials still worth showing, oldest first. One whose line never came, from
+ * a dropped request or a speaker who left, goes after `maxAgeMs`.
+ */
+export function livePartials(partials: readonly CaptionPartial[], now: number, maxAgeMs = 8_000): CaptionPartial[] {
+	return partials.filter((partial) => now - partial.at <= maxAgeMs).sort((a, b) => a.at - b.at);
 }
 
 const pad = (value: number, width = 2) => String(value).padStart(width, '0');

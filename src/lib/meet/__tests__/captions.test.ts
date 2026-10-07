@@ -5,6 +5,7 @@ import {
 	createSpeechSegmenter,
 	downsample,
 	encodeWav,
+	livePartials,
 	parseCaptionMessage,
 	recentCaptions,
 	transcriptFilename,
@@ -83,6 +84,26 @@ describe('createSpeechSegmenter', () => {
 		instance.flush();
 		assert.equal(segments.length, 1);
 	});
+
+	test('while speech goes on, the segment so far comes out as a partial every so often', () => {
+		const partials: number[] = [];
+		const { segments, instance } = segmenter({ partialEveryMs: 500, onPartial: (samples: Float32Array) => partials.push(samples.length) });
+		for (let i = 0; i < 12; i++) instance.push(loud());
+		for (let i = 0; i < 3; i++) instance.push(quiet());
+		assert.deepEqual(partials, [500, 1_000]);
+		assert.equal(segments.length, 1);
+	});
+
+	test('no partial for a pause, or for less than the minimum speech', () => {
+		const partials: number[] = [];
+		const { instance } = segmenter({ partialEveryMs: 100, minSpeechMs: 300, onPartial: (samples: Float32Array) => partials.push(samples.length) });
+		instance.push(loud());
+		instance.push(loud());
+		instance.push(quiet());
+		assert.deepEqual(partials, []);
+		instance.push(loud());
+		assert.deepEqual(partials, [400]);
+	});
 });
 
 describe('downsample', () => {
@@ -119,6 +140,12 @@ describe('parseCaptionMessage', () => {
 		assert.equal(parseCaptionMessage('{"type":"line","text":5}'), null);
 		assert.equal(parseCaptionMessage('not json'), null);
 		assert.equal((parseCaptionMessage(JSON.stringify({ type: 'line', text: 'x'.repeat(5_000) })) as { text: string }).text.length, 1_000);
+	});
+
+	test('a partial may be empty, which takes it down', () => {
+		assert.deepEqual(parseCaptionMessage('{"type":"partial","text":" so the "}'), { type: 'partial', text: 'so the' });
+		assert.deepEqual(parseCaptionMessage('{"type":"partial","text":""}'), { type: 'partial', text: '' });
+		assert.equal(parseCaptionMessage('{"type":"partial"}'), null);
 	});
 });
 
@@ -206,6 +233,108 @@ describe('createCaptionUploader', () => {
 		await settle();
 		assert.equal(requests.length, 2);
 		assert.deepEqual(stops, []);
+	});
+});
+
+describe('createCaptionUploader partials', () => {
+	type Pending = { body: number; resolve: (text: string) => void };
+
+	/** Every request waits until the test answers it, so answers can come back in any order. */
+	function setup() {
+		const pending: Pending[] = [];
+		const events: string[] = [];
+		const uploader = createCaptionUploader({
+			code: 'c',
+			token: 't',
+			fetch: ((_url: string, init: RequestInit) =>
+				new Promise<Response>((resolve) => {
+					pending.push({
+						body: (init.body as Uint8Array)[0],
+						resolve: (text) => resolve(new Response(JSON.stringify({ text })))
+					});
+				})) as typeof fetch,
+			onText: (text) => events.push(`line:${text}`),
+			onPartial: (text) => events.push(`partial:${text}`),
+			onStop: () => {}
+		});
+		const answer = async (body: number, text: string) => {
+			pending.find((request) => request.body === body)?.resolve(text);
+			for (let i = 0; i < 4; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+		};
+		return { uploader, pending, events, answer };
+	}
+
+	test('partials show as they come back, and the line replaces them', async () => {
+		const { uploader, events, answer } = setup();
+		uploader.sendPartial(new Uint8Array([1]));
+		await answer(1, 'Can we');
+		uploader.send(new Uint8Array([2]));
+		await answer(2, 'Can we move it?');
+		assert.deepEqual(events, ['partial:Can we', 'line:Can we move it?']);
+	});
+
+	test('an older partial answering late never overwrites a newer one', async () => {
+		const { uploader, events, answer } = setup();
+		uploader.sendPartial(new Uint8Array([1]));
+		uploader.sendPartial(new Uint8Array([2]));
+		await answer(2, 'Can we move');
+		await answer(1, 'Can');
+		assert.deepEqual(events, ['partial:Can we move']);
+	});
+
+	test('a partial still shows after its segment ended, until the line arrives', async () => {
+		const { uploader, events, answer } = setup();
+		uploader.sendPartial(new Uint8Array([1]));
+		uploader.send(new Uint8Array([2]));
+		await answer(1, 'Can');
+		await answer(2, 'Can we?');
+		assert.deepEqual(events, ['partial:Can', 'line:Can we?']);
+	});
+
+	test('a partial answering after its line is dropped', async () => {
+		const { uploader, events, answer } = setup();
+		uploader.sendPartial(new Uint8Array([1]));
+		uploader.send(new Uint8Array([2]));
+		await answer(2, 'Can we?');
+		await answer(1, 'Can');
+		assert.deepEqual(events, ['line:Can we?']);
+	});
+
+	test('a line for an earlier segment keeps the next segment’s partial up', async () => {
+		const { uploader, events, answer } = setup();
+		uploader.send(new Uint8Array([1]));
+		uploader.sendPartial(new Uint8Array([2]));
+		await answer(2, 'And then');
+		await answer(1, 'First.');
+		assert.deepEqual(events, ['partial:And then', 'line:First.', 'partial:And then']);
+	});
+
+	test('an empty line takes the partial down', async () => {
+		const { uploader, events, answer } = setup();
+		uploader.sendPartial(new Uint8Array([1]));
+		await answer(1, 'Uh');
+		uploader.send(new Uint8Array([2]));
+		await answer(2, '');
+		assert.deepEqual(events, ['partial:Uh', 'partial:']);
+	});
+
+	test('at most three partials are in flight; the rest are skipped', async () => {
+		const { uploader, pending } = setup();
+		for (let i = 1; i <= 5; i++) uploader.sendPartial(new Uint8Array([i]));
+		assert.deepEqual(
+			pending.map((request) => request.body),
+			[1, 2, 3]
+		);
+	});
+});
+
+describe('livePartials', () => {
+	test('drops partials older than the limit, oldest first', () => {
+		const partial = (identity: string, at: number) => ({ identity, name: identity, text: identity, at });
+		assert.deepEqual(
+			livePartials([partial('b', 9_000), partial('a', 5_000), partial('old', 0)], 10_000).map((p) => p.identity),
+			['a', 'b']
+		);
 	});
 });
 

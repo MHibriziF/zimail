@@ -25,11 +25,13 @@ export function captionCaptureSupported(): boolean {
 
 /**
  * Listens to one mic track and calls `onSegment` with a WAV for each stretch
- * of speech. Returns a stop function, which also hands over speech in progress.
+ * of speech, and `onPartial` with the stretch so far while it's still going.
+ * Returns a stop function, which also hands over speech in progress.
  */
 export async function startCaptionCapture(
 	track: MediaStreamTrack,
-	onSegment: (wav: Uint8Array) => void
+	onSegment: (wav: Uint8Array) => void,
+	onPartial?: (wav: Uint8Array) => void
 ): Promise<() => void> {
 	const context = new AudioContext();
 	try {
@@ -41,7 +43,9 @@ export async function startCaptionCapture(
 		}
 		const source = context.createMediaStreamSource(new MediaStream([track]));
 		const tap = new AudioWorkletNode(context, 'caption-tap', { numberOfInputs: 1, numberOfOutputs: 0 });
-		const segmenter = createSpeechSegmenter((samples) => onSegment(encodeWav(samples, CAPTION_SAMPLE_RATE)));
+		const segmenter = createSpeechSegmenter((samples) => onSegment(encodeWav(samples, CAPTION_SAMPLE_RATE)), {
+			onPartial: onPartial && ((samples) => onPartial(encodeWav(samples, CAPTION_SAMPLE_RATE)))
+		});
 		tap.port.onmessage = (event: MessageEvent<Float32Array>) => {
 			segmenter.push(downsample(event.data, context.sampleRate, CAPTION_SAMPLE_RATE));
 		};

@@ -58,9 +58,11 @@
 		CAPTION_TOPIC,
 		createCaptionUploader,
 		parseCaptionMessage,
+		livePartials,
 		recentCaptions,
 		transcriptFile,
 		type CaptionLine,
+		type CaptionPartial,
 		type CaptionStopReason
 	} from '$lib/meet/captions';
 	import { captionCaptureSupported, startCaptionCapture } from '$lib/meet/caption-capture';
@@ -270,7 +272,12 @@
 	const transcribing = $derived(
 		someoneWantsCaptions && micEnabled && !captionsStopped && canCaption && Boolean(captionToken && meetingCode)
 	);
-	const shownCaptions = $derived(captionsOn ? recentCaptions(captionLines, captionClock) : []);
+	/** Words still being spoken, one per speaker, until their line replaces them. */
+	let captionPartials = $state<CaptionPartial[]>([]);
+	const shownPartials = $derived(livePartials(captionPartials, captionClock));
+	const shownCaptions = $derived(
+		captionsOn ? recentCaptions(captionLines, captionClock, undefined, Math.max(1, 3 - shownPartials.length)) : []
+	);
 	/** The language this participant speaks, for their own captions; `''` lets Whisper guess. */
 	let spokenLanguage = $state(loadSpokenLanguage());
 
@@ -1617,16 +1624,30 @@
 		}
 	}
 
+	/** A speaker's partial is replaced by the next one, and taken down by their line or an empty one. */
+	function setCaptionPartial(identity: string, name: string, text: string) {
+		const at = Date.now();
+		const others = captionPartials.filter((partial) => partial.identity !== identity);
+		captionPartials = text ? [...others, { identity, name, text, at }] : others;
+		captionClock = at;
+	}
+
 	function addCaptionLine(identity: string, name: string, text: string) {
 		const at = Date.now();
 		captionLines = [...captionLines.slice(1 - MAX_CAPTION_LINES), { id: crypto.randomUUID(), identity, name, text, at }];
-		captionClock = at;
+		setCaptionPartial(identity, name, '');
 	}
 
 	function publishOwnCaption(text: string) {
 		if (!room) return;
 		addCaptionLine(room.localParticipant.identity, localName, text);
 		room.localParticipant.sendText(JSON.stringify({ type: 'line', text }), { topic: CAPTION_TOPIC }).catch(() => {});
+	}
+
+	function publishOwnPartial(text: string) {
+		if (!room) return;
+		setCaptionPartial(room.localParticipant.identity, localName, text);
+		room.localParticipant.sendText(JSON.stringify({ type: 'partial', text }), { topic: CAPTION_TOPIC }).catch(() => {});
 	}
 
 	function receiveCaption(raw: string, identity: string) {
@@ -1636,7 +1657,9 @@
 			if (wantsCaptions) showNotice(t('meet.captionsPaused'));
 			return;
 		}
-		addCaptionLine(identity, roster.find((entry) => entry.identity === identity)?.name || t('meet.guest'), message.text);
+		const name = roster.find((entry) => entry.identity === identity)?.name || t('meet.guest');
+		if (message.type === 'partial') setCaptionPartial(identity, name, message.text);
+		else addCaptionLine(identity, name, message.text);
 	}
 
 	/** Out of allowance is everyone's business, since it stops every speaker; the rest only stop this one. */
@@ -1671,12 +1694,17 @@
 			token: captionToken,
 			fetch: (input, init) => fetch(input, init),
 			onText: publishOwnCaption,
+			onPartial: publishOwnPartial,
 			onStop: stopCaptions,
 			language: () => spokenLanguage
 		});
 		let stop: (() => void) | null = null;
 		let cancelled = false;
-		startCaptionCapture(track, (wav) => uploader.send(wav))
+		startCaptionCapture(
+			track,
+			(wav) => uploader.send(wav),
+			(wav) => uploader.sendPartial(wav)
+		)
 			.then((stopCapture) => {
 				if (cancelled) stopCapture();
 				else stop = stopCapture;
@@ -1688,9 +1716,9 @@
 		};
 	});
 
-	// Captions fade a few seconds after they're spoken, so the strip needs a clock.
+	// Captions fade a few seconds after they're spoken, and a stranded partial expires, so both need a clock.
 	$effect(() => {
-		if (!captionsOn) return;
+		if (!wantsCaptions) return;
 		const timer = setInterval(() => (captionClock = Date.now()), 1000);
 		return () => clearInterval(timer);
 	});
@@ -2094,6 +2122,7 @@
 		{:else if panel === 'transcript'}
 			<CallTranscriptPanel
 				lines={captionLines}
+				partials={shownPartials}
 				language={spokenLanguage}
 				onSetLanguage={setSpokenLanguage}
 				onDownload={downloadTranscript}
@@ -2106,6 +2135,11 @@
 		<div class="call-captions" aria-live="polite">
 			{#each shownCaptions as line (line.id)}
 				<p class="call-caption"><span class="call-caption-name">{line.name}</span> {line.text}</p>
+			{/each}
+			{#each shownPartials as partial (partial.identity)}
+				<p class="call-caption call-caption-partial">
+					<span class="call-caption-name">{partial.name}</span> {partial.text}
+				</p>
 			{/each}
 		</div>
 	{/if}
@@ -2248,6 +2282,10 @@
 	.call-caption-name {
 		font-weight: 600;
 		color: rgba(255, 255, 255, 0.7);
+	}
+
+	.call-caption-partial {
+		color: rgba(255, 255, 255, 0.65);
 	}
 
 	.call-recording-dot {
