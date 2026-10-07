@@ -318,10 +318,10 @@ meeting* screen, and a rejoin carries the transcript on.
 Each person's browser transcribes only their own mic, and only while they
 speak and someone has captions or the transcript open, on
 [Workers AI](#ai-assistant) (Whisper). So under **Language** in the transcript
-panel, everyone ticks the languages *they* speak, up to three: one language is
-transcribed as exactly that, several keep Whisper's guess within them, and none
-lets it detect the language. Speech never goes anywhere but your own Cloudflare
-account.
+panel, everyone picks the language *they* speak, and their speech is
+transcribed as exactly that; **Detect automatically** lets Whisper guess, which
+can slip into another language on a word or two. Speech never goes anywhere but
+your own Cloudflare account.
 
 Captions share the free daily AI allowance: about 47 neurons a minute of
 speech, so roughly three and a half hours of talk a day if nothing else uses

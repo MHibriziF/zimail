@@ -1,22 +1,18 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { captionLanguages, languageNames } from '../caption-language';
+import { captionLanguage, languageNames } from '../caption-language';
 
-describe('captionLanguages', () => {
-	test('nothing, or nothing known, leaves the guess to Whisper', () => {
-		assert.deepEqual(captionLanguages(null), []);
-		assert.deepEqual(captionLanguages(''), []);
-		assert.deepEqual(captionLanguages('auto'), []);
-		assert.deepEqual(captionLanguages('xx,zz'), []);
+describe('captionLanguage', () => {
+	test('a known code is kept', () => {
+		assert.equal(captionLanguage('id'), 'id');
+		assert.equal(captionLanguage(' en '), 'en');
 	});
 
-	test('keeps known codes in the order picked, without repeats', () => {
-		assert.deepEqual(captionLanguages('id'), ['id']);
-		assert.deepEqual(captionLanguages('ja, en ,xx,ja'), ['ja', 'en']);
-	});
-
-	test('stops at three', () => {
-		assert.deepEqual(captionLanguages('en,id,ja,ko'), ['en', 'id', 'ja']);
+	test('nothing, or anything unknown, leaves the guess to Whisper', () => {
+		assert.equal(captionLanguage(null), '');
+		assert.equal(captionLanguage(''), '');
+		assert.equal(captionLanguage('auto'), '');
+		assert.equal(captionLanguage('en,id'), '');
 	});
 });
 

@@ -857,7 +857,7 @@
 		"transcriptDownloadSubtitles": "Unduh .vtt",
 		"captionLanguage": "Bahasa",
 		"captionLanguageAuto": "Deteksi otomatis",
-		"captionLanguageHint": "Hanya untuk ucapan Anda sendiri; setiap orang mengatur miliknya. Pilih hingga {max}.",
+		"captionLanguageHint": "Hanya untuk ucapan Anda sendiri; setiap orang mengatur miliknya.",
 		"leftTranscript": "Simpan transkrip dari panggilan ini:",
 		"screenShareAsk": "Minta izin berbagi layar",
 		"screenShareWaiting": "Menunggu host mengizinkan Anda berbagi layar",

@@ -5,38 +5,29 @@
 	import { t } from '$lib/i18n';
 	import { intlLocale, parseLocale } from '$lib/i18n/locales';
 	import type { CaptionLine } from '$lib/meet/captions';
-	import { CAPTION_LANGUAGE_CODES, MAX_CAPTION_LANGUAGES, languageNames } from '$lib/meet/caption-language';
+	import { CAPTION_LANGUAGE_CODES, languageNames } from '$lib/meet/caption-language';
 
 	let {
 		lines,
 		timeZone,
-		languages,
-		onSetLanguages,
+		language,
+		onSetLanguage,
 		onDownload,
 		onClose
 	}: {
 		lines: CaptionLine[];
 		timeZone?: string;
-		/** What this participant speaks, for their own captions only; empty lets Whisper guess. */
-		languages: string[];
-		onSetLanguages: (codes: string[]) => void;
+		/** What this participant speaks, for their own captions only; `''` lets Whisper guess. */
+		language: string;
+		onSetLanguage: (code: string) => void;
 		onDownload: (format: 'txt' | 'vtt') => void;
 		onClose: () => void;
 	} = $props();
 
-	let languagesOpen = $state(false);
 	const nameOf = $derived(languageNames(intlLocale(parseLocale(($page.data as { locale?: string }).locale))));
 	const languageOptions = $derived(
 		CAPTION_LANGUAGE_CODES.map((code) => ({ code, name: nameOf(code) })).sort((a, b) => a.name.localeCompare(b.name))
 	);
-	const languageSummary = $derived(
-		languages.length === 0 ? t('meet.captionLanguageAuto') : languages.map(nameOf).join(', ')
-	);
-	const languagesFull = $derived(languages.length >= MAX_CAPTION_LANGUAGES);
-
-	function toggleLanguage(code: string, on: boolean) {
-		onSetLanguages(on ? [...languages, code] : languages.filter((picked) => picked !== code));
-	}
 
 	let bodyEl = $state<HTMLDivElement>();
 	/** Follows new lines only while the reader is already at the bottom, so scrolling back to reread isn't yanked away. */
@@ -63,35 +54,16 @@
 			<Icon name="close-line" size={18} />
 		</button>
 	</div>
-	<div class="call-transcript-language">
+	<label class="call-transcript-language">
 		<span class="call-transcript-language-label">{t('meet.captionLanguage')}</span>
-		<button
-			type="button"
-			class="call-transcript-language-toggle"
-			aria-expanded={languagesOpen}
-			onclick={() => (languagesOpen = !languagesOpen)}
-		>
-			<span>{languageSummary}</span>
-			<Icon name={languagesOpen ? 'arrow-up-s-line' : 'arrow-down-s-line'} size={16} />
-		</button>
-		{#if languagesOpen}
-			<p class="call-transcript-language-hint">{t('meet.captionLanguageHint', { max: MAX_CAPTION_LANGUAGES })}</p>
-			<div class="call-transcript-language-list">
-				{#each languageOptions as option (option.code)}
-					{@const checked = languages.includes(option.code)}
-					<label class:call-transcript-language-off={!checked && languagesFull}>
-						<input
-							type="checkbox"
-							{checked}
-							disabled={!checked && languagesFull}
-							onchange={(event) => toggleLanguage(option.code, event.currentTarget.checked)}
-						/>
-						{option.name}
-					</label>
-				{/each}
-			</div>
-		{/if}
-	</div>
+		<select value={language} onchange={(event) => onSetLanguage(event.currentTarget.value)}>
+			<option value="">{t('meet.captionLanguageAuto')}</option>
+			{#each languageOptions as option (option.code)}
+				<option value={option.code}>{option.name}</option>
+			{/each}
+		</select>
+		<span class="call-transcript-language-hint">{t('meet.captionLanguageHint')}</span>
+	</label>
 	<div class="call-transcript-body" bind:this={bodyEl} onscroll={onScroll} aria-live="polite">
 		{#if lines.length === 0}
 			<p class="call-transcript-empty">{t('meet.transcriptEmpty')}</p>
@@ -156,52 +128,19 @@
 		color: rgba(255, 255, 255, 0.55);
 	}
 
-	.call-transcript-language-toggle {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 0.5rem;
+	.call-transcript-language select {
 		padding: 0.375rem 0.5rem;
 		border: 1px solid rgba(255, 255, 255, 0.12);
 		border-radius: 0.5rem;
 		font-size: 0.8125rem;
-		text-align: left;
 		color: #fff;
 		background: #26262b;
-		cursor: pointer;
 	}
 
 	.call-transcript-language-hint {
-		margin: 0;
 		font-size: 0.6875rem;
 		line-height: 1.4;
 		color: rgba(255, 255, 255, 0.55);
-	}
-
-	.call-transcript-language-list {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.125rem 0.5rem;
-		max-height: 10rem;
-		overflow-y: auto;
-		font-size: 0.75rem;
-	}
-
-	.call-transcript-language-list label {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		padding: 0.1875rem 0;
-		cursor: pointer;
-	}
-
-	.call-transcript-language-list input {
-		accent-color: #4f8cff;
-	}
-
-	.call-transcript-language-off {
-		opacity: 0.45;
-		cursor: default;
 	}
 
 	.call-transcript-body {

@@ -161,12 +161,12 @@ describe('createCaptionUploader', () => {
 		uploader.send(new Uint8Array([1]));
 		await settle();
 		await settle();
-		language = 'en,id';
+		language = 'id';
 		uploader.send(new Uint8Array([2]));
 		await settle();
 		await settle();
 		const sent = requests.map((request) => (request.init.headers as Record<string, string>)['X-Caption-Language']);
-		assert.deepEqual(sent, ['en', 'en,id']);
+		assert.deepEqual(sent, ['en', 'id']);
 	});
 
 	test('when the Worker falls behind, the oldest waiting segment is dropped', async () => {
