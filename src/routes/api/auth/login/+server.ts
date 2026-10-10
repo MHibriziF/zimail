@@ -12,6 +12,12 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
 
 	const result = await getAuthService(platform).login(body.email, body.password, body.code);
 	if (!result.ok) {
+		if (result.reason === 'locked') {
+			return json(
+				{ locked: true, retryAfterSeconds: result.retryAfterSeconds, error: 'Too many attempts. Try again later.' },
+				{ status: 429, headers: { 'Retry-After': String(result.retryAfterSeconds) } }
+			);
+		}
 		// The prompt itself is not an error: the password was right, the form just
 		// needs a second field now.
 		if (result.reason === 'totp_required') {

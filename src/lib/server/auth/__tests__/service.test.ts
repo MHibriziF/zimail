@@ -36,12 +36,15 @@ function fakeRepo(overrides: Partial<AuthRepository> = {}) {
 	const totp = new Map<string, { secret: string | null; enabled: boolean }>();
 	const backupCodes = new Map<string, Set<string>>(); // userId -> set of code hashes still unused
 	const spentBackupCodes = new Set<string>();
+	const throttle = new Map<string, { failedLogins: number; lockedUntil: number | null; totpLastStep: number | null }>();
+	const writes: string[] = [];
 
 	function addUser(u: User & { passwordHash: string }) {
 		users.set(u.id, { ...u, signature: '', theme: null, locale: null });
 		recovery.set(u.id, { email: null, pending: null, verifiedAt: null });
 		totp.set(u.id, { secret: null, enabled: false });
 		backupCodes.set(u.id, new Set());
+		throttle.set(u.id, { failedLogins: 0, lockedUntil: null, totpLastStep: null });
 	}
 
 	const base: AuthRepository = {
@@ -221,6 +224,44 @@ function fakeRepo(overrides: Partial<AuthRepository> = {}) {
 			return true;
 		},
 
+		async findLoginAccount(email) {
+			for (const u of users.values()) {
+				if (u.email !== email) continue;
+				const { passwordHash, signature: _s, theme: _t, locale: _l, ...rest } = u;
+				return { user: rest, passwordHash, lockedUntil: throttle.get(u.id)?.lockedUntil ?? null };
+			}
+			return null;
+		},
+		async readLoginGate(userId) {
+			const row = throttle.get(userId);
+			const factor = totp.get(userId);
+			if (!row || !factor) return null;
+			return { ...row, totpSecret: factor.secret, totpEnabled: factor.enabled };
+		},
+		async recordLoginFailure(userId, weight, nowMs, policy) {
+			writes.push('recordLoginFailure');
+			const row = throttle.get(userId);
+			if (!row) return null;
+			row.failedLogins += weight;
+			if (row.failedLogins >= policy.threshold) {
+				const past = Math.min(row.failedLogins - policy.threshold, 30);
+				row.lockedUntil = nowMs + Math.min(policy.maxLockMs, policy.baseLockMs * 2 ** past);
+			}
+			return row.lockedUntil;
+		},
+		async clearLoginFailures(userId) {
+			writes.push('clearLoginFailures');
+			const row = throttle.get(userId);
+			if (row) Object.assign(row, { failedLogins: 0, lockedUntil: null });
+		},
+		async claimTotpStep(userId, step) {
+			writes.push('claimTotpStep');
+			const row = throttle.get(userId);
+			if (!row || (row.totpLastStep !== null && row.totpLastStep >= step)) return false;
+			row.totpLastStep = step;
+			return true;
+		},
+
 		async getEmailSignature(userId) {
 			return users.get(userId)?.signature ?? '';
 		},
@@ -246,7 +287,7 @@ function fakeRepo(overrides: Partial<AuthRepository> = {}) {
 		...overrides
 	};
 
-	return { repo: base, addUser, users };
+	return { repo: base, addUser, users, throttle, writes };
 }
 
 describe('pure helpers', () => {
@@ -375,6 +416,132 @@ describe('login', () => {
 		const service = createAuthService(repo);
 		const result = await service.login('ada@example.com', 'correct-password', await totpCode(secret));
 		assert.equal(result.ok, true);
+	});
+});
+
+describe('login throttling', () => {
+	const START = Date.UTC(2026, 9, 10, 12, 0, 0);
+
+	async function setup({ twoFactor = false } = {}) {
+		const fake = fakeRepo();
+		fake.addUser({ ...user(), passwordHash: await hashPassword('correct-password') });
+		let secret = '';
+		if (twoFactor) {
+			secret = generateTotpSecret();
+			await fake.repo.setPendingTotpSecret('user-1', secret);
+			await fake.repo.enableTotp('user-1');
+		}
+		const clock = { ms: START };
+		const service = createAuthService(fake.repo, { now: () => clock.ms });
+		return { ...fake, service, clock, secret };
+	}
+
+	async function failPasswords(service: ReturnType<typeof createAuthService>, times: number) {
+		for (let i = 0; i < times; i++) await service.login('ada@example.com', 'wrong-password');
+	}
+
+	test('a normal sign-in writes nothing to the throttle', async () => {
+		const { service, writes } = await setup();
+		assert.equal((await service.login('ada@example.com', 'correct-password')).ok, true);
+		assert.deepEqual(writes, []);
+	});
+
+	test('ten wrong passwords lock the account, even against the right one', async () => {
+		const { service, writes } = await setup();
+		await failPasswords(service, 9);
+		assert.deepEqual(await service.login('ada@example.com', 'wrong-password'), {
+			ok: false,
+			reason: 'locked',
+			retryAfterSeconds: 60
+		});
+
+		const writesBefore = writes.length;
+		assert.deepEqual(await service.login('ada@example.com', 'correct-password'), {
+			ok: false,
+			reason: 'locked',
+			retryAfterSeconds: 60
+		});
+		assert.equal(writes.length, writesBefore, 'a refused attempt while locked costs no write');
+	});
+
+	test('the lock expires, and a success then resets the count', async () => {
+		const { service, clock, throttle } = await setup();
+		await failPasswords(service, 10);
+
+		clock.ms += 61_000;
+		assert.equal((await service.login('ada@example.com', 'correct-password')).ok, true);
+		assert.deepEqual(throttle.get('user-1'), { failedLogins: 0, lockedUntil: null, totpLastStep: null });
+	});
+
+	test('each failure past the threshold doubles the lock, up to an hour', async () => {
+		const { service, clock } = await setup();
+		await failPasswords(service, 10);
+
+		clock.ms += 61_000;
+		const second = await service.login('ada@example.com', 'wrong-password');
+		assert.deepEqual(second, { ok: false, reason: 'locked', retryAfterSeconds: 120 });
+
+		for (let i = 0; i < 10; i++) {
+			clock.ms += 60 * 60_000 + 1;
+			await service.login('ada@example.com', 'wrong-password');
+		}
+		const capped = await service.login('ada@example.com', 'correct-password');
+		assert.deepEqual(capped, { ok: false, reason: 'locked', retryAfterSeconds: 3600 });
+	});
+
+	test('a success after a few failures clears them', async () => {
+		const { service, throttle, writes } = await setup();
+		await failPasswords(service, 3);
+		assert.equal(throttle.get('user-1')?.failedLogins, 3);
+
+		assert.equal((await service.login('ada@example.com', 'correct-password')).ok, true);
+		assert.equal(throttle.get('user-1')?.failedLogins, 0);
+		assert.equal(writes.at(-1), 'clearLoginFailures');
+	});
+
+	test('five wrong codes lock the account', async () => {
+		const { service } = await setup({ twoFactor: true });
+		for (let i = 0; i < 4; i++) {
+			assert.equal(
+				((await service.login('ada@example.com', 'correct-password', '000000')) as { reason: string }).reason,
+				'totp_invalid'
+			);
+		}
+		assert.equal(
+			((await service.login('ada@example.com', 'correct-password', '000000')) as { reason: string }).reason,
+			'locked'
+		);
+	});
+
+	test('asking for the code costs nothing; it is not a failure', async () => {
+		const { service, writes } = await setup({ twoFactor: true });
+		assert.equal(((await service.login('ada@example.com', 'correct-password')) as { reason: string }).reason, 'totp_required');
+		assert.deepEqual(writes, []);
+	});
+
+	test('an authenticator code works once, and an older one never after it', async () => {
+		const { service, clock, secret } = await setup({ twoFactor: true });
+		const code = await totpCode(secret, clock.ms);
+		assert.equal((await service.login('ada@example.com', 'correct-password', code)).ok, true);
+		assert.deepEqual(await service.login('ada@example.com', 'correct-password', code), {
+			ok: false,
+			reason: 'totp_invalid'
+		});
+
+		const previous = await totpCode(secret, clock.ms - 30_000);
+		assert.equal(
+			((await service.login('ada@example.com', 'correct-password', previous)) as { reason: string }).reason,
+			'totp_invalid'
+		);
+
+		clock.ms += 30_000;
+		assert.equal((await service.login('ada@example.com', 'correct-password', await totpCode(secret, clock.ms))).ok, true);
+	});
+
+	test('an unknown email is refused without touching the throttle', async () => {
+		const { service, writes } = await setup();
+		assert.deepEqual(await service.login('nobody@example.com', 'x'), { ok: false, reason: 'invalid' });
+		assert.deepEqual(writes, []);
 	});
 });
 

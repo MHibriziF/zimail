@@ -6,8 +6,8 @@ import { DEFAULT_UI_THEME, isThemeId } from '$lib/ui-theme/ids';
 import { DEFAULT_LOCALE, parseLocale, type Locale } from '$lib/i18n/locales';
 import { SESSION_COOKIE, SESSION_DAYS } from '../constants';
 import { createSessionToken, hashPassword, hashToken, verifyPassword } from '../util/crypto';
-import { generateTotpSecret, otpauthUri, verifyTotp } from '../util/totp';
-import type { AccountTokenKind, AuthRepository } from './repository';
+import { generateTotpSecret, matchTotpStep, otpauthUri, verifyTotp } from '../util/totp';
+import type { AccountTokenKind, AuthRepository, LockPolicy, LoginGateRow } from './repository';
 
 export { SESSION_COOKIE };
 
@@ -40,9 +40,28 @@ export type TwoFactorStatus = {
 	backupCodesRemaining: number;
 };
 
+/**
+ * Ten wrong passwords lock an account for a minute; each failure after that
+ * doubles the lock, up to an hour. A wrong second factor weighs double, so
+ * five of them lock it: a six-digit code is far easier to guess than a password.
+ */
+export const LOGIN_LOCK_POLICY: LockPolicy = { threshold: 10, baseLockMs: 60_000, maxLockMs: 60 * 60_000 };
+export const PASSWORD_FAILURE_WEIGHT = 1;
+export const SECOND_FACTOR_FAILURE_WEIGHT = 2;
+
+/**
+ * Checked against when the email is unknown, so that answer takes as long as
+ * a wrong password. All-zero salt and hash: the same PBKDF2 work, and nothing
+ * can match it.
+ */
+const DUMMY_PASSWORD_HASH = `${'A'.repeat(22)}==:${'A'.repeat(43)}=`;
+
 export type LoginResult =
 	| { ok: true; user: User; token: string }
-	| { ok: false; reason: 'invalid' | 'totp_required' | 'totp_invalid' };
+	| { ok: false; reason: 'invalid' | 'totp_required' | 'totp_invalid' }
+	| { ok: false; reason: 'locked'; retryAfterSeconds: number };
+
+export type AuthServiceOptions = { now?: () => number };
 
 /**
  * Not a full validator — just a shape check. Written without nested
@@ -153,7 +172,19 @@ export type AuthService = {
 	setUserLocale(userId: string, locale: string): Promise<Locale>;
 };
 
-export function createAuthService(repo: AuthRepository): AuthService {
+function lockedFor(lockedUntil: number | null, nowMs: number): LoginResult | null {
+	if (lockedUntil === null || lockedUntil <= nowMs) return null;
+	return { ok: false, reason: 'locked', retryAfterSeconds: Math.ceil((lockedUntil - nowMs) / 1000) };
+}
+
+export function createAuthService(repo: AuthRepository, { now = Date.now }: AuthServiceOptions = {}): AuthService {
+	/** Counts the failure; once it locks the account, the caller learns that instead of `reason`. */
+	async function fail(userId: string, weight: number, reason: 'invalid' | 'totp_invalid'): Promise<LoginResult> {
+		const nowMs = now();
+		const lockedUntil = await repo.recordLoginFailure(userId, weight, nowMs, LOGIN_LOCK_POLICY);
+		return lockedFor(lockedUntil, nowMs) ?? { ok: false, reason };
+	}
+
 	async function startSession(user: User): Promise<{ user: User; token: string }> {
 		const token = createSessionToken();
 		const tokenHash = await hashToken(token);
@@ -237,25 +268,44 @@ export function createAuthService(repo: AuthRepository): AuthService {
 		 * Password first, then the second factor if the account has one.
 		 *
 		 * No session exists until both pass, so a correct password on its own buys
-		 * an attacker nothing.
+		 * an attacker nothing. A locked account is refused before the password is
+		 * checked, so the refusal says nothing about it. Nothing is written unless
+		 * something failed, now or since the last success.
 		 */
 		async login(email, password, code) {
-			const user = await repo.getUserByEmail(email);
-			if (!user) return { ok: false, reason: 'invalid' };
+			const account = await repo.findLoginAccount(email);
+			if (!account) {
+				await verifyPassword(password, DUMMY_PASSWORD_HASH);
+				return { ok: false, reason: 'invalid' };
+			}
 
-			const valid = await verifyPassword(password, user.passwordHash);
-			if (!valid) return { ok: false, reason: 'invalid' };
+			const locked = lockedFor(account.lockedUntil, now());
+			if (locked) return locked;
 
-			const { passwordHash: _, ...safeUser } = user;
+			const { user } = account;
+			if (!(await verifyPassword(password, account.passwordHash))) {
+				return fail(user.id, PASSWORD_FAILURE_WEIGHT, 'invalid');
+			}
 
-			if (await isTwoFactorEnabledInternal(repo, safeUser.id)) {
+			// Read again: failures racing this request may have locked the account
+			// while the password was being checked.
+			const gate = await repo.readLoginGate(user.id);
+			if (!gate) return { ok: false, reason: 'invalid' };
+			const lockedNow = lockedFor(gate.lockedUntil, now());
+			if (lockedNow) return lockedNow;
+
+			if (gate.totpEnabled && gate.totpSecret) {
 				if (!code?.trim()) return { ok: false, reason: 'totp_required' };
-				if (!(await verifyChallengeInternal(repo, safeUser.id, code))) {
-					return { ok: false, reason: 'totp_invalid' };
+				if (!(await passSecondFactor(repo, user.id, gate, code, now()))) {
+					return fail(user.id, SECOND_FACTOR_FAILURE_WEIGHT, 'totp_invalid');
 				}
 			}
 
-			return { ok: true, ...(await startSession(safeUser)) };
+			if (gate.failedLogins > 0 || gate.lockedUntil !== null) {
+				await repo.clearLoginFailures(user.id);
+			}
+
+			return { ok: true, ...(await startSession(user)) };
 		},
 
 		async logout(token) {
@@ -492,7 +542,11 @@ export function createAuthService(repo: AuthRepository): AuthService {
 
 		disableTwoFactor: (userId) => repo.disableTotpCascade(userId),
 
-		verifyChallenge: (userId, code) => verifyChallengeInternal(repo, userId, code),
+		async verifyChallenge(userId, code) {
+			const gate = await repo.readLoginGate(userId);
+			if (!gate?.totpEnabled || !gate.totpSecret) return false;
+			return passSecondFactor(repo, userId, gate, code, now());
+		},
 
 		async getEmailSignature(userId) {
 			return repo.getEmailSignature(userId);
@@ -540,14 +594,23 @@ async function isTwoFactorEnabledInternal(repo: AuthRepository, userId: string):
 /**
  * Checks a login challenge against the authenticator, then the recovery codes.
  *
- * A backup code is burned on use, so a code read off a screenshot or a
- * shoulder cannot be replayed.
+ * Both are single use. An authenticator code is refused once its time step,
+ * or a later one, has been accepted; a backup code is burned. Either way a
+ * code read off a screenshot or a shoulder cannot be replayed.
  */
-async function verifyChallengeInternal(repo: AuthRepository, userId: string, code: string): Promise<boolean> {
-	const row = await repo.readTotp(userId);
-	if (!row?.secret || !row.enabled) return false;
+async function passSecondFactor(
+	repo: AuthRepository,
+	userId: string,
+	gate: LoginGateRow,
+	code: string,
+	nowMs: number
+): Promise<boolean> {
+	if (!gate.totpSecret) return false;
 
-	if (await verifyTotp(row.secret, code)) return true;
+	const step = await matchTotpStep(gate.totpSecret, code, { atMs: nowMs });
+	const fresh = step !== null && (gate.totpLastStep === null || step > gate.totpLastStep);
+	// Conditioned on the step still being newer, so two racing logins cannot both spend it.
+	if (fresh && (await repo.claimTotpStep(userId, step))) return true;
 
 	const match = await repo.findBackupCodeByHash(userId, await hashToken(normalizeBackupCode(code)));
 	if (!match) return false;

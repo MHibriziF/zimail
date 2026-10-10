@@ -15,6 +15,10 @@ export const MIGRATIONS: PlannedMigration[] = [
 		sql: "-- Mailbox queries filter and join on the conversation key COALESCE(thread_id, id), which\n-- idx_emails_thread cannot serve, so every thread on a page rescanned all of the user's mail.\nCREATE INDEX IF NOT EXISTS idx_emails_conversation ON emails(user_id, COALESCE(thread_id, id));\n"
 	},
 	{
+		name: "0054_login_throttle.sql",
+		sql: "-- Failed sign-ins per account, and the lock they earn. Written only on a\n-- failure, and once more on the first success after one.\nALTER TABLE users ADD COLUMN failed_logins INTEGER NOT NULL DEFAULT 0;\n\n-- Unix epoch milliseconds; NULL when the account has never been locked.\nALTER TABLE users ADD COLUMN locked_until INTEGER;\n\n-- The last authenticator time step accepted, so a code cannot be used twice.\nALTER TABLE users ADD COLUMN totp_last_step INTEGER;\n"
+	},
+	{
 		name: "0001_init.sql",
 		archived: true,
 		sql: "CREATE TABLE users (\n\tid TEXT PRIMARY KEY,\n\temail TEXT NOT NULL UNIQUE COLLATE NOCASE,\n\tname TEXT NOT NULL,\n\tpassword_hash TEXT NOT NULL,\n\tis_admin INTEGER NOT NULL DEFAULT 0,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE sessions (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\ttoken_hash TEXT NOT NULL UNIQUE,\n\texpires_at TEXT NOT NULL,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE emails (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\tdirection TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),\n\tfrom_addr TEXT NOT NULL,\n\tto_addr TEXT NOT NULL,\n\tsubject TEXT NOT NULL,\n\tbody_text TEXT,\n\tbody_html TEXT,\n\tmessage_id TEXT,\n\tin_reply_to TEXT,\n\tis_read INTEGER NOT NULL DEFAULT 0,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE INDEX idx_emails_user_created ON emails(user_id, created_at DESC);\nCREATE INDEX idx_sessions_token ON sessions(token_hash);\n"
