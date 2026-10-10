@@ -41,8 +41,8 @@ MCP:
   quickinbox mcp
 
 Auth is a Settings → API keys bearer token. QUICKINBOX_URL and QUICKINBOX_TOKEN
-override the saved config (`QUICKMAIL_URL` / `QUICKMAIL_TOKEN` still work).
-The `quickmail` command is an alias for `quickinbox`. Use --json on mail/admin
+override the saved config (QUICKMAIL_URL / QUICKMAIL_TOKEN still work).
+The quickmail command is an alias for quickinbox. Use --json on mail/admin
 commands for raw output.
 `;
 
