@@ -9,6 +9,7 @@
 	import type { MailCategory } from '$lib/mail/categories';
 	import type { Label } from '$lib/mail/labels';
 	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
+	import { hasRemoteContent } from '$lib/utils/email-html';
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -74,6 +75,8 @@
 	let loading = $state(false);
 	let error = $state('');
 	let opened = $state<Set<string>>(new Set());
+	/** Messages whose remote images the reader asked for, until another thread is opened. */
+	let imagesShown = $state<Set<string>>(new Set());
 	let replyOpen = $state(false);
 	let replyMode = $state<ReplyMode>('reply');
 	let replyTarget = $state<ThreadMessage | null>(null);
@@ -134,6 +137,7 @@
 					const last = body.messages[body.messages.length - 1];
 					if (resetUi) {
 						opened = new Set(last ? [last.id] : []);
+						imagesShown = new Set();
 					} else if (last) {
 						opened = new Set([...untrack(() => opened), last.id]);
 					}
@@ -819,7 +823,17 @@
 							{/if}
 							<div class="z-msg-html">
 								{#if message.body_html}
-									<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
+									{@const remote = imagesShown.has(message.id)}
+									{#if !remote && hasRemoteContent(message.body_html)}
+										<div class="z-images-bar" role="status">
+											<Icon name="ImageFile" size={14} />
+											<span>{t('thread.imagesHidden')}</span>
+											<button type="button" onclick={() => (imagesShown = new Set([...imagesShown, message.id]))}>
+												{t('thread.showImages')}
+											</button>
+										</div>
+									{/if}
+									<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} {remote} />
 								{:else}
 									<pre class="z-msg-text">{message.body_text}</pre>
 								{/if}

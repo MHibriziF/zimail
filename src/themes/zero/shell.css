@@ -1156,6 +1156,41 @@
 	padding: 0 1rem;
 }
 
+[data-ui-theme='zero'] .z-images-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem 0.5rem;
+	margin: 0.5rem 0 0.75rem;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--z-chip-border);
+	border-radius: 0.5rem;
+	background: #fafafa;
+	color: var(--z-muted);
+	font-size: 0.8125rem;
+	--icon-color: var(--z-muted);
+}
+
+[data-ui-theme='zero'][data-theme='dark'] .z-images-bar {
+	border-color: transparent;
+	background: #262626;
+}
+
+[data-ui-theme='zero'] .z-images-bar button {
+	border: 0;
+	padding: 0;
+	background: none;
+	color: var(--z-fg);
+	font: inherit;
+	font-weight: 500;
+	cursor: pointer;
+}
+
+[data-ui-theme='zero'] .z-images-bar button:hover {
+	text-decoration: underline;
+	text-underline-offset: 0.15em;
+}
+
 [data-ui-theme='zero'] .z-msg-text {
 	margin: 0;
 	padding: 0.5rem 0 0;

@@ -227,19 +227,107 @@ function isFullDocument(html: string): boolean {
 	return /<html[\s>]/i.test(html) || /<body[\s>]/i.test(html);
 }
 
+/** Where inline `cid:` images are served from once resolveInlineImages has pointed them at their attachment. */
+const INLINE_IMAGE_PATH = '/api/mail/';
+
+export type EmailDocumentOptions = {
+	rich: boolean;
+	theme?: string;
+	original?: boolean;
+	/** The reader asked to see this message's remote images. */
+	remote?: boolean;
+	/** The app's origin, so inline images can be allowed by path rather than all of it. */
+	origin?: string;
+};
+
 /**
  * The frame is already scriptless by sandbox; this closes off the rest —
  * subresources, embedded frames, form posts. It goes in ahead of anything the
  * sender wrote, because a policy only governs what follows it.
  *
+ * Remote images stay blocked until the reader asks: a tracking pixel or a CSS
+ * background tells its sender when the message was opened, and from where.
+ * Inline images are the message's own attachments, served by the app.
+ *
  * Fonts are denied along with everything else, so a message using a hosted
  * webface falls back to the stack below rather than announcing the open to
  * whoever hosts it.
  */
-const CSP =
-	"default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; " +
-	"font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; " +
-	"form-action 'none'; base-uri 'none'";
+export function emailCsp(options: Pick<EmailDocumentOptions, 'remote' | 'origin'> = {}): string {
+	const inline = options.origin ? `${options.origin}${INLINE_IMAGE_PATH}` : "'self'";
+	const remote = options.remote ? ' https: http:' : '';
+	return (
+		`default-src 'none'; img-src data: ${inline}${remote}; style-src 'unsafe-inline'; ` +
+		"font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; " +
+		"form-action 'none'; base-uri 'none'"
+	);
+}
+
+/** Attributes that load an image the moment the message is shown. */
+const LOADING_ATTRIBUTES = ['src', 'srcset', 'background', 'poster'];
+
+const REMOTE_URL = /^(?:https?:)?\/\//i;
+
+function isAttributeStart(lower: string, at: number): boolean {
+	return at === 0 || /[\s"'/]/.test(lower[at - 1]);
+}
+
+function skipSpaces(text: string, at: number): number {
+	let index = at;
+	while (index < text.length && /\s/.test(text[index])) index += 1;
+	return index;
+}
+
+function isQuote(character: string | undefined): boolean {
+	return character === '"' || character === "'";
+}
+
+/** The attribute `name` written at `at`, if it is one: its value without quotes, and where the scan resumes. */
+function attributeAt(lower: string, name: string, at: number): { value: string; end: number } | null {
+	if (!isAttributeStart(lower, at)) return null;
+	const equals = skipSpaces(lower, at + name.length);
+	if (lower[equals] !== '=') return null;
+	const start = skipSpaces(lower, equals + 1);
+	const end = valueEnd(lower, start);
+	const valueStart = isQuote(lower[start]) ? start + 1 : start;
+	return { value: lower.slice(valueStart, end), end: Math.max(end, start) };
+}
+
+function isRemoteValue(name: string, value: string): boolean {
+	const urls = name === 'srcset' ? value.split(',') : [value];
+	return urls.some((url) => REMOTE_URL.test(url.trim()));
+}
+
+function remoteAttribute(lower: string, name: string): boolean {
+	let at = lower.indexOf(name);
+	while (at !== -1) {
+		const attribute = attributeAt(lower, name, at);
+		if (attribute && isRemoteValue(name, attribute.value)) return true;
+		at = lower.indexOf(name, attribute ? attribute.end : at + name.length);
+	}
+	return false;
+}
+
+function remoteStyleUrl(lower: string): boolean {
+	let at = lower.indexOf('url(');
+	while (at !== -1) {
+		const close = lower.indexOf(')', at + 4);
+		const value = lower.slice(at + 4, close === -1 ? at + 256 : close);
+		if (REMOTE_URL.test(value.trim().replace(/^["']/, '').trim())) return true;
+		at = lower.indexOf('url(', at + 4);
+	}
+	return false;
+}
+
+/**
+ * Would the message load anything from elsewhere if allowed to? Decides whether
+ * the reader is offered "Show images" at all. A miss only means no offer — the
+ * policy still blocks it — so this errs towards being simple.
+ */
+export function hasRemoteContent(html: string): boolean {
+	const lower = html.toLowerCase();
+	return LOADING_ATTRIBUTES.some((name) => remoteAttribute(lower, name)) || remoteStyleUrl(lower);
+}
 
 /** A styled message's fallbacks; a plain one gets none, since everything it needs comes last. */
 function pageCss(html: string, adapted: boolean): string {
@@ -247,9 +335,9 @@ function pageCss(html: string, adapted: boolean): string {
 	return adapted ? ADAPTED_PAGE_CSS : LIGHT_PAGE_CSS;
 }
 
-function headStart(html: string, rich: boolean, adapted: boolean): string {
-	const defaults = rich ? `<style>${STYLED_DEFAULTS_CSS}${pageCss(html, adapted)}</style>` : '';
-	return `<meta http-equiv="Content-Security-Policy" content="${CSP}">
+function headStart(html: string, options: EmailDocumentOptions, adapted: boolean): string {
+	const defaults = options.rich ? `<style>${STYLED_DEFAULTS_CSS}${pageCss(html, adapted)}</style>` : '';
+	return `<meta http-equiv="Content-Security-Policy" content="${emailCsp(options)}">
 <meta name="referrer" content="no-referrer">${defaults}`;
 }
 
@@ -265,37 +353,108 @@ function headEnd(rich: boolean): string {
 }
 
 /**
- * `before` goes in ahead of the sender's own head so it governs it; `after`
- * goes in last so our rules outrank theirs.
+ * The sender's doctype decides between standards and quirks layout, so it has
+ * to stay first. Only comments may come before it; a doctype ends at its first
+ * `>` whatever quotes it holds, exactly as the parser reads it.
  */
-function spliceHead(html: string, before: string, after: string): string {
-	const open = /<head\b[^>]*>/i.exec(html);
-	if (open) {
-		const at = open.index + open[0].length;
-		const withBefore = html.slice(0, at) + before + html.slice(at);
-
-		const closing = withBefore.search(/<\/head\s*>/i);
-		return closing === -1
-			? withBefore + after
-			: withBefore.slice(0, closing) + after + withBefore.slice(closing);
+function splitDoctype(html: string): { doctype: string; rest: string } {
+	let at = 0;
+	for (;;) {
+		while (at < html.length && /\s/.test(html[at])) at += 1;
+		if (!html.startsWith('<!--', at)) break;
+		const close = html.indexOf('-->', at + 4);
+		if (close === -1) return { doctype: '', rest: html };
+		at = close + 3;
 	}
-
-	const root = /<html\b[^>]*>/i.exec(html);
-	if (root) {
-		const at = root.index + root[0].length;
-		return `${html.slice(0, at)}<head>${before}${after}</head>${html.slice(at)}`;
-	}
-
-	// A <body> with no <html> around it; give it a root to hang the theme on.
-	return `<html><head>${before}${after}</head>${html}`;
+	if (html.slice(at, at + 9).toLowerCase() !== '<!doctype') return { doctype: '', rest: html };
+	const end = html.indexOf('>', at);
+	if (end === -1) return { doctype: '', rest: html };
+	return { doctype: html.slice(at, end + 1), rest: html.slice(0, at) + html.slice(end + 1) };
 }
 
-/** Ours wins: a sender carrying its own data-theme would otherwise pick ours. */
-function withTheme(html: string, theme: string): string {
-	return html.replace(
-		/<html\b[^>]*/i,
-		(tag) => `${tag.replace(/\sdata-theme\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '')} data-theme="${theme}"`
-	);
+/** Elements whose content is text to the parser, so a tag written inside one is not a tag. */
+const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
+
+const TAG_OPEN = /^<(\/?)([a-z][^\s/>]*)/i;
+
+/** The `>` that closes a tag opened before `from`, stepping over quoted attribute values. */
+function tagEnd(html: string, from: number): number {
+	let at = from;
+	while (at < html.length && html[at] !== '>') {
+		const next = html[at] === '=' ? skipQuoted(html, at) : at;
+		if (next === -1) return -1;
+		at = next + 1;
+	}
+	return at < html.length ? at : -1;
+}
+
+/** From an `=`: the closing quote of the value after it, its first character when unquoted, or -1 when never closed. */
+function skipQuoted(html: string, equals: number): number {
+	const start = skipSpaces(html, equals + 1);
+	return isQuote(html[start]) ? html.indexOf(html[start], start + 1) : start;
+}
+
+/** Past a `<!--` comment at `at`, or -1 when it never closes. */
+function skipComment(lower: string, at: number): number {
+	const close = lower.indexOf('-->', at + 4);
+	return close === -1 ? -1 : close + 3;
+}
+
+const BOGUS_COMMENT_OPENERS = new Set(['!', '?', '/']);
+
+/** Past a `<` that opens no tag: a comment, a bogus comment (`<!…>`, `<?…>`, `</ …>`), or plain text. */
+function skipNonTag(lower: string, at: number): number {
+	if (lower.startsWith('<!--', at)) return skipComment(lower, at);
+	if (!BOGUS_COMMENT_OPENERS.has(lower[at + 1])) return at + 1;
+	const end = lower.indexOf('>', at);
+	return end === -1 ? -1 : end + 1;
+}
+
+/** Past a tag at `at`, and past its content too when that content is raw text. */
+function skipTag(lower: string, at: number, [token, slash, name]: RegExpExecArray): number {
+	const end = tagEnd(lower, at + token.length);
+	if (end === -1) return -1;
+	return slash !== '/' && RAW_TEXT.has(name) ? lower.indexOf(`</${name}`, end + 1) : end + 1;
+}
+
+function endsHead([, slash, name]: RegExpExecArray): boolean {
+	return slash === '/' ? name === 'head' : name === 'body';
+}
+
+/**
+ * Where the sender's head ends — its `</head>`, or the `<body>` that ends it
+ * implicitly — read the way a parser would, so the same text inside a comment,
+ * an attribute value or a `<style>` does not count. -1 when there is none.
+ */
+function senderHeadEnd(html: string): number {
+	const lower = html.toLowerCase();
+	let at = lower.indexOf('<');
+	while (at !== -1) {
+		const open = TAG_OPEN.exec(lower.slice(at, at + 64));
+		if (open && endsHead(open)) return at;
+		if (open?.[2] === 'plaintext') return -1;
+		const after = open ? skipTag(lower, at, open) : skipNonTag(lower, at);
+		if (after === -1) return -1;
+		at = lower.indexOf('<', after);
+	}
+	return -1;
+}
+
+/**
+ * A complete document from the sender is wrapped, never spliced into: our own
+ * `<html>` and `<head>` open the document with the policy as the very first
+ * thing in it, so nothing the sender wrote can come ahead of it or swallow it
+ * (a `<head>` inside a comment once did exactly that). The parser folds the
+ * sender's own `<html>` and `<head>` into ours — their `<html>` attributes are
+ * kept where ours does not set the same one, so our `data-theme` wins — and
+ * their head content follows our defaults, so their styles outrank those.
+ * `after` goes where their head ends, so the frame's rules come last.
+ */
+function wrapDocument(html: string, theme: string, before: string, after: string): string {
+	const { doctype, rest } = splitDoctype(html);
+	const end = senderHeadEnd(rest);
+	const sender = end === -1 ? rest + after : rest.slice(0, end) + after + rest.slice(end);
+	return `${doctype}<html data-theme="${theme}"><head>${before}${sender}`;
 }
 
 /**
@@ -306,23 +465,20 @@ export function adaptsToDark(html: string, options: { rich: boolean; theme?: str
 	return options.rich && options.theme === 'dark' && !options.original && !supportsDarkScheme(html);
 }
 
-export function buildEmailDocument(
-	html: string,
-	options: { rich: boolean; theme?: string; original?: boolean }
-): string {
+export function buildEmailDocument(html: string, options: EmailDocumentOptions): string {
 	const theme = options.theme ?? 'light';
 	const adapted = adaptsToDark(html, options);
-	const before = headStart(html, options.rich, adapted);
+	const before = headStart(html, options, adapted);
 	const after = headEnd(options.rich);
 	const body = adapted ? adaptDarkColours(html) : html;
 
 	// A complete document cannot be nested inside another one — that drops its
-	// <head>, and with it any <style> the layout needs. Our own assets are
-	// spliced into the head it already has instead. Doing this here rather than
+	// <head>, and with it any <style> the layout needs. Its head is merged into
+	// ours by the parser instead (see wrapDocument). Doing this here rather than
 	// after load matters in dark mode: the colour scheme and the transparency
 	// opt-out have to be in the very first paint, or the message flashes up as a
 	// white sheet while it waits for script.
-	if (isFullDocument(body)) return withTheme(spliceHead(body, before, after), theme);
+	if (isFullDocument(body)) return wrapDocument(body, theme, before, after);
 
 	return `<!doctype html><html data-theme="${theme}"><head><meta charset="utf-8">
 ${before}
