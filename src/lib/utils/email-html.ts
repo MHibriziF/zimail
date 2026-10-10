@@ -265,37 +265,104 @@ function headEnd(rich: boolean): string {
 }
 
 /**
- * `before` goes in ahead of the sender's own head so it governs it; `after`
- * goes in last so our rules outrank theirs.
+ * The sender's doctype decides between standards and quirks layout, so it has
+ * to stay first. Only comments may come before it; a doctype ends at its first
+ * `>` whatever quotes it holds, exactly as the parser reads it.
  */
-function spliceHead(html: string, before: string, after: string): string {
-	const open = /<head\b[^>]*>/i.exec(html);
-	if (open) {
-		const at = open.index + open[0].length;
-		const withBefore = html.slice(0, at) + before + html.slice(at);
-
-		const closing = withBefore.search(/<\/head\s*>/i);
-		return closing === -1
-			? withBefore + after
-			: withBefore.slice(0, closing) + after + withBefore.slice(closing);
+function splitDoctype(html: string): { doctype: string; rest: string } {
+	let at = 0;
+	for (;;) {
+		while (at < html.length && /\s/.test(html[at])) at += 1;
+		if (!html.startsWith('<!--', at)) break;
+		const close = html.indexOf('-->', at + 4);
+		if (close === -1) return { doctype: '', rest: html };
+		at = close + 3;
 	}
-
-	const root = /<html\b[^>]*>/i.exec(html);
-	if (root) {
-		const at = root.index + root[0].length;
-		return `${html.slice(0, at)}<head>${before}${after}</head>${html.slice(at)}`;
-	}
-
-	// A <body> with no <html> around it; give it a root to hang the theme on.
-	return `<html><head>${before}${after}</head>${html}`;
+	if (html.slice(at, at + 9).toLowerCase() !== '<!doctype') return { doctype: '', rest: html };
+	const end = html.indexOf('>', at);
+	if (end === -1) return { doctype: '', rest: html };
+	return { doctype: html.slice(at, end + 1), rest: html.slice(0, at) + html.slice(end + 1) };
 }
 
-/** Ours wins: a sender carrying its own data-theme would otherwise pick ours. */
-function withTheme(html: string, theme: string): string {
-	return html.replace(
-		/<html\b[^>]*/i,
-		(tag) => `${tag.replace(/\sdata-theme\s*=\s*("[^"]*"|'[^']*'|\S+)/gi, '')} data-theme="${theme}"`
-	);
+/** Elements whose content is text to the parser, so a tag written inside one is not a tag. */
+const RAW_TEXT = new Set(['script', 'style', 'title', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes']);
+
+const TAG_OPEN = /^<(\/?)([a-z][^\s/>]*)/i;
+
+/** The `>` that closes a tag opened before `from`, stepping over quoted attribute values. */
+function tagEnd(html: string, from: number): number {
+	let at = from;
+	while (at < html.length && html[at] !== '>') {
+		if (html[at] === '=') {
+			at += 1;
+			while (at < html.length && /\s/.test(html[at])) at += 1;
+			const quote = html[at];
+			if (quote === '"' || quote === "'") {
+				at = html.indexOf(quote, at + 1);
+				if (at === -1) return -1;
+			}
+		}
+		at += 1;
+	}
+	return at < html.length ? at : -1;
+}
+
+/**
+ * Where the sender's head ends — its `</head>`, or the `<body>` that ends it
+ * implicitly — read the way a parser would, so the same text inside a comment,
+ * an attribute value or a `<style>` does not count. -1 when there is none.
+ */
+function senderHeadEnd(html: string): number {
+	const lower = html.toLowerCase();
+	let at = lower.indexOf('<');
+	while (at !== -1) {
+		if (lower.startsWith('<!--', at)) {
+			const close = lower.indexOf('-->', at + 4);
+			if (close === -1) return -1;
+			at = lower.indexOf('<', close + 3);
+			continue;
+		}
+		const open = TAG_OPEN.exec(lower.slice(at, at + 64));
+		if (!open) {
+			// `<!…>`, `<?…>` and `</ …>` are bogus comments; any other `<` is text.
+			const bogus = /[!?/]/.test(lower[at + 1] ?? '');
+			const end = bogus ? lower.indexOf('>', at) : at;
+			if (end === -1) return -1;
+			at = lower.indexOf('<', end + 1);
+			continue;
+		}
+		const [token, slash, name] = open;
+		const closing = slash === '/';
+		if ((closing && name === 'head') || (!closing && name === 'body')) return at;
+		if (name === 'plaintext') return -1;
+
+		const end = tagEnd(lower, at + token.length);
+		if (end === -1) return -1;
+		at = end + 1;
+		if (!closing && RAW_TEXT.has(name)) {
+			at = lower.indexOf(`</${name}`, at);
+			if (at === -1) return -1;
+		}
+		at = lower.indexOf('<', at);
+	}
+	return -1;
+}
+
+/**
+ * A complete document from the sender is wrapped, never spliced into: our own
+ * `<html>` and `<head>` open the document with the policy as the very first
+ * thing in it, so nothing the sender wrote can come ahead of it or swallow it
+ * (a `<head>` inside a comment once did exactly that). The parser folds the
+ * sender's own `<html>` and `<head>` into ours — their `<html>` attributes are
+ * kept where ours does not set the same one, so our `data-theme` wins — and
+ * their head content follows our defaults, so their styles outrank those.
+ * `after` goes where their head ends, so the frame's rules come last.
+ */
+function wrapDocument(html: string, theme: string, before: string, after: string): string {
+	const { doctype, rest } = splitDoctype(html);
+	const end = senderHeadEnd(rest);
+	const sender = end === -1 ? rest + after : rest.slice(0, end) + after + rest.slice(end);
+	return `${doctype}<html data-theme="${theme}"><head>${before}${sender}`;
 }
 
 /**
@@ -317,12 +384,12 @@ export function buildEmailDocument(
 	const body = adapted ? adaptDarkColours(html) : html;
 
 	// A complete document cannot be nested inside another one — that drops its
-	// <head>, and with it any <style> the layout needs. Our own assets are
-	// spliced into the head it already has instead. Doing this here rather than
+	// <head>, and with it any <style> the layout needs. Its head is merged into
+	// ours by the parser instead (see wrapDocument). Doing this here rather than
 	// after load matters in dark mode: the colour scheme and the transparency
 	// opt-out have to be in the very first paint, or the message flashes up as a
 	// white sheet while it waits for script.
-	if (isFullDocument(body)) return withTheme(spliceHead(body, before, after), theme);
+	if (isFullDocument(body)) return wrapDocument(body, theme, before, after);
 
 	return `<!doctype html><html data-theme="${theme}"><head><meta charset="utf-8">
 ${before}

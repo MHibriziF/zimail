@@ -102,6 +102,52 @@ describe('buildEmailDocument', () => {
 	});
 });
 
+describe('buildEmailDocument: the policy cannot be displaced', () => {
+	const policyFirst = (doc: string) =>
+		assert.match(doc, /^(?:<!doctype[^>]*>)?<html data-theme="\w+"><head><meta http-equiv="Content-Security-Policy"/i);
+
+	test('a <head> inside a comment does not swallow the policy', () => {
+		const doc = buildEmailDocument(
+			'<!--<head>--><html><body><iframe src="https://example.com"></iframe></body></html>',
+			{ rich: true }
+		);
+		policyFirst(doc);
+		assert.ok(!doc.includes('<!--<head><meta'));
+	});
+
+	test('a <head> inside an attribute value, a title or a style is not the head', () => {
+		for (const html of [
+			'<html><body><div title="<head></head>">x</div></body></html>',
+			'<html><head><title><head></head></title></head><body>x</body></html>',
+			'<html><head><style>/* </head> */ p { color: red }</style></head><body>x</body></html>',
+			'<html><head><meta name="x" content="</head>"></head><body>x</body></html>'
+		]) {
+			const doc = buildEmailDocument(html, { rich: true });
+			policyFirst(doc);
+			// The frame's rules land where the real head ends, not inside the decoy.
+			assert.match(doc, /\.quote-hidden[^<]*<\/style>(?:<\/head>)?<body>/, html);
+		}
+	});
+
+	test('the sender’s doctype stays first, so the layout mode is theirs', () => {
+		const doc = buildEmailDocument('<!-- hi --><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"><html><body>x</body></html>', { rich: true });
+		assert.ok(doc.startsWith('<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"><html data-theme='));
+		policyFirst(doc);
+		assert.equal(buildEmailDocument('<html><body>x</body></html>', { rich: true }).startsWith('<html'), true);
+	});
+
+	test('ours is the first data-theme, so the parser keeps it', () => {
+		const doc = buildEmailDocument('<html data-theme="light" lang="en"><body>x</body></html>', { rich: true, theme: 'dark' });
+		assert.ok(doc.startsWith('<html data-theme="dark">'));
+	});
+
+	test('a document whose head never ends still gets the frame rules', () => {
+		const doc = buildEmailDocument('<html><head><style>p{}</style><!-- unterminated', { rich: true });
+		policyFirst(doc);
+		assert.ok(doc.includes('.quote-hidden'));
+	});
+});
+
 describe('supportsDarkScheme', () => {
 	test('only a real dark design counts', () => {
 		assert.equal(supportsDarkScheme('<style>@media (prefers-color-scheme: dark) { body { background: #000 } }</style>'), true);
