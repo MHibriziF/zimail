@@ -2,6 +2,7 @@
 	import Icon from '../Icon.svelte';
 	import AddressField from '../AddressField.svelte';
 	import { t } from '$lib/i18n';
+	import { addressErrorMessage } from '$lib/address-error';
 	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
 	import type { Domain, MailAddress } from '$lib/types';
 
@@ -42,7 +43,11 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? 'Could not add that address';
+				error = addressErrorMessage(
+					body,
+					`${localPart.trim().toLowerCase().split('@')[0]}@${selectedDomain?.name ?? ''}`,
+					'Could not add that address'
+				);
 				return;
 			}
 			edited = [...addresses, body.address];

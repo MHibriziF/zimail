@@ -111,6 +111,8 @@ export type DomainsRepository = {
 	findAddressByValue(address: string): Promise<{ id: string } | null>;
 	findAddressesByValues(addresses: string[]): Promise<MatchedAddress[]>;
 	findDomainCatchallByName(name: string): Promise<DomainCatchall | null>;
+	/** Whether the catch-all owner has stored inbound mail that reached them as `address`. */
+	hasCatchallMailFor(catchallUserId: string, domainId: string, address: string): Promise<boolean>;
 	insertAddress(input: NewAddress): Promise<void>;
 	updateAddressRow(userId: string, addressId: string, patch: AddressPatch): Promise<void>;
 	setDefaultAddress(userId: string, addressId: string): Promise<void>;
@@ -249,6 +251,21 @@ export function createD1DomainsRepository(db: D1Database): DomainsRepository {
 				.bind(name.toLowerCase())
 				.first<{ id: string; catchall_user_id: string | null }>();
 			return row ? { id: row.id, catchallUserId: row.catchall_user_id } : null;
+		},
+
+		async hasCatchallMailFor(catchallUserId, domainId, address) {
+			// Catch-all delivery stores the matched recipient as `to_addr` with no
+			// `address_id`. The (user_id, domain_id) index bounds the scan.
+			const row = await db
+				.prepare(
+					`SELECT 1 AS found FROM emails
+					 WHERE address_id IS NULL AND user_id = ? AND domain_id = ?
+					   AND direction = 'inbound' AND to_addr = ? COLLATE NOCASE
+					 LIMIT 1`
+				)
+				.bind(catchallUserId, domainId, address)
+				.first<{ found: number }>();
+			return row !== null;
 		},
 
 		async insertAddress(input) {

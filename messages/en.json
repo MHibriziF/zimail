@@ -603,7 +603,9 @@
 		"domain": "Domain",
 		"send": "Send",
 		"receive": "Receive",
-		"receivingOffSelected": "Receiving is off for a selected domain. Enable inbound on it at the mail provider to get mail — sending still works."
+		"receivingOffSelected": "Receiving is off for a selected domain. Enable inbound on it at the mail provider to get mail — sending still works.",
+		"reservedAddress": "{address} is kept for the admin. Ask an admin to set it up, or pick another name.",
+		"catchallAddress": "{address} already gets mail through the catch-all. Ask an admin to assign it, or pick another name."
 	},
 	"wizard": {
 		"progress": "Setup progress"

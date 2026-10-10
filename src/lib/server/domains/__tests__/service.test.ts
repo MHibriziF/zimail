@@ -40,9 +40,14 @@ function address(overrides: Partial<MailAddress> = {}): MailAddress {
  * the payoff of the repository/service split: business rules get tested
  * without hand-rolling a fake database.
  */
-function fakeRepo(seed: { domains?: Domain[]; addresses?: MailAddress[] } = {}): DomainsRepository {
+type CatchallMail = { userId: string; domainId: string; address: string };
+
+function fakeRepo(
+	seed: { domains?: Domain[]; addresses?: MailAddress[]; catchallMail?: CatchallMail[] } = {}
+): DomainsRepository {
 	const domains = seed.domains ?? [];
 	const addresses = seed.addresses ?? [];
+	const catchallMail = seed.catchallMail ?? [];
 
 	return {
 		async listConnected() {
@@ -103,6 +108,11 @@ function fakeRepo(seed: { domains?: Domain[]; addresses?: MailAddress[] } = {}):
 			const found = domains.find((d) => d.name === name);
 			return found ? { id: found.id, catchallUserId: found.catchall_user_id } : null;
 		},
+		async hasCatchallMailFor(userId, domainId, value) {
+			return catchallMail.some(
+				(mail) => mail.userId === userId && mail.domainId === domainId && mail.address === value
+			);
+		},
 		async insertAddress(input) {
 			addresses.push(
 				address({
@@ -156,7 +166,7 @@ describe('createAddress', () => {
 	test('rejects an address on a domain that is not connected', async () => {
 		const service = createDomainsService({ repo: fakeRepo() });
 		await assert.rejects(
-			service.createAddress({ userId: 'user-1', domainId: 'missing', localPart: 'me' }),
+			service.createAddress({ userId: 'user-1', domainId: 'missing', localPart: 'me', actorIsAdmin: false }),
 			(error) => error instanceof DomainsServiceError && error.message === 'Domain is not connected'
 		);
 	});
@@ -164,7 +174,7 @@ describe('createAddress', () => {
 	test('rejects a local part with disallowed characters', async () => {
 		const service = createDomainsService({ repo: fakeRepo({ domains: [domain()] }) });
 		await assert.rejects(
-			service.createAddress({ userId: 'user-1', domainId: 'domain-1', localPart: 'me you' }),
+			service.createAddress({ userId: 'user-1', domainId: 'domain-1', localPart: 'me you', actorIsAdmin: false }),
 			/letters, numbers/
 		);
 	});
@@ -173,7 +183,7 @@ describe('createAddress', () => {
 		const repo = fakeRepo({ domains: [domain()], addresses: [address({ address: 'me@example.com' })] });
 		const service = createDomainsService({ repo });
 		await assert.rejects(
-			service.createAddress({ userId: 'user-2', domainId: 'domain-1', localPart: 'me' }),
+			service.createAddress({ userId: 'user-2', domainId: 'domain-1', localPart: 'me', actorIsAdmin: true }),
 			/already taken/
 		);
 	});
@@ -181,9 +191,92 @@ describe('createAddress', () => {
 	test('the first address created for a user becomes their default', async () => {
 		const repo = fakeRepo({ domains: [domain()] });
 		const service = createDomainsService({ repo });
-		const created = await service.createAddress({ userId: 'user-1', domainId: 'domain-1', localPart: 'Me' });
+		const created = await service.createAddress({
+			userId: 'user-1',
+			domainId: 'domain-1',
+			localPart: 'Me',
+			actorIsAdmin: false
+		});
 		assert.equal(created.address, 'me@example.com');
 		assert.equal(created.is_default, true);
+	});
+});
+
+describe('createAddress for members', () => {
+	const refusedWith = (code: string) => (error: unknown) =>
+		error instanceof DomainsServiceError && error.code === code && error.status === 403;
+
+	test('refuses role addresses, their +tag variants, and any casing', async () => {
+		const service = createDomainsService({ repo: fakeRepo({ domains: [domain()] }) });
+		for (const localPart of ['postmaster', 'Abuse', 'no-reply', 'mailer-daemon', 'billing+invoices', 'INFO+x']) {
+			await assert.rejects(
+				service.createAddress({ userId: 'member', domainId: 'domain-1', localPart, actorIsAdmin: false }),
+				refusedWith('reserved_address'),
+				localPart
+			);
+		}
+	});
+
+	test('allows names that only contain a role word', async () => {
+		const service = createDomainsService({ repo: fakeRepo({ domains: [domain()] }) });
+		const created = await service.createAddress({
+			userId: 'member',
+			domainId: 'domain-1',
+			localPart: 'info-desk',
+			actorIsAdmin: false
+		});
+		assert.equal(created.address, 'info-desk@example.com');
+	});
+
+	test('refuses an address the catch-all owner already receives mail for', async () => {
+		const repo = fakeRepo({
+			domains: [domain({ catchall_user_id: 'admin' })],
+			catchallMail: [{ userId: 'admin', domainId: 'domain-1', address: 'bank@example.com' }]
+		});
+		const service = createDomainsService({ repo });
+		await assert.rejects(
+			service.createAddress({ userId: 'member', domainId: 'domain-1', localPart: 'Bank', actorIsAdmin: false }),
+			refusedWith('catchall_address')
+		);
+		const fresh = await service.createAddress({
+			userId: 'member',
+			domainId: 'domain-1',
+			localPart: 'ada',
+			actorIsAdmin: false
+		});
+		assert.equal(fresh.address, 'ada@example.com');
+	});
+
+	test('the catch-all owner may claim their own catch-all mail', async () => {
+		const repo = fakeRepo({
+			domains: [domain({ catchall_user_id: 'member' })],
+			catchallMail: [{ userId: 'member', domainId: 'domain-1', address: 'bank@example.com' }]
+		});
+		const service = createDomainsService({ repo });
+		const created = await service.createAddress({
+			userId: 'member',
+			domainId: 'domain-1',
+			localPart: 'bank',
+			actorIsAdmin: false
+		});
+		assert.equal(created.address, 'bank@example.com');
+	});
+
+	test('admins stay unrestricted, including for other users', async () => {
+		const repo = fakeRepo({
+			domains: [domain({ catchall_user_id: 'admin' })],
+			catchallMail: [{ userId: 'admin', domainId: 'domain-1', address: 'bank@example.com' }]
+		});
+		const service = createDomainsService({ repo });
+		for (const localPart of ['postmaster', 'bank']) {
+			const created = await service.createAddress({
+				userId: 'member',
+				domainId: 'domain-1',
+				localPart,
+				actorIsAdmin: true
+			});
+			assert.equal(created.address, `${localPart}@example.com`);
+		}
 	});
 });
 

@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { getDomainsService } from '$lib/server/domains';
+import { DomainsServiceError, getDomainsService } from '$lib/server/domains';
 
 export const GET: RequestHandler = async ({ locals, platform, url }) => {
 	if (!platform?.env.DB || !locals.user) {
@@ -35,17 +35,22 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	}
 
 	// Admins can provision addresses for other users; everyone else gets their own.
-	const userId = locals.user.is_admin && body.userId ? body.userId : locals.user.id;
+	const actorIsAdmin = Boolean(locals.user.is_admin);
+	const userId = actorIsAdmin && body.userId ? body.userId : locals.user.id;
 
 	try {
 		const address = await getDomainsService(platform).createAddress({
 			userId,
 			domainId: body.domainId,
 			localPart: body.localPart,
-			label: body.label ?? null
+			label: body.label ?? null,
+			actorIsAdmin
 		});
 		return json({ address }, { status: 201 });
 	} catch (error) {
+		if (error instanceof DomainsServiceError) {
+			return json({ error: error.message, code: error.code }, { status: error.status });
+		}
 		return json(
 			{ error: error instanceof Error ? error.message : 'Failed to create address' },
 			{ status: 400 }
