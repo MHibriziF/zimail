@@ -272,23 +272,38 @@ function isAttributeStart(lower: string, at: number): boolean {
 	return at === 0 || /[\s"'/]/.test(lower[at - 1]);
 }
 
+function skipSpaces(text: string, at: number): number {
+	let index = at;
+	while (index < text.length && /\s/.test(text[index])) index += 1;
+	return index;
+}
+
+function isQuote(character: string | undefined): boolean {
+	return character === '"' || character === "'";
+}
+
+/** The attribute `name` written at `at`, if it is one: its value without quotes, and where the scan resumes. */
+function attributeAt(lower: string, name: string, at: number): { value: string; end: number } | null {
+	if (!isAttributeStart(lower, at)) return null;
+	const equals = skipSpaces(lower, at + name.length);
+	if (lower[equals] !== '=') return null;
+	const start = skipSpaces(lower, equals + 1);
+	const end = valueEnd(lower, start);
+	const valueStart = isQuote(lower[start]) ? start + 1 : start;
+	return { value: lower.slice(valueStart, end), end: Math.max(end, start) };
+}
+
+function isRemoteValue(name: string, value: string): boolean {
+	const urls = name === 'srcset' ? value.split(',') : [value];
+	return urls.some((url) => REMOTE_URL.test(url.trim()));
+}
+
 function remoteAttribute(lower: string, name: string): boolean {
 	let at = lower.indexOf(name);
 	while (at !== -1) {
-		let equals = at + name.length;
-		while (equals < lower.length && /\s/.test(lower[equals])) equals += 1;
-		let next = at + name.length;
-		if (lower[equals] === '=' && isAttributeStart(lower, at)) {
-			let start = equals + 1;
-			while (start < lower.length && /\s/.test(lower[start])) start += 1;
-			const end = valueEnd(lower, start);
-			const quoted = lower[start] === '"' || lower[start] === "'";
-			const value = lower.slice(quoted ? start + 1 : start, end);
-			const urls = name === 'srcset' ? value.split(',') : [value];
-			if (urls.some((url) => REMOTE_URL.test(url.trim()))) return true;
-			next = Math.max(end, start);
-		}
-		at = lower.indexOf(name, next);
+		const attribute = attributeAt(lower, name, at);
+		if (attribute && isRemoteValue(name, attribute.value)) return true;
+		at = lower.indexOf(name, attribute ? attribute.end : at + name.length);
 	}
 	return false;
 }
@@ -365,18 +380,44 @@ const TAG_OPEN = /^<(\/?)([a-z][^\s/>]*)/i;
 function tagEnd(html: string, from: number): number {
 	let at = from;
 	while (at < html.length && html[at] !== '>') {
-		if (html[at] === '=') {
-			at += 1;
-			while (at < html.length && /\s/.test(html[at])) at += 1;
-			const quote = html[at];
-			if (quote === '"' || quote === "'") {
-				at = html.indexOf(quote, at + 1);
-				if (at === -1) return -1;
-			}
-		}
-		at += 1;
+		const next = html[at] === '=' ? skipQuoted(html, at) : at;
+		if (next === -1) return -1;
+		at = next + 1;
 	}
 	return at < html.length ? at : -1;
+}
+
+/** From an `=`: the closing quote of the value after it, its first character when unquoted, or -1 when never closed. */
+function skipQuoted(html: string, equals: number): number {
+	const start = skipSpaces(html, equals + 1);
+	return isQuote(html[start]) ? html.indexOf(html[start], start + 1) : start;
+}
+
+/** Past a `<!--` comment at `at`, or -1 when it never closes. */
+function skipComment(lower: string, at: number): number {
+	const close = lower.indexOf('-->', at + 4);
+	return close === -1 ? -1 : close + 3;
+}
+
+const BOGUS_COMMENT_OPENERS = ['!', '?', '/'];
+
+/** Past a `<` that opens no tag: a comment, a bogus comment (`<!…>`, `<?…>`, `</ …>`), or plain text. */
+function skipNonTag(lower: string, at: number): number {
+	if (lower.startsWith('<!--', at)) return skipComment(lower, at);
+	if (!BOGUS_COMMENT_OPENERS.includes(lower[at + 1])) return at + 1;
+	const end = lower.indexOf('>', at);
+	return end === -1 ? -1 : end + 1;
+}
+
+/** Past a tag at `at`, and past its content too when that content is raw text. */
+function skipTag(lower: string, at: number, [token, slash, name]: RegExpExecArray): number {
+	const end = tagEnd(lower, at + token.length);
+	if (end === -1) return -1;
+	return slash !== '/' && RAW_TEXT.has(name) ? lower.indexOf(`</${name}`, end + 1) : end + 1;
+}
+
+function endsHead([, slash, name]: RegExpExecArray): boolean {
+	return slash === '/' ? name === 'head' : name === 'body';
 }
 
 /**
@@ -388,34 +429,12 @@ function senderHeadEnd(html: string): number {
 	const lower = html.toLowerCase();
 	let at = lower.indexOf('<');
 	while (at !== -1) {
-		if (lower.startsWith('<!--', at)) {
-			const close = lower.indexOf('-->', at + 4);
-			if (close === -1) return -1;
-			at = lower.indexOf('<', close + 3);
-			continue;
-		}
 		const open = TAG_OPEN.exec(lower.slice(at, at + 64));
-		if (!open) {
-			// `<!…>`, `<?…>` and `</ …>` are bogus comments; any other `<` is text.
-			const bogus = /[!?/]/.test(lower[at + 1] ?? '');
-			const end = bogus ? lower.indexOf('>', at) : at;
-			if (end === -1) return -1;
-			at = lower.indexOf('<', end + 1);
-			continue;
-		}
-		const [token, slash, name] = open;
-		const closing = slash === '/';
-		if ((closing && name === 'head') || (!closing && name === 'body')) return at;
-		if (name === 'plaintext') return -1;
-
-		const end = tagEnd(lower, at + token.length);
-		if (end === -1) return -1;
-		at = end + 1;
-		if (!closing && RAW_TEXT.has(name)) {
-			at = lower.indexOf(`</${name}`, at);
-			if (at === -1) return -1;
-		}
-		at = lower.indexOf('<', at);
+		if (open && endsHead(open)) return at;
+		if (open?.[2] === 'plaintext') return -1;
+		const after = open ? skipTag(lower, at, open) : skipNonTag(lower, at);
+		if (after === -1) return -1;
+		at = lower.indexOf('<', after);
 	}
 	return -1;
 }
