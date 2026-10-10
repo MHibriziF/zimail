@@ -71,7 +71,7 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
 			password: body.password
 		});
 
-		await domains.createAddress({ userId: user.id, domainId: domain.id, localPart });
+		await domains.createAddress({ userId: user.id, domainId: domain.id, localPart, actorIsAdmin: true });
 
 		// The provider accepts mail for every mailbox on the domain; without a
 		// catch-all anything sent to an unknown address would just pile up unrouted.

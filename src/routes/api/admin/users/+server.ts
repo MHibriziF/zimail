@@ -71,7 +71,8 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		const address = await domains.createAddress({
 			userId: user.id,
 			domainId: domain.id,
-			localPart
+			localPart,
+			actorIsAdmin: true
 		});
 
 		return json({ user, address }, { status: 201 });

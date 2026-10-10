@@ -603,7 +603,9 @@
 		"domain": "Domaine",
 		"send": "Envoi",
 		"receive": "Réception",
-		"receivingOffSelected": "La réception est désactivée pour un domaine sélectionné. Activez l’entrée chez le fournisseur pour recevoir du courrier — l’envoi fonctionne toujours."
+		"receivingOffSelected": "La réception est désactivée pour un domaine sélectionné. Activez l’entrée chez le fournisseur pour recevoir du courrier — l’envoi fonctionne toujours.",
+		"reservedAddress": "{address} est réservée à l’administrateur. Demandez à un administrateur de la créer, ou choisissez un autre nom.",
+		"catchallAddress": "{address} reçoit déjà du courrier via le catch-all. Demandez à un administrateur de vous l’attribuer, ou choisissez un autre nom."
 	},
 	"wizard": {
 		"progress": "Progression de la configuration"

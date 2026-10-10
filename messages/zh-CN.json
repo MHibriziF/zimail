@@ -603,7 +603,9 @@
 		"domain": "域名",
 		"send": "发送",
 		"receive": "接收",
-		"receivingOffSelected": "所选域名未开启接收。请在邮件服务商处启用入站以收信 — 发送仍然可用。"
+		"receivingOffSelected": "所选域名未开启接收。请在邮件服务商处启用入站以收信 — 发送仍然可用。",
+		"reservedAddress": "{address} 保留给管理员。请让管理员来设置，或换一个名称。",
+		"catchallAddress": "{address} 已通过 Catch-all 收到邮件。请让管理员分配给你，或换一个名称。"
 	},
 	"wizard": {
 		"progress": "设置进度"

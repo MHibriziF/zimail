@@ -9,6 +9,7 @@ export {
 	DomainsServiceError,
 	type DomainsService,
 	type CreateAddressInput,
+	type DomainsServiceErrorCode,
 	type AddressUpdate,
 	type InboundRoute
 } from './service';

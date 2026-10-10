@@ -12,6 +12,7 @@
 	} from '$lib/provider-copy';
 	import { APP_NAME } from '$lib/constants';
 	import { plural, t } from '$lib/i18n';
+	import { addressErrorMessage } from '$lib/address-error';
 	import { page } from '$app/stores';
 	import type { PageData } from './$types';
 
@@ -79,7 +80,11 @@
 			});
 			const body = await res.json();
 			if (!res.ok) {
-				error = body.error ?? t('onboarding.couldNotCreateAddress');
+				error = addressErrorMessage(
+					body,
+					`${cleanLocal}@${activeDomain?.name ?? ''}`,
+					t('onboarding.couldNotCreateAddress')
+				);
 				return;
 			}
 			window.location.href = '/inbox';

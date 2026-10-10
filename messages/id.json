@@ -603,7 +603,9 @@
 		"domain": "Domain",
 		"send": "Kirim",
 		"receive": "Terima",
-		"receivingOffSelected": "Penerimaan mati untuk salah satu domain yang dipilih. Aktifkan surel masuk untuk domain itu di penyedia surel agar surel sampai — pengiriman tetap berjalan."
+		"receivingOffSelected": "Penerimaan mati untuk salah satu domain yang dipilih. Aktifkan surel masuk untuk domain itu di penyedia surel agar surel sampai — pengiriman tetap berjalan.",
+		"reservedAddress": "{address} disimpan untuk admin. Minta admin untuk menyiapkannya, atau pilih nama lain.",
+		"catchallAddress": "{address} sudah menerima surel lewat catch-all. Minta admin untuk memberikannya, atau pilih nama lain."
 	},
 	"wizard": {
 		"progress": "Kemajuan penyiapan"

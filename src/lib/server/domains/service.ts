@@ -17,21 +17,49 @@ export type CreateAddressInput = {
 	domainId: string;
 	localPart: string;
 	label?: string | null;
+	/** Admins may claim any free address; members are kept off role and catch-all addresses. */
+	actorIsAdmin: boolean;
 };
 
 export type AddressUpdate = { label?: string | null; signature?: string | null };
 
+export type DomainsServiceErrorCode = 'reserved_address' | 'catchall_address';
+
 export class DomainsServiceError extends Error {
 	readonly status: number;
+	readonly code: DomainsServiceErrorCode | null;
 
-	constructor(status: number, message: string) {
+	constructor(status: number, message: string, code: DomainsServiceErrorCode | null = null) {
 		super(message);
 		this.name = 'DomainsServiceError';
 		this.status = status;
+		this.code = code;
 	}
 }
 
 const LOCAL_PART = /^[a-z0-9._%+-]+$/i;
+
+const RESERVED_LOCAL_PARTS = new Set([
+	'postmaster',
+	'abuse',
+	'admin',
+	'administrator',
+	'hostmaster',
+	'webmaster',
+	'security',
+	'root',
+	'noreply',
+	'no-reply',
+	'mailer-daemon',
+	'support',
+	'billing',
+	'info'
+]);
+
+/** `postmaster+anything` is still postmaster's mail. */
+export function isReservedLocalPart(localPart: string): boolean {
+	return RESERVED_LOCAL_PARTS.has(localPart.toLowerCase().split('+')[0]);
+}
 
 export type DomainsService = {
 	listConnected(): Promise<Domain[]>;
@@ -79,6 +107,26 @@ export function createDomainsService(deps: DomainsServiceDeps): DomainsService {
 	async function connectOne(providerDomainId: string): Promise<Domain> {
 		const remote = await requireProvider(deps).getDomain(providerDomainId);
 		return repo.upsertDomain(remote);
+	}
+
+	// Mail to an unclaimed address goes to the catch-all owner, so a member who
+	// claimed it would take over mail someone else already relies on.
+	async function assertMemberMayClaim(domain: Domain, userId: string, localPart: string, address: string) {
+		if (isReservedLocalPart(localPart)) {
+			throw new DomainsServiceError(403, `${address} is kept for the admin`, 'reserved_address');
+		}
+		const catchallUserId = domain.catchall_user_id;
+		if (
+			catchallUserId &&
+			catchallUserId !== userId &&
+			(await repo.hasCatchallMailFor(catchallUserId, domain.id, address))
+		) {
+			throw new DomainsServiceError(
+				403,
+				`${address} already gets mail through the catch-all`,
+				'catchall_address'
+			);
+		}
 	}
 
 	return {
@@ -140,6 +188,10 @@ export function createDomainsService(deps: DomainsServiceDeps): DomainsService {
 			const existing = await repo.findAddressByValue(address);
 			if (existing) {
 				throw new DomainsServiceError(400, `${address} is already taken`);
+			}
+
+			if (!input.actorIsAdmin) {
+				await assertMemberMayClaim(domain, input.userId, localPart, address);
 			}
 
 			const isFirst = (await repo.listAddressesForUser(input.userId)).length === 0;
