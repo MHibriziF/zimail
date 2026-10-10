@@ -88,6 +88,7 @@
 		"password": "Kata sandi",
 		"signingIn": "Sedang masuk…",
 		"loginFailed": "Gagal masuk",
+		"tooManyAttempts": "Terlalu banyak percobaan masuk. Coba lagi dalam {minutes} menit.",
 		"twoFactorLabel": "Kode autentikator",
 		"recoveryHint": "Atau masukkan salah satu kode pemulihan Anda.",
 		"verify": "Verifikasi",

@@ -113,28 +113,34 @@ export async function totpCode(secret: string, atMs = Date.now()): Promise<strin
 	return hotp(decodeBase32(secret), counter);
 }
 
+type TotpOptions = { window?: number; atMs?: number };
+
 /**
+ * The time step `code` belongs to, or null when it matches none.
+ *
  * Accepts the neighbouring steps too, so a phone clock that drifts by a few
  * seconds still works. One step either side is the usual tolerance — wider
- * windows meaningfully weaken a 6-digit code.
+ * windows meaningfully weaken a 6-digit code. Callers that sign someone in
+ * must refuse a step at or below the last one they accepted, or the same code
+ * works again for the rest of the window.
  */
-export async function verifyTotp(
+export async function matchTotpStep(
 	secret: string,
 	code: string,
-	{ window = 1, atMs = Date.now() }: { window?: number; atMs?: number } = {}
-): Promise<boolean> {
+	{ window = 1, atMs = Date.now() }: TotpOptions = {}
+): Promise<number | null> {
 	const cleaned = code.replace(/\s/g, '');
-	if (!/^\d{6}$/.test(cleaned)) return false;
+	if (!/^\d{6}$/.test(cleaned)) return null;
 
 	let secretBytes: Uint8Array;
 	try {
 		secretBytes = decodeBase32(secret);
 	} catch {
-		return false;
+		return null;
 	}
 
 	const counter = Math.floor(atMs / 1000 / PERIOD_SECONDS);
-	let matched = false;
+	let matched: number | null = null;
 
 	// Every candidate is checked even after a hit, so the time taken does not
 	// reveal which step matched.
@@ -144,10 +150,14 @@ export async function verifyTotp(
 		for (let i = 0; i < candidate.length; i++) {
 			diff |= candidate.charCodeAt(i) ^ cleaned.charCodeAt(i % cleaned.length);
 		}
-		if (diff === 0) matched = true;
+		if (diff === 0) matched = counter + offset;
 	}
 
 	return matched;
+}
+
+export async function verifyTotp(secret: string, code: string, options: TotpOptions = {}): Promise<boolean> {
+	return (await matchTotpStep(secret, code, options)) !== null;
 }
 
 /** The URI an authenticator app scans. Label carries issuer twice by convention. */
