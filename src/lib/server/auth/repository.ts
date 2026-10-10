@@ -298,7 +298,7 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 					`SELECT u.id, u.email, u.name, u.is_admin, u.must_change_password, u.created_at, u.email_signature
 					 FROM sessions s
 					 JOIN users u ON u.id = s.user_id
-					 WHERE s.token_hash = ? AND s.expires_at > datetime('now')`
+					 WHERE s.token_hash = ? AND datetime(s.expires_at) > datetime('now')`
 				)
 				.bind(tokenHash)
 				.first<UserRow>();
@@ -368,7 +368,7 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 			const row = await db
 				.prepare(
 					`SELECT id FROM account_tokens
-					  WHERE user_id = ? AND kind = ? AND used_at IS NULL AND created_at > ?`
+					  WHERE user_id = ? AND kind = ? AND used_at IS NULL AND datetime(created_at) > datetime(?)`
 				)
 				.bind(userId, kind, cutoff)
 				.first<{ id: string }>();
