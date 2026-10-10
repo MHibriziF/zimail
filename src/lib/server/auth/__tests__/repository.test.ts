@@ -187,7 +187,7 @@ function setup(seed: Partial<UserRow>[] = []) {
 			t.used_at = 'used';
 			return [t];
 		}
-		if (sql.includes('FROM account_tokens') && sql.includes('created_at > ?')) {
+		if (sql.includes('FROM account_tokens') && sql.includes('datetime(created_at) > datetime(?)')) {
 			const [userId, kind, cutoff] = args as [string, string, string];
 			return accountTokens.filter((t) => t.user_id === userId && t.kind === kind && t.used_at === null && t.created_at > cutoff);
 		}
