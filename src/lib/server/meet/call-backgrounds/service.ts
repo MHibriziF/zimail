@@ -1,5 +1,8 @@
 import { MAX_CALL_BACKGROUND_BYTES, MAX_CALL_BACKGROUNDS_PER_USER } from '../../constants';
 import type { CallBackgroundMeta, CallBackgroundsRepository, StoredCallBackground } from './repository';
+import { baseContentType } from '$lib/utils/attachments';
+
+const BACKGROUND_TYPES: ReadonlySet<string> = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 export type CallBackgroundsService = {
 	list(userId: string): Promise<CallBackgroundMeta[]>;
@@ -31,8 +34,9 @@ export function createCallBackgroundsService(deps: { repo: CallBackgroundsReposi
 		readBytes: (background) => repo.readBytes(background.storage_key),
 
 		async create(userId, input) {
-			if (!input.type.startsWith('image/')) {
-				throw new Error('Backgrounds must be an image');
+			const contentType = baseContentType(input.type);
+			if (!BACKGROUND_TYPES.has(contentType)) {
+				throw new Error('Backgrounds must be a PNG, JPEG, WebP or GIF image');
 			}
 			if (input.bytes.byteLength > MAX_CALL_BACKGROUND_BYTES) {
 				const limitMb = MAX_CALL_BACKGROUND_BYTES / (1024 * 1024);
@@ -46,7 +50,7 @@ export function createCallBackgroundsService(deps: { repo: CallBackgroundsReposi
 				id,
 				userId,
 				storageKey: buildStorageKey(userId, id, input.filename),
-				contentType: input.type,
+				contentType,
 				sizeBytes: input.bytes.byteLength,
 				bytes: input.bytes,
 				filename: input.filename

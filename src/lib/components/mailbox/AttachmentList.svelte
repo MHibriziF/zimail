@@ -4,7 +4,7 @@
 	import {
 		attachmentHref,
 		attachmentIcon,
-		isImageType,
+		isInlineImageType,
 		isPreviewableInline
 	} from '$lib/utils/attachments';
 	import type { EmailAttachmentMeta } from '$lib/types';
@@ -32,7 +32,7 @@
 
 		<div class="attachments-grid">
 			{#each attachments as file (file.id)}
-				{#if isImageType(file.content_type)}
+				{#if isInlineImageType(file.content_type)}
 					<figure class="attachment-image">
 						<a
 							href={attachmentHref(emailId, file.id)}

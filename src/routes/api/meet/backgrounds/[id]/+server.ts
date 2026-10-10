@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getCallBackgroundsService } from '$lib/server/meet/call-backgrounds';
+import { storedFileHeaders } from '$lib/server/file-response';
 
 export const GET: RequestHandler = async ({ params, locals, platform }) => {
 	if (!locals.user || !platform?.env.DB || !platform?.env.ATTACHMENTS) {
@@ -14,15 +15,12 @@ export const GET: RequestHandler = async ({ params, locals, platform }) => {
 	const bytes = await backgrounds.readBytes(background);
 	if (!bytes) throw error(404, 'Background not found');
 
-	const body = new Uint8Array(bytes);
-
-	return new Response(body, {
-		headers: {
-			'Content-Type': background.content_type,
-			'Content-Disposition': 'inline',
-			'Content-Length': String(bytes.length),
-			'Cache-Control': 'private, max-age=86400'
-		}
+	return new Response(new Uint8Array(bytes), {
+		headers: storedFileHeaders({
+			contentType: background.content_type,
+			size: bytes.length,
+			cacheControl: 'private, max-age=86400'
+		})
 	});
 };
 

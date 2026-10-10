@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getAttachmentForUser, readAttachmentBytes } from '$lib/server/attachments';
-import { isPreviewableInline } from '$lib/utils/attachments';
+import { storedFileHeaders } from '$lib/server/file-response';
 
 export const GET: RequestHandler = async ({ params, locals, platform, url }) => {
 	if (!locals.user || !platform?.env.DB || !platform?.env.ATTACHMENTS) {
@@ -24,17 +24,13 @@ export const GET: RequestHandler = async ({ params, locals, platform, url }) => 
 		throw error(404, 'Attachment not found');
 	}
 
-	const forceDownload = url.searchParams.get('download') === '1';
-	const inline = !forceDownload && isPreviewableInline(attachment.content_type);
-
-	const body = new Uint8Array(bytes);
-
-	return new Response(body, {
-		headers: {
-			'Content-Type': attachment.content_type,
-			'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(attachment.filename)}"`,
-			'Content-Length': String(bytes.length),
-			'Cache-Control': 'private, max-age=3600'
-		}
+	return new Response(new Uint8Array(bytes), {
+		headers: storedFileHeaders({
+			contentType: attachment.content_type,
+			size: bytes.length,
+			cacheControl: 'private, max-age=3600',
+			filename: attachment.filename,
+			allowInline: url.searchParams.get('download') !== '1'
+		})
 	});
 };

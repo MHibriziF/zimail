@@ -1,5 +1,5 @@
 import type { EmailAttachmentMeta } from '$lib/types';
-import { attachmentHref } from './attachments';
+import { attachmentHref, isInlineImageType } from './attachments';
 
 /**
  * Inline images arrive as `<img src="cid:ii_123@mail">` — a reference to a MIME
@@ -23,8 +23,20 @@ function bare(value: string): string {
 	return text.replace(/^<|>$/g, '').trim().toLowerCase();
 }
 
+// Only an image the server serves inline can stand in for a cid reference. An
+// SVG or any other type is served as a download, so it stays a chip instead.
 function isImage(attachment: EmailAttachmentMeta): boolean {
-	return attachment.content_type.toLowerCase().startsWith('image/');
+	return isInlineImageType(attachment.content_type);
+}
+
+function imagesByContentId(attachments: EmailAttachmentMeta[]): Map<string, EmailAttachmentMeta> {
+	const byContentId = new Map<string, EmailAttachmentMeta>();
+	for (const attachment of attachments) {
+		if (attachment.content_id && isImage(attachment)) {
+			byContentId.set(bare(attachment.content_id), attachment);
+		}
+	}
+	return byContentId;
 }
 
 /**
@@ -36,6 +48,13 @@ function soleImageFallback(
 	html: string,
 	attachments: EmailAttachmentMeta[]
 ): EmailAttachmentMeta | null {
+	// Only mail stored before the Content-ID column existed may be paired by
+	// guesswork. Once any part carries one, an unmatched reference is a genuine
+	// miss — a quoted `cid:` from a forwarded original, say — and substituting
+	// the one image that happens to be attached would show the wrong picture
+	// with nothing to give it away.
+	if (attachments.some((attachment) => attachment.content_id)) return null;
+
 	const referenced = new Set<string>();
 	for (const match of html.matchAll(CID_REFERENCE)) referenced.add(bare(match[1]));
 	if (referenced.size !== 1) return null;
@@ -66,12 +85,8 @@ export function inlineAttachmentIds(
 	const ids = new Set<string>();
 	if (!html?.toLowerCase().includes('cid:')) return ids;
 
-	const byContentId = new Map<string, EmailAttachmentMeta>();
-	for (const attachment of attachments) {
-		if (attachment.content_id) byContentId.set(bare(attachment.content_id), attachment);
-	}
-
-	const fallback = byContentId.size === 0 ? soleImageFallback(html, attachments) : null;
+	const byContentId = imagesByContentId(attachments);
+	const fallback = soleImageFallback(html, attachments);
 
 	for (const match of html.matchAll(CID_REFERENCE)) {
 		const resolved = byContentId.get(bare(match[1])) ?? fallback;
@@ -89,17 +104,8 @@ export function resolveInlineImages(
 	if (!html) return '';
 	if (!html.toLowerCase().includes('cid:')) return html;
 
-	const byContentId = new Map<string, EmailAttachmentMeta>();
-	for (const attachment of attachments) {
-		if (attachment.content_id) byContentId.set(bare(attachment.content_id), attachment);
-	}
-
-	// Only mail stored before the Content-ID column existed may be paired by
-	// guesswork. Once any part carries one, an unmatched reference is a genuine
-	// miss — a quoted `cid:` from a forwarded original, say — and substituting
-	// the one image that happens to be attached would show the wrong picture
-	// with nothing to give it away.
-	const fallback = byContentId.size === 0 ? soleImageFallback(html, attachments) : null;
+	const byContentId = imagesByContentId(attachments);
+	const fallback = soleImageFallback(html, attachments);
 
 	return html.replace(CID_REFERENCE, (whole, reference: string) => {
 		const match = byContentId.get(bare(reference)) ?? fallback;

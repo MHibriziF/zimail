@@ -122,4 +122,11 @@ describe('visibleAttachments', () => {
 		const files = [attachment({ content_id: 'other' })];
 		assert.deepEqual(visibleAttachments(html, files), files);
 	});
+
+	test('leaves an SVG as a chip, since it is served as a download', () => {
+		const html = '<img src="cid:ii_123">';
+		const files = [attachment({ content_type: 'image/svg+xml', filename: 'logo.svg' })];
+		assert.equal(resolveInlineImages(html, 'mail-1', files), html);
+		assert.deepEqual(visibleAttachments(html, files), files);
+	});
 });

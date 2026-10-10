@@ -56,6 +56,23 @@ describe('create', () => {
 		);
 	});
 
+	test('rejects an image type outside the allowlist', async () => {
+		const { repo, rows } = fakeRepo();
+		const service = createCallBackgroundsService({ repo });
+		await assert.rejects(
+			service.create('user-1', { filename: 'a.svg', type: 'image/svg+xml', bytes: new Uint8Array(1) }),
+			/PNG, JPEG, WebP or GIF/
+		);
+		assert.equal(rows.length, 0);
+	});
+
+	test('stores the normalized type', async () => {
+		const { repo } = fakeRepo();
+		const service = createCallBackgroundsService({ repo });
+		const saved = await service.create('user-1', { filename: 'a.jpg', type: 'IMAGE/JPEG; x=1', bytes: new Uint8Array(1) });
+		assert.equal(saved.content_type, 'image/jpeg');
+	});
+
 	test('rejects an oversized upload', async () => {
 		const { repo } = fakeRepo();
 		const service = createCallBackgroundsService({ repo });
