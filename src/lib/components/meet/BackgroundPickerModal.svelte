@@ -222,7 +222,7 @@
 					<Icon name={uploading ? 'loader-4-line' : 'upload-2-line'} size={16} class={uploading ? 'bgp-spin' : ''} />
 				</button>
 			</div>
-			<input type="file" accept="image/*" hidden bind:this={fileInput} onchange={handleFile} />
+			<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden bind:this={fileInput} onchange={handleFile} />
 		</div>
 
 		<div class="bgp-actions">

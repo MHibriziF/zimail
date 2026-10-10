@@ -2,13 +2,37 @@ export function isImageType(contentType: string): boolean {
 	return contentType.startsWith('image/');
 }
 
+/**
+ * The only types a stored file may be served inline as, mapped to the exact
+ * Content-Type sent. Senders declare the type themselves, so anything a browser
+ * could run as a page (HTML, SVG, XML) is served as a download instead.
+ */
+const INLINE_CONTENT_TYPES: ReadonlyMap<string, string> = new Map([
+	['image/png', 'image/png'],
+	['image/jpeg', 'image/jpeg'],
+	['image/gif', 'image/gif'],
+	['image/webp', 'image/webp'],
+	['application/pdf', 'application/pdf'],
+	['text/plain', 'text/plain; charset=utf-8']
+]);
+
+/** Lower-cased media type with any parameters (`; charset=...`) removed. */
+export function baseContentType(contentType: string): string {
+	return contentType.split(';')[0].trim().toLowerCase();
+}
+
+/** The Content-Type to serve a file inline with, or null when it must be downloaded. */
+export function inlineContentType(contentType: string): string | null {
+	return INLINE_CONTENT_TYPES.get(baseContentType(contentType)) ?? null;
+}
+
 export function isPreviewableInline(contentType: string): boolean {
-	return (
-		isImageType(contentType) ||
-		contentType === 'application/pdf' ||
-		contentType.startsWith('text/') ||
-		contentType === 'application/json'
-	);
+	return inlineContentType(contentType) !== null;
+}
+
+/** An image the server serves inline, so an `<img>` pointing at it renders. */
+export function isInlineImageType(contentType: string): boolean {
+	return isPreviewableInline(contentType) && baseContentType(contentType).startsWith('image/');
 }
 
 /** An iCalendar part: an invitation, a cancellation, or an answer to one. */
