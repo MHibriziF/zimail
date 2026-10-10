@@ -19,7 +19,21 @@ function d1Over(db: DatabaseSync): D1Database {
 			run: async () => ({ success: true, meta: { changes: Number(db.prepare(sql).run(...args).changes) } })
 		};
 	}
-	return { prepare: (sql: string) => statement(sql, []) } as unknown as D1Database;
+	return {
+		prepare: (sql: string) => statement(sql, []),
+		batch: async (statements: Array<{ run: () => Promise<unknown> }>) => {
+			db.exec('BEGIN');
+			try {
+				const results = [];
+				for (const stmt of statements) results.push(await stmt.run());
+				db.exec('COMMIT');
+				return results;
+			} catch (error) {
+				db.exec('ROLLBACK');
+				throw error;
+			}
+		}
+	} as unknown as D1Database;
 }
 
 const POLICY: LockPolicy = { threshold: 10, baseLockMs: 60_000, maxLockMs: 3_600_000 };
@@ -70,6 +84,14 @@ describe('AuthRepository — login throttle (SQLite)', () => {
 		const gate = await repo.readLoginGate('u1');
 		assert.equal(gate?.failedLogins, 0);
 		assert.equal(gate?.lockedUntil, null);
+	});
+
+	test('cutting sessions on a password change also lifts the lock', async () => {
+		const { repo } = setup();
+		for (let i = 0; i < 10; i++) await repo.recordLoginFailure('u1', 1, NOW, POLICY);
+		await repo.cutSessionsAndTokens('u1');
+		assert.equal((await repo.findLoginAccount('ada@example.com'))?.lockedUntil, null);
+		assert.equal((await repo.readLoginGate('u1'))?.failedLogins, 0);
 	});
 
 	test('a TOTP step can be claimed once, and never an older one after it', async () => {

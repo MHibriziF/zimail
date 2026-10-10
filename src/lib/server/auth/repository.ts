@@ -83,7 +83,10 @@ export type AuthRepository = {
 	listUsers(): Promise<User[]>;
 	insertUser(user: NewUser): Promise<void>;
 	updatePasswordHash(userId: string, passwordHash: string): Promise<boolean>;
-	/** Password rotation must cut off every login path, including long-lived keys. */
+	/**
+	 * Password rotation must cut off every login path, including long-lived keys.
+	 * It also lifts any sign-in lock, so a reset gets a locked-out owner back in.
+	 */
 	cutSessionsAndTokens(userId: string): Promise<void>;
 	updateName(userId: string, name: string): Promise<boolean>;
 	promoteAdmin(userId: string): Promise<void>;
@@ -153,6 +156,8 @@ export type AuthRepository = {
 	setLocale(userId: string, locale: string): Promise<void>;
 };
 
+const CLEAR_LOGIN_FAILURES_SQL = 'UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?';
+
 export function createD1AuthRepository(db: D1Database): AuthRepository {
 	return {
 		async countUsers() {
@@ -216,7 +221,8 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 		async cutSessionsAndTokens(userId) {
 			await db.batch([
 				db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
-				db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId)
+				db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId),
+				db.prepare(CLEAR_LOGIN_FAILURES_SQL).bind(userId)
 			]);
 		},
 
@@ -588,7 +594,7 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 		},
 
 		async clearLoginFailures(userId) {
-			await db.prepare('UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?').bind(userId).run();
+			await db.prepare(CLEAR_LOGIN_FAILURES_SQL).bind(userId).run();
 		},
 
 		async claimTotpStep(userId, step) {
