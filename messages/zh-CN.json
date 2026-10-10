@@ -88,6 +88,7 @@
 		"password": "密码",
 		"signingIn": "正在登录…",
 		"loginFailed": "登录失败",
+		"tooManyAttempts": "登录尝试次数过多，请在 {minutes} 分钟后重试。",
 		"twoFactorLabel": "验证器代码",
 		"recoveryHint": "或输入你的某个恢复码。",
 		"verify": "验证",

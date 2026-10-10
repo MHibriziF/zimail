@@ -33,6 +33,11 @@
 			});
 			const data = await res.json();
 			if (!res.ok) {
+				if (res.status === 429) {
+					const minutes = Math.max(1, Math.ceil((Number(data.retryAfterSeconds) || 60) / 60));
+					error = t('auth.tooManyAttempts', { minutes });
+					return;
+				}
 				// The password was right — the form just grows a second field.
 				if (data.requiresTwoFactor) {
 					needsCode = true;

@@ -160,6 +160,9 @@ function setup(seed: Partial<UserRow>[] = []) {
 			return [];
 		}
 		if (sql === 'DELETE FROM api_tokens WHERE user_id = ?') return [];
+		if (sql === 'UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?') {
+			return users.filter((u) => u.id === args[0]);
+		}
 
 		if (sql.includes('recovery_email, recovery_email_pending, recovery_email_verified_at FROM users')) {
 			return users.filter((u) => u.id === args[0]);
