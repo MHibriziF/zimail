@@ -311,8 +311,9 @@ function remoteAttribute(lower: string, name: string): boolean {
 function remoteStyleUrl(lower: string): boolean {
 	let at = lower.indexOf('url(');
 	while (at !== -1) {
-		const value = lower.slice(at + 4, at + 4 + 24).trim().replace(/^["']/, '');
-		if (REMOTE_URL.test(value)) return true;
+		const close = lower.indexOf(')', at + 4);
+		const value = lower.slice(at + 4, close === -1 ? at + 256 : close);
+		if (REMOTE_URL.test(value.trim().replace(/^["']/, '').trim())) return true;
 		at = lower.indexOf('url(', at + 4);
 	}
 	return false;
@@ -399,12 +400,12 @@ function skipComment(lower: string, at: number): number {
 	return close === -1 ? -1 : close + 3;
 }
 
-const BOGUS_COMMENT_OPENERS = ['!', '?', '/'];
+const BOGUS_COMMENT_OPENERS = new Set(['!', '?', '/']);
 
 /** Past a `<` that opens no tag: a comment, a bogus comment (`<!…>`, `<?…>`, `</ …>`), or plain text. */
 function skipNonTag(lower: string, at: number): number {
 	if (lower.startsWith('<!--', at)) return skipComment(lower, at);
-	if (!BOGUS_COMMENT_OPENERS.includes(lower[at + 1])) return at + 1;
+	if (!BOGUS_COMMENT_OPENERS.has(lower[at + 1])) return at + 1;
 	const end = lower.indexOf('>', at);
 	return end === -1 ? -1 : end + 1;
 }

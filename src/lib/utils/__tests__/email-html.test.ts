@@ -187,7 +187,8 @@ describe('hasRemoteContent', () => {
 			'<td background="https://cdn.test/bg.jpg">',
 			'<video poster="https://cdn.test/poster.jpg"></video>',
 			'<div style="background-image: url(\'https://cdn.test/bg.png\')">',
-			'<style>.hero { background: url( https://cdn.test/hero.png ) }</style>'
+			'<style>.hero { background: url( https://cdn.test/hero.png ) }</style>',
+			`<div style="background: url(        '   https://cdn.test/spaced.png')">`
 		]) {
 			assert.equal(hasRemoteContent(html), true, html);
 		}
