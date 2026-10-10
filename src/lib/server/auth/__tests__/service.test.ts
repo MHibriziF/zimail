@@ -81,6 +81,8 @@ function fakeRepo(overrides: Partial<AuthRepository> = {}) {
 		},
 		async cutSessionsAndTokens(userId) {
 			for (const [hash, uid] of sessions) if (uid === userId) sessions.delete(hash);
+			const row = throttle.get(userId);
+			if (row) Object.assign(row, { failedLogins: 0, lockedUntil: null });
 		},
 		async updateName(userId, name) {
 			const u = users.get(userId);
@@ -536,6 +538,15 @@ describe('login throttling', () => {
 
 		clock.ms += 30_000;
 		assert.equal((await service.login('ada@example.com', 'correct-password', await totpCode(secret, clock.ms))).ok, true);
+	});
+
+	test('setting a new password (reset or admin) lifts the lock', async () => {
+		const { service } = await setup();
+		await failPasswords(service, 10);
+		assert.equal(((await service.login('ada@example.com', 'correct-password')) as { reason: string }).reason, 'locked');
+
+		await service.setUserPassword('user-1', 'brand-new-password');
+		assert.equal((await service.login('ada@example.com', 'brand-new-password')).ok, true);
 	});
 
 	test('an unknown email is refused without touching the throttle', async () => {
