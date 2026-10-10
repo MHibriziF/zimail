@@ -390,6 +390,8 @@
 		"showQuoted": "Afficher le texte cité",
 		"showOriginalColours": "Afficher les couleurs d’origine",
 		"showDarkColours": "Afficher en couleurs sombres",
+		"imagesHidden": "Les images sont masquées pour protéger votre vie privée.",
+		"showImages": "Afficher les images",
 		"emptyMessage": "Message vide",
 		"messageContent": "Contenu du message",
 		"didNotReach": "Ce message n’est pas parvenu au destinataire.",

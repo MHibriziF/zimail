@@ -390,6 +390,8 @@
 		"showQuoted": "显示引用文字",
 		"showOriginalColours": "显示原始颜色",
 		"showDarkColours": "以深色显示",
+		"imagesHidden": "为保护您的隐私，图片已隐藏。",
+		"showImages": "显示图片",
 		"emptyMessage": "空邮件",
 		"messageContent": "邮件内容",
 		"didNotReach": "此邮件未能送达收件人。",

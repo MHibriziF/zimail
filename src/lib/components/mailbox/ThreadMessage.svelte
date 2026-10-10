@@ -7,6 +7,7 @@
 	import InvitationCard from './InvitationCard.svelte';
 	import { isCalendarAttachment } from '$lib/utils/attachments';
 	import { resolveInlineImages, visibleAttachments } from '$lib/utils/inline-images';
+	import { hasRemoteContent } from '$lib/utils/email-html';
 	import { formatFullDate, formatRelativeDate } from '$lib/utils/date';
 	import { page } from '$app/stores';
 	import { splitQuotedText } from '$lib/utils/quotes';
@@ -37,6 +38,9 @@
 	const snippet = $derived(text.body.replace(/\s+/g, ' ').trim().slice(0, 140));
 
 	let quoteOpen = $state(false);
+	/** For this view only; reopening the thread hides them again. */
+	let showImages = $state(false);
+	const remoteBlocked = $derived(!showImages && hasRemoteContent(message.body_html ?? ''));
 	let copied = $state(false);
 	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -136,7 +140,17 @@
 
 		<div class="body mail-body">
 			{#if message.body_html}
-				<EmailBody html={resolveInlineImages(message.body_html, message.id, message.attachments)} />
+				{#if remoteBlocked}
+					<div class="images-bar" role="status">
+						<Icon name="image-line" size={14} />
+						<span>{t('thread.imagesHidden')}</span>
+						<button type="button" onclick={() => (showImages = true)}>{t('thread.showImages')}</button>
+					</div>
+				{/if}
+				<EmailBody
+					html={resolveInlineImages(message.body_html, message.id, message.attachments)}
+					remote={showImages}
+				/>
 			{:else if text.body}
 				<p class="whitespace-pre-wrap">{text.body}</p>
 				{#if text.quoted}
@@ -314,6 +328,29 @@
 	.body {
 		margin-top: 1rem;
 		font-size: 0.9375rem;
+	}
+
+	.images-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.375rem 0.5rem;
+		margin-bottom: 0.75rem;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+		background: var(--color-surface-muted);
+	}
+
+	.images-bar button {
+		font-weight: 500;
+		color: var(--color-accent-text);
+	}
+
+	.images-bar button:hover {
+		text-decoration: underline;
+		text-underline-offset: 0.15em;
 	}
 
 	.empty {

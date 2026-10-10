@@ -227,19 +227,91 @@ function isFullDocument(html: string): boolean {
 	return /<html[\s>]/i.test(html) || /<body[\s>]/i.test(html);
 }
 
+/** Where inline `cid:` images are served from once resolveInlineImages has pointed them at their attachment. */
+const INLINE_IMAGE_PATH = '/api/mail/';
+
+export type EmailDocumentOptions = {
+	rich: boolean;
+	theme?: string;
+	original?: boolean;
+	/** The reader asked to see this message's remote images. */
+	remote?: boolean;
+	/** The app's origin, so inline images can be allowed by path rather than all of it. */
+	origin?: string;
+};
+
 /**
  * The frame is already scriptless by sandbox; this closes off the rest —
  * subresources, embedded frames, form posts. It goes in ahead of anything the
  * sender wrote, because a policy only governs what follows it.
  *
+ * Remote images stay blocked until the reader asks: a tracking pixel or a CSS
+ * background tells its sender when the message was opened, and from where.
+ * Inline images are the message's own attachments, served by the app.
+ *
  * Fonts are denied along with everything else, so a message using a hosted
  * webface falls back to the stack below rather than announcing the open to
  * whoever hosts it.
  */
-const CSP =
-	"default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; " +
-	"font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; " +
-	"form-action 'none'; base-uri 'none'";
+export function emailCsp(options: Pick<EmailDocumentOptions, 'remote' | 'origin'> = {}): string {
+	const inline = options.origin ? `${options.origin}${INLINE_IMAGE_PATH}` : "'self'";
+	const remote = options.remote ? ' https: http:' : '';
+	return (
+		`default-src 'none'; img-src data: ${inline}${remote}; style-src 'unsafe-inline'; ` +
+		"font-src 'none'; media-src 'none'; frame-src 'none'; object-src 'none'; " +
+		"form-action 'none'; base-uri 'none'"
+	);
+}
+
+/** Attributes that load an image the moment the message is shown. */
+const LOADING_ATTRIBUTES = ['src', 'srcset', 'background', 'poster'];
+
+const REMOTE_URL = /^(?:https?:)?\/\//i;
+
+function isAttributeStart(lower: string, at: number): boolean {
+	return at === 0 || /[\s"'/]/.test(lower[at - 1]);
+}
+
+function remoteAttribute(lower: string, name: string): boolean {
+	let at = lower.indexOf(name);
+	while (at !== -1) {
+		let equals = at + name.length;
+		while (equals < lower.length && /\s/.test(lower[equals])) equals += 1;
+		let next = at + name.length;
+		if (lower[equals] === '=' && isAttributeStart(lower, at)) {
+			let start = equals + 1;
+			while (start < lower.length && /\s/.test(lower[start])) start += 1;
+			const end = valueEnd(lower, start);
+			const quoted = lower[start] === '"' || lower[start] === "'";
+			const value = lower.slice(quoted ? start + 1 : start, end);
+			const urls = name === 'srcset' ? value.split(',') : [value];
+			if (urls.some((url) => REMOTE_URL.test(url.trim()))) return true;
+			next = Math.max(end, start);
+		}
+		at = lower.indexOf(name, next);
+	}
+	return false;
+}
+
+function remoteStyleUrl(lower: string): boolean {
+	let at = lower.indexOf('url(');
+	while (at !== -1) {
+		const value = lower.slice(at + 4, at + 4 + 24).trim().replace(/^["']/, '');
+		if (REMOTE_URL.test(value)) return true;
+		at = lower.indexOf('url(', at + 4);
+	}
+	return false;
+}
+
+/**
+ * Would the message load anything from elsewhere if allowed to? Decides whether
+ * the reader is offered "Show images" at all. A miss only means no offer — the
+ * policy still blocks it — so this errs towards being simple.
+ */
+export function hasRemoteContent(html: string): boolean {
+	const lower = html.toLowerCase();
+	return LOADING_ATTRIBUTES.some((name) => remoteAttribute(lower, name)) || remoteStyleUrl(lower);
+}
 
 /** A styled message's fallbacks; a plain one gets none, since everything it needs comes last. */
 function pageCss(html: string, adapted: boolean): string {
@@ -247,9 +319,9 @@ function pageCss(html: string, adapted: boolean): string {
 	return adapted ? ADAPTED_PAGE_CSS : LIGHT_PAGE_CSS;
 }
 
-function headStart(html: string, rich: boolean, adapted: boolean): string {
-	const defaults = rich ? `<style>${STYLED_DEFAULTS_CSS}${pageCss(html, adapted)}</style>` : '';
-	return `<meta http-equiv="Content-Security-Policy" content="${CSP}">
+function headStart(html: string, options: EmailDocumentOptions, adapted: boolean): string {
+	const defaults = options.rich ? `<style>${STYLED_DEFAULTS_CSS}${pageCss(html, adapted)}</style>` : '';
+	return `<meta http-equiv="Content-Security-Policy" content="${emailCsp(options)}">
 <meta name="referrer" content="no-referrer">${defaults}`;
 }
 
@@ -373,13 +445,10 @@ export function adaptsToDark(html: string, options: { rich: boolean; theme?: str
 	return options.rich && options.theme === 'dark' && !options.original && !supportsDarkScheme(html);
 }
 
-export function buildEmailDocument(
-	html: string,
-	options: { rich: boolean; theme?: string; original?: boolean }
-): string {
+export function buildEmailDocument(html: string, options: EmailDocumentOptions): string {
 	const theme = options.theme ?? 'light';
 	const adapted = adaptsToDark(html, options);
-	const before = headStart(html, options.rich, adapted);
+	const before = headStart(html, options, adapted);
 	const after = headEnd(options.rich);
 	const body = adapted ? adaptDarkColours(html) : html;
 

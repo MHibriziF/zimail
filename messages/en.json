@@ -390,6 +390,8 @@
 		"showQuoted": "Show quoted text",
 		"showOriginalColours": "Show original colours",
 		"showDarkColours": "Show in dark colours",
+		"imagesHidden": "Images are hidden to protect your privacy.",
+		"showImages": "Show images",
 		"emptyMessage": "Empty message",
 		"messageContent": "Message content",
 		"didNotReach": "This message didn't reach the recipient.",

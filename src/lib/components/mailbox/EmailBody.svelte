@@ -5,7 +5,8 @@
 	import { canFoldQuotes, foldQuotedHtml } from '$lib/utils/quotes';
 	import { t } from '$lib/i18n';
 
-	let { html }: { html: string } = $props();
+	/** `remote`: the reader asked to see this message's remote images. The control for it lives with each theme. */
+	let { html, remote = false }: { html: string; remote?: boolean } = $props();
 
 	const rich = $derived(isRichHtml(html));
 	/** In dark mode, the reader asked for this message's own light colours instead of the recoloured ones. */
@@ -30,7 +31,9 @@
 	 * cost a reload to correct, and nothing about a scriptless frame benefits
 	 * from it: the frame is invisible until measured from out here.
 	 */
-	const srcdoc = $derived(browser ? buildEmailDocument(html, { rich, theme, original }) : '');
+	const srcdoc = $derived(
+		browser ? buildEmailDocument(html, { rich, theme, original, remote, origin: location.origin }) : ''
+	);
 
 	let mounted = $state(false);
 	let frame = $state<HTMLIFrameElement | null>(null);

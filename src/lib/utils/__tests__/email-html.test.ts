@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { buildEmailDocument, isRichHtml, supportsDarkScheme } from '../email-html';
+import { buildEmailDocument, emailCsp, hasRemoteContent, isRichHtml, supportsDarkScheme } from '../email-html';
 
 describe('isRichHtml: did the sender style it?', () => {
 	test('plain writing is not styled', () => {
@@ -145,6 +145,72 @@ describe('buildEmailDocument: the policy cannot be displaced', () => {
 		const doc = buildEmailDocument('<html><head><style>p{}</style><!-- unterminated', { rich: true });
 		policyFirst(doc);
 		assert.ok(doc.includes('.quote-hidden'));
+	});
+});
+
+describe('emailCsp: remote images wait for the reader', () => {
+	const imgSrc = (policy: string) => /img-src ([^;]*);/.exec(policy)?.[1];
+
+	test('by default only data: and the app’s inline attachments load', () => {
+		assert.equal(imgSrc(emailCsp({ origin: 'https://mail.test' })), 'data: https://mail.test/api/mail/');
+		assert.equal(imgSrc(emailCsp()), "data: 'self'");
+	});
+
+	test('showing images allows remote ones for that document only', () => {
+		assert.equal(imgSrc(emailCsp({ origin: 'https://mail.test', remote: true })), 'data: https://mail.test/api/mail/ https: http:');
+	});
+
+	test('everything else stays shut either way', () => {
+		for (const remote of [false, true]) {
+			const policy = emailCsp({ remote });
+			for (const rule of ["default-src 'none'", "font-src 'none'", "frame-src 'none'", "form-action 'none'", "base-uri 'none'"]) {
+				assert.ok(policy.includes(rule), rule);
+			}
+		}
+	});
+
+	test('the document carries the policy it was asked for', () => {
+		const html = '<p><img src="https://track.test/p.png"></p>';
+		assert.ok(!buildEmailDocument(html, { rich: false, origin: 'https://mail.test' }).includes('https: http:'));
+		assert.ok(buildEmailDocument(html, { rich: false, origin: 'https://mail.test', remote: true }).includes('https: http:'));
+	});
+});
+
+describe('hasRemoteContent', () => {
+	test('images, backgrounds and CSS urls from elsewhere count', () => {
+		for (const html of [
+			'<img src="https://track.test/p.png" width="1" height="1">',
+			"<img alt='x' src='http://track.test/p.gif'>",
+			'<img SRC=https://cdn.test/a.png>',
+			'<img src = "//cdn.test/a.png">',
+			'<img src="/api/mail/1/attachments/2" srcset="/a.png 1x, https://cdn.test/b.png 2x">',
+			'<td background="https://cdn.test/bg.jpg">',
+			'<video poster="https://cdn.test/poster.jpg"></video>',
+			'<div style="background-image: url(\'https://cdn.test/bg.png\')">',
+			'<style>.hero { background: url( https://cdn.test/hero.png ) }</style>'
+		]) {
+			assert.equal(hasRemoteContent(html), true, html);
+		}
+	});
+
+	test('links, inline images and data URIs do not', () => {
+		for (const html of [
+			'<p>See <a href="https://example.test">our site</a></p>',
+			'<img src="/api/mail/1/attachments/2">',
+			'<img src="cid:logo@mail">',
+			'<img src="data:image/png;base64,iVBORw0KGgo=">',
+			'<img data-src="https://cdn.test/lazy.png">',
+			'<a href="https://example.test"><img src="/api/mail/1/attachments/2"></a>',
+			'<div style="background: url(data:image/png;base64,AAAA)">'
+		]) {
+			assert.equal(hasRemoteContent(html), false, html);
+		}
+	});
+
+	test('a long message is judged quickly', () => {
+		const started = performance.now();
+		hasRemoteContent(`<p>${'src= url( srcset= '.repeat(20_000)}</p>`);
+		assert.ok(performance.now() - started < 200);
 	});
 });
 
