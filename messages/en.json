@@ -88,6 +88,7 @@
 		"password": "Password",
 		"signingIn": "Signing in…",
 		"loginFailed": "Login failed",
+		"tooManyAttempts": "Too many sign-in attempts. Try again in {minutes} min.",
 		"twoFactorLabel": "Authenticator code",
 		"recoveryHint": "Or enter one of your recovery codes.",
 		"verify": "Verify",

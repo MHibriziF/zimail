@@ -45,6 +45,29 @@ export type TwoFactorStatusRow = {
 	enabledAt: string | null;
 };
 
+export type LoginAccount = {
+	user: User;
+	passwordHash: string;
+	/** Epoch ms. */
+	lockedUntil: number | null;
+};
+
+/** What the second half of a sign-in needs, read fresh after the password check. */
+export type LoginGateRow = {
+	failedLogins: number;
+	lockedUntil: number | null;
+	totpSecret: string | null;
+	totpEnabled: boolean;
+	totpLastStep: number | null;
+};
+
+export type LockPolicy = {
+	/** Failure weight at which the account locks. */
+	threshold: number;
+	baseLockMs: number;
+	maxLockMs: number;
+};
+
 /**
  * Raw D1 (+ R2, for the user-delete cascade) access for identity: users,
  * sessions, account_tokens, totp_backup_codes. No business rules — see
@@ -60,7 +83,10 @@ export type AuthRepository = {
 	listUsers(): Promise<User[]>;
 	insertUser(user: NewUser): Promise<void>;
 	updatePasswordHash(userId: string, passwordHash: string): Promise<boolean>;
-	/** Password rotation must cut off every login path, including long-lived keys. */
+	/**
+	 * Password rotation must cut off every login path, including long-lived keys.
+	 * It also lifts any sign-in lock, so a reset gets a locked-out owner back in.
+	 */
 	cutSessionsAndTokens(userId: string): Promise<void>;
 	updateName(userId: string, name: string): Promise<boolean>;
 	promoteAdmin(userId: string): Promise<void>;
@@ -110,6 +136,18 @@ export type AuthRepository = {
 	findBackupCodeByHash(userId: string, codeHash: string): Promise<{ id: string } | null>;
 	markBackupCodeUsed(id: string): Promise<boolean>;
 
+	findLoginAccount(email: string): Promise<LoginAccount | null>;
+	readLoginGate(userId: string): Promise<LoginGateRow | null>;
+	/**
+	 * Adds `weight` to the failure count and, once it reaches the threshold,
+	 * locks for `baseLockMs` doubled per failure past it, capped at `maxLockMs`.
+	 * One UPDATE, so concurrent failures cannot lose a count. Returns the lock.
+	 */
+	recordLoginFailure(userId: string, weight: number, nowMs: number, policy: LockPolicy): Promise<number | null>;
+	clearLoginFailures(userId: string): Promise<void>;
+	/** Stores `step` only if it is newer than the last accepted one. False means a replay. */
+	claimTotpStep(userId: string, step: number): Promise<boolean>;
+
 	getEmailSignature(userId: string): Promise<string>;
 	setEmailSignature(userId: string, value: string): Promise<void>;
 	getUiTheme(userId: string): Promise<string | null>;
@@ -117,6 +155,8 @@ export type AuthRepository = {
 	getLocale(userId: string): Promise<string | null>;
 	setLocale(userId: string, locale: string): Promise<void>;
 };
+
+const CLEAR_LOGIN_FAILURES_SQL = 'UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?';
 
 export function createD1AuthRepository(db: D1Database): AuthRepository {
 	return {
@@ -181,7 +221,8 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 		async cutSessionsAndTokens(userId) {
 			await db.batch([
 				db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId),
-				db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId)
+				db.prepare('DELETE FROM api_tokens WHERE user_id = ?').bind(userId),
+				db.prepare(CLEAR_LOGIN_FAILURES_SQL).bind(userId)
 			]);
 		},
 
@@ -494,6 +535,74 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 			const result = await db
 				.prepare("UPDATE totp_backup_codes SET used_at = datetime('now') WHERE id = ? AND used_at IS NULL")
 				.bind(id)
+				.run();
+			return (result.meta.changes ?? 0) === 1;
+		},
+
+		async findLoginAccount(email) {
+			const row = await db
+				.prepare(
+					`SELECT id, email, name, is_admin, must_change_password, created_at, password_hash, locked_until
+					   FROM users WHERE email = ?`
+				)
+				.bind(email.toLowerCase())
+				.first<UserRow & { password_hash: string; locked_until: number | null }>();
+			if (!row) return null;
+			return { user: mapUser(row), passwordHash: row.password_hash, lockedUntil: row.locked_until };
+		},
+
+		async readLoginGate(userId) {
+			const row = await db
+				.prepare(
+					'SELECT failed_logins, locked_until, totp_secret, totp_enabled, totp_last_step FROM users WHERE id = ?'
+				)
+				.bind(userId)
+				.first<{
+					failed_logins: number;
+					locked_until: number | null;
+					totp_secret: string | null;
+					totp_enabled: number;
+					totp_last_step: number | null;
+				}>();
+			if (!row) return null;
+			return {
+				failedLogins: row.failed_logins,
+				lockedUntil: row.locked_until,
+				totpSecret: row.totp_secret,
+				totpEnabled: row.totp_enabled === 1,
+				totpLastStep: row.totp_last_step
+			};
+		},
+
+		async recordLoginFailure(userId, weight, nowMs, policy) {
+			// Right-hand sides read the row as it was, so `failed_logins + ?2` is the new count.
+			const row = await db
+				.prepare(
+					`UPDATE users
+					    SET failed_logins = failed_logins + ?2,
+					        locked_until = CASE
+					          WHEN failed_logins + ?2 >= ?3
+					          THEN ?4 + min(?6, ?5 << min(failed_logins + ?2 - ?3, 30))
+					          ELSE locked_until
+					        END
+					  WHERE id = ?1
+					RETURNING locked_until`
+				)
+				.bind(userId, weight, policy.threshold, nowMs, policy.baseLockMs, policy.maxLockMs)
+				.first<{ locked_until: number | null }>();
+			return row?.locked_until ?? null;
+		},
+
+		async clearLoginFailures(userId) {
+			await db.prepare(CLEAR_LOGIN_FAILURES_SQL).bind(userId).run();
+		},
+
+		async claimTotpStep(userId, step) {
+			const result = await db
+				.prepare(
+					'UPDATE users SET totp_last_step = ?2 WHERE id = ?1 AND (totp_last_step IS NULL OR totp_last_step < ?2)'
+				)
+				.bind(userId, step)
 				.run();
 			return (result.meta.changes ?? 0) === 1;
 		},

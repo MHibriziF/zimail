@@ -88,6 +88,7 @@
 		"password": "Mot de passe",
 		"signingIn": "Connexion…",
 		"loginFailed": "Échec de la connexion",
+		"tooManyAttempts": "Trop de tentatives de connexion. Réessayez dans {minutes} min.",
 		"twoFactorLabel": "Code d’authentification",
 		"recoveryHint": "Ou saisissez l’un de vos codes de récupération.",
 		"verify": "Vérifier",
