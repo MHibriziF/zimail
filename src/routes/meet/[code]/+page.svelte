@@ -89,7 +89,12 @@
 		};
 	});
 
-	onDestroy(stopWaiting);
+	/** A check still in flight when the page goes must not start another one. */
+	let destroyed = false;
+	onDestroy(() => {
+		destroyed = true;
+		stopWaiting();
+	});
 
 	function attachPreview(stream: MediaStream) {
 		previewStream = stream;
@@ -247,6 +252,7 @@
 				waitingForHost?: boolean;
 				error?: string;
 			};
+			if (destroyed) return;
 			if (body.waitingForHost) {
 				waitingForHost = true;
 				hostRetry = setTimeout(() => void requestJoin(), HOST_RETRY_MS);
@@ -275,6 +281,7 @@
 			};
 		} catch {
 			// A dropped check while waiting for the host just tries again; otherwise say so.
+			if (destroyed) return;
 			if (waitingForHost) hostRetry = setTimeout(() => void requestJoin(), HOST_RETRY_MS);
 			else error = t('common.networkError');
 		} finally {
@@ -318,6 +325,7 @@
 				// A dropped poll just retries on the next tick — the request stays pending either way.
 			}
 		};
+		if (destroyed) return;
 		void check();
 		pollTimer = setInterval(() => void check(), 3000);
 	}
