@@ -409,7 +409,7 @@
 	/>
 {:else}
 	<div class="auth-shell">
-		<div class="auth-card">
+		<div class="auth-card" class:meet-lobby={data.code && !left && !waitingDenied}>
 			<div class="auth-brand">
 				{#if waiting && !left}
 					<div class="wait-mark" aria-hidden="true">
@@ -685,6 +685,39 @@
 		align-items: center;
 		gap: 0.75rem;
 		margin-top: 1.5rem;
+	}
+
+	@media (min-width: 56rem) {
+		.auth-card.meet-lobby {
+			display: grid;
+			grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+			grid-template-areas: 'preview brand' 'preview form';
+			grid-template-rows: auto 1fr;
+			column-gap: 2.5rem;
+			max-width: 64rem;
+			padding: 2.5rem;
+		}
+
+		.meet-lobby .auth-brand {
+			grid-area: brand;
+			align-self: end;
+		}
+
+		.meet-lobby .lobby-preview {
+			grid-area: preview;
+			align-self: center;
+			margin-top: 0;
+		}
+
+		.meet-lobby .lobby-video {
+			aspect-ratio: 16 / 9;
+		}
+
+		.meet-lobby > form,
+		.meet-lobby > .wait-panel {
+			grid-area: form;
+			align-self: start;
+		}
 	}
 
 	.lobby-video {
