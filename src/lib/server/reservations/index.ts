@@ -2,7 +2,7 @@ import { createD1CalendarRepository } from '../calendar/repository';
 import { calendarFeedsServiceForDb } from '../calendar-feeds';
 import { getEmailProvider } from '../context';
 import { getMeetingsService } from '../meet/meetings';
-import { renderEmailHtml, renderEmailText } from '../outbound/email-template';
+import { emailLogoAttachment, renderEmailHtml, renderEmailText } from '../outbound/email-template';
 import { calendarAttachment, defaultSender } from '../outbound/calendar-mail';
 import { sendOutboundEmail } from '../outbound/send-mail';
 import { bookingEmailContent, bookingIcs, bookingMethod, bookingRecipients, type BookingDetails, type InviteKind } from './email';
@@ -82,7 +82,7 @@ export function getReservationsService(platform: App.Platform | undefined | null
 				subject: content.title,
 				text: renderEmailText(content),
 				html: renderEmailHtml(content),
-				attachments: [calendarAttachment(bookingIcs(booking, kind), bookingMethod(kind))]
+				attachments: [calendarAttachment(bookingIcs(booking, kind), bookingMethod(kind)), emailLogoAttachment()]
 			});
 		}
 	});

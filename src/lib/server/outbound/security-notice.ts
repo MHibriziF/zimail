@@ -3,7 +3,7 @@ import type { MailAddress, User } from '$lib/types';
 import { APP_NAME } from '$lib/constants';
 import { listAddressesForUser } from '../domains';
 import { sendOutboundEmail } from './send-mail';
-import { renderEmailHtml, renderEmailText, type EmailContent } from './email-template';
+import { emailLogoAttachment, renderEmailHtml, renderEmailText, type EmailContent } from './email-template';
 import type { EmailProvider } from '../email-provider';
 
 export type SecurityEvent =
@@ -100,7 +100,8 @@ export async function notifySecurityEvent(
 			to,
 			subject: `${APP_NAME}: ${COPY[event].subject}`,
 			text: renderEmailText(content),
-			html: renderEmailHtml(content)
+			html: renderEmailHtml(content),
+			attachments: [emailLogoAttachment()]
 		});
 	} catch {
 		// Deliberately swallowed — see the doc comment.
@@ -134,7 +135,8 @@ export async function sendPasswordResetLink(
 		to,
 		subject: `${APP_NAME}: reset your password`,
 		text: renderEmailText(content),
-		html: renderEmailHtml(content)
+		html: renderEmailHtml(content),
+		attachments: [emailLogoAttachment()]
 	});
 }
 
@@ -163,6 +165,7 @@ export async function sendRecoveryVerification(
 		to,
 		subject: `${APP_NAME}: confirm your recovery address`,
 		text: renderEmailText(content),
-		html: renderEmailHtml(content)
+		html: renderEmailHtml(content),
+		attachments: [emailLogoAttachment()]
 	});
 }
