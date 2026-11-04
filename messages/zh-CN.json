@@ -1113,6 +1113,8 @@
 		"earlier": "更早",
 		"later": "更晚",
 		"noneThisWeek": "本周没有空闲时间——试试下一周。",
+		"noneThisMonth": "本月没有可预约的时间，请看看下个月。",
+		"timeZone": "时区",
 		"noneLeft": "已没有空闲时间。",
 		"couldNotLoad": "无法加载可用时间。",
 		"couldNotBook": "无法预约该时间。",

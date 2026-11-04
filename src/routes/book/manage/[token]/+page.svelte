@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { t } from '$lib/i18n';
 	import { DEFAULT_LOCALE, intlLocale } from '$lib/i18n/locales';
@@ -14,7 +15,7 @@
 	const booking = $derived(data.booking);
 
 	const locale = $derived(intlLocale($page.data.locale ?? DEFAULT_LOCALE));
-	const guestZone = $derived(browser ? detectTimeZone() : booking.timeZone);
+	let guestZone = $state(browser ? detectTimeZone() : untrack(() => booking.timeZone));
 	const fullFormat = $derived(
 		new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: guestZone })
 	);
@@ -125,9 +126,8 @@
 						bind:this={picker}
 						bind:chosen
 						url="/api/book/manage/{encodeURIComponent(data.token)}"
-						pageZone={booking.timeZone}
 						endDate={booking.endDate}
-						{guestZone}
+						bind:guestZone
 						{locale}
 					/>
 					<dialog

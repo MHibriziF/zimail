@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { t } from '$lib/i18n';
 	import { DEFAULT_LOCALE, intlLocale } from '$lib/i18n/locales';
@@ -18,7 +19,7 @@
 
 	const locale = $derived(intlLocale($page.data.locale ?? DEFAULT_LOCALE));
 	// Guests read times in their own zone; the page's zone only decides which hours exist.
-	const guestZone = $derived(browser ? detectTimeZone() : reservation.timeZone);
+	let guestZone = $state(browser ? detectTimeZone() : untrack(() => reservation.timeZone));
 	const fullFormat = $derived(
 		new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeStyle: 'short', timeZone: guestZone })
 	);
@@ -101,7 +102,6 @@
 			<h1>{reservation.title}</h1>
 			<p class="book-meta">
 				<span><Icon name="time-line" size={15} />{t('book.minutes', { count: reservation.slotMinutes })}</span>
-				<span><Icon name="global-line" size={15} />{t('book.timesIn', { zone: guestZone })}</span>
 				{#if reservation.location}
 					<span><Icon name="map-pin-line" size={15} />{reservation.location}</span>
 				{/if}
@@ -135,9 +135,9 @@
 				bind:this={picker}
 				bind:chosen
 				url="/api/book/{encodeURIComponent(reservation.slug)}"
-				pageZone={reservation.timeZone}
+				startDate={reservation.startDate}
 				endDate={reservation.endDate}
-				{guestZone}
+				bind:guestZone
 				{locale}
 			/>
 

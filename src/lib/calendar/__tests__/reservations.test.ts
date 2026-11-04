@@ -5,6 +5,9 @@ import {
 	isValidSlug,
 	MAX_COLLABORATORS,
 	MAX_PAGE_LOCATION_LENGTH,
+	MAX_SLOT_DAYS,
+	SLOT_DAYS_PER_REQUEST,
+	slotDays,
 	minutesToTime,
 	slugify,
 	timeToMinutes,
@@ -42,6 +45,14 @@ const page: ReservationPageSettings = {
 	roomSettings: null
 };
 const now = new Date('2026-09-24T00:00:00.000Z');
+
+describe('slotDays', () => {
+	test('reads ?days=, clamped, with a week for anything unreadable', () => {
+		assert.equal(slotDays('33'), 33);
+		assert.equal(slotDays('999'), MAX_SLOT_DAYS);
+		for (const junk of [null, '', '0', '-3', '2.5', 'month']) assert.equal(slotDays(junk), SLOT_DAYS_PER_REQUEST);
+	});
+});
 
 describe('validatePageSettings collaborators', () => {
 	test('are lowercased and deduplicated, and default to none', () => {

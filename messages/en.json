@@ -1113,6 +1113,8 @@
 		"earlier": "Earlier",
 		"later": "Later",
 		"noneThisWeek": "No open times this week — try the next one.",
+		"noneThisMonth": "No open times this month — try the next one.",
+		"timeZone": "Time zone",
 		"noneLeft": "There are no open times left.",
 		"couldNotLoad": "Could not load the available times.",
 		"couldNotBook": "Could not book that time.",
