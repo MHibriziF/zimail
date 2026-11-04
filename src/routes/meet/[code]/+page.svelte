@@ -51,6 +51,22 @@
 		return `${day}, ${time.formatRange(start, end)}`;
 	});
 	let now = $state(Date.now());
+	/** Either wait: for the host to start, or for them to let this guest in. */
+	const waiting = $derived(!!waitingAdmissionId || waitingForHost);
+	let waitingSince = $state(0);
+	const waitedFor = $derived.by(() => {
+		const seconds = Math.max(0, Math.floor((now - waitingSince) / 1000));
+		return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+	});
+
+	// The lobby's clock only needs minutes; the waiting screen counts seconds.
+	$effect(() => {
+		if (!waiting) return;
+		waitingSince = Date.now();
+		now = waitingSince;
+		const tick = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(tick);
+	});
 	const scheduleRelative = $derived.by(() => {
 		if (!data.schedule) return '';
 		const start = new Date(data.schedule.start).getTime();
@@ -231,6 +247,7 @@
 		hostRetry = null;
 		joining = true;
 		error = '';
+		const epoch = waitEpoch;
 
 		const displayName = name.trim() || t('meet.guest');
 
@@ -252,7 +269,7 @@
 				waitingForHost?: boolean;
 				error?: string;
 			};
-			if (destroyed) return;
+			if (destroyed || epoch !== waitEpoch) return;
 			if (body.waitingForHost) {
 				waitingForHost = true;
 				hostRetry = setTimeout(() => void requestJoin(), HOST_RETRY_MS);
@@ -281,7 +298,7 @@
 			};
 		} catch {
 			// A dropped check while waiting for the host just tries again; otherwise say so.
-			if (destroyed) return;
+			if (destroyed || epoch !== waitEpoch) return;
 			if (waitingForHost) hostRetry = setTimeout(() => void requestJoin(), HOST_RETRY_MS);
 			else error = t('common.networkError');
 		} finally {
@@ -291,6 +308,7 @@
 
 	/** Polls until the host admits or denies this request — see join/[code]/admission/[admissionId]. */
 	function pollAdmission(admissionId: string, displayName: string) {
+		const epoch = waitEpoch;
 		const check = async () => {
 			try {
 				const response = await fetch(
@@ -305,6 +323,7 @@
 					captions?: boolean;
 					captionToken?: string;
 				};
+				if (destroyed || epoch !== waitEpoch) return;
 				if (body.status === 'admitted' && body.url && body.token && body.roomName) {
 					stopWaiting();
 					stopPreview();
@@ -329,6 +348,16 @@
 		void check();
 		pollTimer = setInterval(() => void check(), 3000);
 	}
+
+	/** Back to the lobby. A request the host hasn't answered stays on their list until they do. */
+	function leaveWaiting() {
+		waitEpoch++;
+		stopWaiting();
+		waitingForHost = false;
+	}
+
+	/** Bumped when the guest stops waiting, so a check already in flight is ignored. */
+	let waitEpoch = 0;
 
 	function stopWaiting() {
 		if (pollTimer) clearInterval(pollTimer);
@@ -382,8 +411,19 @@
 	<div class="auth-shell">
 		<div class="auth-card">
 			<div class="auth-brand">
-				<div class="brand-icon"><Logo size={48} /></div>
-				<h1>{left ? t('meet.leftTitle') : t('meet.title', { app: APP_NAME })}</h1>
+				{#if waiting && !left}
+					<div class="wait-mark" aria-hidden="true">
+						<span class="wait-ring"></span>
+						<span class="wait-ring wait-ring-late"></span>
+						<Logo size={44} />
+					</div>
+					<h1>{waitingForHost ? t('meet.waitingStartTitle') : t('meet.waitingAdmissionTitle')}</h1>
+					<p class="wait-lead" role="status">{waitingForHost ? t('meet.waitingForHostStart') : t('meet.waitingForHost')}</p>
+					<span class="wait-timer">{t('meet.waitingFor', { time: waitedFor })}</span>
+				{:else}
+					<div class="brand-icon"><Logo size={48} /></div>
+					<h1>{left ? t('meet.leftTitle') : t('meet.title', { app: APP_NAME })}</h1>
+				{/if}
 				{#if scheduleText && !left}
 					<p class="meet-schedule">
 						<Icon name="calendar-line" size={15} />
@@ -483,6 +523,13 @@
 					/>
 				{/if}
 
+				{#if waiting}
+					<!-- The host is deciding on the name they were shown, so it stays fixed while waiting. -->
+					<div class="wait-panel">
+						<span class="wait-as">{t('meet.joiningAs', { name: name.trim() || t('meet.guest') })}</span>
+						<button type="button" class="btn-secondary" onclick={leaveWaiting}>{t('meet.stopWaiting')}</button>
+					</div>
+				{:else}
 				<form class="mt-8 space-y-4" onsubmit={join}>
 					<div>
 						<label for="name" class="text-sm text-[var(--color-text-secondary)]">
@@ -496,7 +543,6 @@
 							placeholder={t('meet.namePlaceholder')}
 							autocomplete="name"
 							class="auth-input"
-							disabled={!!waitingAdmissionId || waitingForHost}
 						/>
 					</div>
 
@@ -504,17 +550,11 @@
 						<p class="text-sm text-[var(--color-danger)]">{error}</p>
 					{/if}
 
-					{#if waitingAdmissionId}
-						<!-- The host is deciding on the name they were shown, so only that stays fixed while waiting. -->
-						<p class="note" role="status">{t('meet.waitingForHost')}</p>
-					{:else if waitingForHost}
-						<p class="note" role="status">{t('meet.waitingForHostStart')}</p>
-					{:else}
-						<button type="submit" disabled={joining} class="btn-primary mt-2 w-full py-2.5">
-							{joining ? t('meet.joining') : t('meet.join')}
-						</button>
-					{/if}
+					<button type="submit" disabled={joining} class="btn-primary mt-2 w-full py-2.5">
+						{joining ? t('meet.joining') : t('meet.join')}
+					</button>
 				</form>
+				{/if}
 			{/if}
 		</div>
 	</div>
@@ -533,6 +573,86 @@
 		margin-bottom: 1rem;
 		border-radius: 0.75rem;
 		box-shadow: var(--shadow-sm);
+	}
+
+	.wait-mark {
+		position: relative;
+		display: grid;
+		place-items: center;
+		width: 5.5rem;
+		height: 5.5rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.wait-ring {
+		position: absolute;
+		inset: 0;
+		border-radius: 999px;
+		background: var(--color-accent);
+		opacity: 0;
+		animation: wait-pulse 2.4s ease-out infinite;
+	}
+
+	.wait-ring-late {
+		animation-delay: 1.2s;
+	}
+
+	.wait-mark :global(img) {
+		position: relative;
+	}
+
+	@keyframes wait-pulse {
+		0% {
+			transform: scale(0.55);
+			opacity: 0.35;
+		}
+		100% {
+			transform: scale(1.15);
+			opacity: 0;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.wait-ring {
+			animation: none;
+			opacity: 0.15;
+		}
+	}
+
+	.wait-lead {
+		max-width: 22rem;
+		margin-top: 0.5rem;
+		font-size: 0.9375rem;
+		line-height: 1.5;
+		color: var(--color-text-secondary);
+	}
+
+	.wait-timer {
+		margin-top: 0.75rem;
+		padding: 0.25rem 0.625rem;
+		border-radius: 999px;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		color: var(--color-accent-text);
+		background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+	}
+
+	.wait-panel {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		margin-top: 2rem;
+		padding: 0.75rem 1rem;
+		border-radius: 0.75rem;
+		background: var(--color-surface-muted);
+	}
+
+	.wait-as {
+		font-size: 0.875rem;
+		color: var(--color-text-secondary);
 	}
 
 	.meet-schedule {
