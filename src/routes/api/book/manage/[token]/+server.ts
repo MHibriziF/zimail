@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getReservationsService, publicBaseUrl } from '$lib/server/reservations';
 import { guestChangeResponse } from '$lib/server/reservations/responses';
+import { slotDays } from '$lib/calendar/reservations';
 
 /**
  * Public: the guest's own link to their booking. The token in the path is the
@@ -10,7 +11,12 @@ import { guestChangeResponse } from '$lib/server/reservations/responses';
 export const GET: RequestHandler = async ({ params, url, platform }) => {
 	if (!platform?.env.DB) return json({ error: 'Unavailable' }, { status: 503 });
 
-	const days = await getReservationsService(platform).rescheduleSlots(params.token, url.searchParams.get('from'));
+	const { searchParams } = url;
+	const days = await getReservationsService(platform).rescheduleSlots(
+		params.token,
+		searchParams.get('from'),
+		slotDays(searchParams.get('days'))
+	);
 	if (!days) return guestChangeResponse({ type: 'not_found' });
 	return json({ days }, { headers: { 'Cache-Control': 'no-store' } });
 };

@@ -1113,6 +1113,8 @@
 		"earlier": "Sebelumnya",
 		"later": "Berikutnya",
 		"noneThisWeek": "Tidak ada waktu kosong minggu ini — coba minggu berikutnya.",
+		"noneThisMonth": "Tidak ada waktu kosong bulan ini — coba bulan berikutnya.",
+		"timeZone": "Zona waktu",
 		"noneLeft": "Tidak ada lagi waktu kosong.",
 		"couldNotLoad": "Tidak dapat memuat waktu yang tersedia.",
 		"couldNotBook": "Tidak dapat memesan waktu itu.",

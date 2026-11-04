@@ -1113,6 +1113,8 @@
 		"earlier": "Antes",
 		"later": "Después",
 		"noneThisWeek": "No hay horarios libres esta semana — prueba la siguiente.",
+		"noneThisMonth": "No hay horarios libres este mes; prueba el siguiente.",
+		"timeZone": "Zona horaria",
 		"noneLeft": "Ya no quedan horarios libres.",
 		"couldNotLoad": "No se pudieron cargar los horarios.",
 		"couldNotBook": "No se pudo reservar ese horario.",

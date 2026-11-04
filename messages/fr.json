@@ -1113,6 +1113,8 @@
 		"earlier": "Plus tôt",
 		"later": "Plus tard",
 		"noneThisWeek": "Aucun créneau libre cette semaine — essayez la suivante.",
+		"noneThisMonth": "Aucun créneau libre ce mois-ci — essayez le suivant.",
+		"timeZone": "Fuseau horaire",
 		"noneLeft": "Il n'y a plus de créneau libre.",
 		"couldNotLoad": "Impossible de charger les créneaux.",
 		"couldNotBook": "Impossible de réserver ce créneau.",

@@ -16,6 +16,21 @@ export function detectTimeZone(): string {
 	}
 }
 
+/**
+ * Every zone the browser knows, so the list is never out of date, plus `extra`
+ * (e.g. the detected zone, which can be an alias the list doesn't name).
+ * Older engines without the list get just `extra` and UTC.
+ */
+export function listTimeZones(extra: string[] = []): string[] {
+	let all: string[] = [];
+	try {
+		all = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
+	} catch {
+		// Older engines: only what can be named for certain.
+	}
+	return [...new Set([...(all.length ? all : ['UTC']), ...extra])];
+}
+
 export function isValidTimeZone(zone: string): boolean {
 	try {
 		new Intl.DateTimeFormat('en-US', { timeZone: zone });

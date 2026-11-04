@@ -6,6 +6,7 @@ import type { BookingDetails } from '../email';
 import type { NewBooking, ReservationsRepository, StoredPage } from '../repository';
 import { createReservationsService, MAX_UPCOMING_PER_GUEST, type RoomSchedule } from '../service';
 import type { RoomSettings } from '../../../meet/room-settings';
+import { MAX_SLOT_DAYS } from '../../../calendar/reservations';
 
 const NOW = new Date('2026-09-24T00:00:00.000Z');
 const BASE = 'https://mail.test';
@@ -319,6 +320,16 @@ describe('ReservationsService collaborators', () => {
 		assert.deepEqual(await service.create('owner', { ...body, collaborators: ['not an email'] }), {
 			type: 'invalid_collaborators'
 		});
+	});
+});
+
+describe('ReservationsService slot range', () => {
+	test('a week by default, more when asked, never past the cap', async () => {
+		const { service } = setup();
+		await service.create('owner', { ...body, endDate: '2026-12-31' });
+		assert.equal((await service.slots('office-hours', '2026-09-28'))?.length, 7);
+		assert.equal((await service.slots('office-hours', '2026-09-28', 33))?.length, 33);
+		assert.equal((await service.slots('office-hours', '2026-09-28', 400))?.length, MAX_SLOT_DAYS);
 	});
 });
 

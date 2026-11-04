@@ -3,7 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
-	import { detectTimeZone } from '$lib/timezone';
+	import { detectTimeZone, listTimeZones } from '$lib/timezone';
 
 	let { timeZone: initial }: { timeZone: string | null } = $props();
 
@@ -15,17 +15,7 @@
 
 	const detected = detectTimeZone();
 
-	/** Every zone the browser knows, so the list is never out of date. */
-	const zones = (() => {
-		try {
-			const all = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] })
-				.supportedValuesOf?.('timeZone');
-			if (all?.length) return all;
-		} catch {
-			// Older engines: fall back to what we can name for certain.
-		}
-		return [detected, 'UTC'].filter((zone, index, list) => list.indexOf(zone) === index);
-	})();
+	const zones = listTimeZones([detected]);
 
 	const example = $derived.by(() => {
 		const zone = choice || detected;

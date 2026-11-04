@@ -4,6 +4,7 @@ import {
 	guestChangeBlock,
 	MAX_GUEST_RESCHEDULES,
 	MAX_PAGES_PER_USER,
+	MAX_SLOT_DAYS,
 	SLOT_DAYS_PER_REQUEST,
 	slugify,
 	validateGuest,
@@ -71,7 +72,8 @@ export type ReservationsService = {
 	remove(userId: string, id: string): Promise<boolean>;
 	/** Active pages only; `null` otherwise, the same as a page that doesn't exist. */
 	publicPage(slug: string): Promise<PublicReservationPage | null>;
-	slots(slug: string, fromKey: string | null): Promise<DaySlots[] | null>;
+	/** `days` defaults to a week and is capped at MAX_SLOT_DAYS. */
+	slots(slug: string, fromKey: string | null, days?: number): Promise<DaySlots[] | null>;
 	/** `baseUrl` is this deployment's origin, for the meeting room's join link. */
 	book(slug: string, body: Record<string, unknown>, baseUrl: string): Promise<BookingOutcome>;
 	/**
@@ -88,7 +90,7 @@ export type ReservationsService = {
 	/** The booking behind a guest's link, as they see it; `null` for a link that matches none. */
 	managedBooking(token: string): Promise<ManagedBookingView | null>;
 	/** Free slots to move it to; its own current time is left out. */
-	rescheduleSlots(token: string, fromKey: string | null): Promise<DaySlots[] | null>;
+	rescheduleSlots(token: string, fromKey: string | null, days?: number): Promise<DaySlots[] | null>;
 	/** `baseUrl` is for the link in the updated invitation. */
 	rescheduleByGuest(token: string, body: Record<string, unknown>, baseUrl: string): Promise<GuestChangeOutcome>;
 	cancelByGuest(token: string): Promise<GuestChangeOutcome>;
@@ -198,13 +200,14 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 	}
 
 	/** A week of free slots from `fromKey`, clamped to today and the page's first day. */
-	async function slotsFor(page: StoredPage, fromKey: string | null, excluding?: string): Promise<DaySlots[]> {
+	async function slotsFor(page: StoredPage, fromKey: string | null, days: number, excluding?: string): Promise<DaySlots[]> {
 		const at = now();
 		const today = dateKeyIn(at, page.timeZone);
 		const requested = fromKey && /^\d{4}-\d{2}-\d{2}$/.test(fromKey) ? fromKey : today;
 		const start = [requested, today, page.startDate].sort((a, b) => a.localeCompare(b))[2];
-		const busy = await busyNear(page, start, SLOT_DAYS_PER_REQUEST, excluding);
-		return computeSlots(page, busy, { fromKey: start, days: SLOT_DAYS_PER_REQUEST, now: at });
+		const count = Math.min(Math.max(1, days), MAX_SLOT_DAYS);
+		const busy = await busyNear(page, start, count, excluding);
+		return computeSlots(page, busy, { fromKey: start, days: count, now: at });
 	}
 
 	const manageLink = (baseUrl: string, token: string) => new URL(`/book/manage/${token}`, baseUrl).href;
@@ -348,12 +351,12 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			};
 		},
 
-		async slots(slug, fromKey) {
+		async slots(slug, fromKey, days = SLOT_DAYS_PER_REQUEST) {
 			const page = await activePage(slug);
 			if (!page) return null;
 			// Not awaited: this visitor sees what is stored, and it is fresh a moment later.
 			refreshHost(page.userId);
-			return slotsFor(page, fromKey);
+			return slotsFor(page, fromKey, days);
 		},
 
 		async book(slug, body, baseUrl) {
@@ -472,11 +475,11 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			};
 		},
 
-		async rescheduleSlots(token, fromKey) {
+		async rescheduleSlots(token, fromKey, days = SLOT_DAYS_PER_REQUEST) {
 			const loaded = await loadManaged(token);
 			if (!loaded) return null;
-			const days = await slotsFor(loaded.page, fromKey, loaded.booking.eventId);
-			return days.map((day) => ({ ...day, slots: day.slots.filter((slot) => slot !== loaded.booking.start) }));
+			const found = await slotsFor(loaded.page, fromKey, days, loaded.booking.eventId);
+			return found.map((day) => ({ ...day, slots: day.slots.filter((slot) => slot !== loaded.booking.start) }));
 		},
 
 		async rescheduleByGuest(token, body, baseUrl) {

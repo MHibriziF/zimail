@@ -16,8 +16,16 @@ export const MAX_PAGE_LOCATION_LENGTH = 200;
 export const MAX_GUEST_NAME_LENGTH = 100;
 export const MAX_GUEST_NOTE_LENGTH = 1000;
 export const MAX_PAGES_PER_USER = 20;
-/** How many days of slots one public request returns. */
+/** How many days of slots one public request returns, unless it asks for more. */
 export const SLOT_DAYS_PER_REQUEST = 7;
+/** The most one request may ask for: a month seen from any time zone, with a day either side. */
+export const MAX_SLOT_DAYS = 42;
+
+/** A `?days=` value, clamped; anything unreadable is the default. */
+export function slotDays(value: string | null): number {
+	const days = Number(value);
+	return Number.isInteger(days) && days > 0 ? Math.min(days, MAX_SLOT_DAYS) : SLOT_DAYS_PER_REQUEST;
+}
 /** How close to the start a guest may still move or cancel, per page. */
 export const RESCHEDULE_CUTOFF_HOURS = [1, 4, 12, 24, 48, 72, 168] as const;
 export const DEFAULT_RESCHEDULE_CUTOFF_HOURS = 24;

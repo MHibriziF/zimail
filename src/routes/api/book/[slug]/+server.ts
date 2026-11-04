@@ -2,12 +2,14 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { getReservationsService, publicBaseUrl } from '$lib/server/reservations';
 import { bookingResponse } from '$lib/server/reservations/responses';
+import { slotDays } from '$lib/calendar/reservations';
 
-/** Public: a week of free slots from `?from=YYYY-MM-DD`. Busy time shows only as missing slots. */
+/** Public: free slots from `?from=YYYY-MM-DD`, a week unless `?days=` asks for more. Busy time shows only as missing slots. */
 export const GET: RequestHandler = async ({ params, url, platform }) => {
 	if (!platform?.env.DB) return json({ error: 'Unavailable' }, { status: 503 });
 
-	const days = await getReservationsService(platform).slots(params.slug, url.searchParams.get('from'));
+	const { searchParams } = url;
+	const days = await getReservationsService(platform).slots(params.slug, searchParams.get('from'), slotDays(searchParams.get('days')));
 	if (!days) return bookingResponse({ type: 'not_found' });
 	return json({ days }, { headers: { 'Cache-Control': 'no-store' } });
 };
