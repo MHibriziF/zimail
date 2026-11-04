@@ -775,6 +775,8 @@
 	},
 	"meet": {
 		"title": "Reunión — {app}",
+		"previewTitle": "Únete a la reunión en {app}",
+		"previewDescription": "Reuniones de video en tu navegador. No necesitas descargar nada ni crear una cuenta para unirte.",
 		"yourName": "Tu nombre",
 		"namePlaceholder": "Ingresa tu nombre",
 		"guest": "Invitado",

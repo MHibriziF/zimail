@@ -14,6 +14,9 @@ export type PreviewDefaults = {
 	siteName: string;
 	/** Title for a page that sets none, in place of the app name. */
 	fallbackTitle?: string;
+	/** Shown in link previews instead of the page's <title>. */
+	previewTitle?: string;
+	description?: string;
 };
 
 const escapeAttribute = (value: string) => value.replaceAll('"', '&quot;');
@@ -54,8 +57,13 @@ export function addPreviewTags(html: string, defaults: PreviewDefaults): string 
 	const has = (property: string) => head.includes(`property="${property}"`);
 
 	const tags: string[] = [];
-	const title = titleText(head);
+	const title = defaults.previewTitle ?? titleText(head);
 	if (!has('og:title') && title) tags.push(`<meta property="og:title" content="${escapeAttribute(title)}" />`);
+	if (!has('og:description') && defaults.description) {
+		const description = escapeAttribute(defaults.description);
+		tags.push(`<meta property="og:description" content="${description}" />`);
+		if (!head.includes('name="description"')) tags.push(`<meta name="description" content="${description}" />`);
+	}
 	if (!has('og:site_name')) tags.push(`<meta property="og:site_name" content="${escapeAttribute(defaults.siteName)}" />`);
 	if (!has('og:type')) tags.push('<meta property="og:type" content="website" />');
 	if (!has('og:image')) tags.push(`<meta property="og:image" content="${escapeAttribute(defaults.image)}" />`);
