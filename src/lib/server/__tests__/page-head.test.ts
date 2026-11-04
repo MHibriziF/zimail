@@ -54,6 +54,28 @@ describe('finishHead', () => {
 		assert.deepEqual(titles(html.slice(0, html.indexOf('</head>'))), ['Zimail']);
 	});
 
+	test('a preview title and description replace the tab title in link previews only', () => {
+		const html = finishHead(page(''), {
+			...defaults,
+			fallbackTitle: 'Meeting — Zimail',
+			previewTitle: 'Join the meeting on Zimail',
+			description: 'Video meetings in your "browser".'
+		});
+		assert.deepEqual(titles(html), ['Meeting — Zimail']);
+		assert.equal(meta(html, 'og:title'), 'Join the meeting on Zimail');
+		assert.equal(meta(html, 'og:description'), 'Video meetings in your &quot;browser&quot;.');
+		assert.match(html, /name="description" content="Video meetings/);
+	});
+
+	test('a description the page set itself is not replaced', () => {
+		const html = finishHead(page('<title>Book</title><meta property="og:description" content="Pick a time" />'), {
+			...defaults,
+			description: 'Default'
+		});
+		assert.equal(html.match(/property="og:description"/g)?.length, 1);
+		assert.equal(meta(html, 'og:description'), 'Pick a time');
+	});
+
 	test('a chunk without the head is passed through untouched', () => {
 		assert.equal(finishHead('<div>body chunk</div>', defaults), '<div>body chunk</div>');
 	});

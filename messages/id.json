@@ -775,6 +775,8 @@
 	},
 	"meet": {
 		"title": "Rapat — {app}",
+		"previewTitle": "Bergabung ke rapat di {app}",
+		"previewDescription": "Rapat video langsung dari browser. Tanpa perlu mengunduh aplikasi atau membuat akun.",
 		"yourName": "Nama Anda",
 		"namePlaceholder": "Masukkan nama Anda",
 		"guest": "Tamu",

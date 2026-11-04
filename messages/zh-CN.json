@@ -775,6 +775,8 @@
 	},
 	"meet": {
 		"title": "会议 — {app}",
+		"previewTitle": "在 {app} 加入会议",
+		"previewDescription": "在浏览器中进行视频会议，无需下载或注册账号即可加入。",
 		"yourName": "你的姓名",
 		"namePlaceholder": "输入你的姓名",
 		"guest": "访客",

@@ -38,11 +38,15 @@ function jsonError(error: string, status: number): Response {
 function render(event: RequestEvent, resolve: Resolve): ReturnType<Handle> {
 	const uiTheme = event.locals.uiTheme || DEFAULT_UI_THEME;
 	const locale = event.locals.locale || DEFAULT_LOCALE;
+	// The meeting page renders only in the browser, so the server can't see its title.
+	// Like Meet and Zoom, its preview names the app but never the meeting, which a shared chat would leak.
+	const meeting = event.url.pathname.startsWith('/meet/');
 	const preview = {
 		image: new URL('/icons/icon-512.png', event.url.origin).href,
 		siteName: APP_NAME,
-		// The meeting page renders only in the browser, so the server can't see its title.
-		fallbackTitle: event.url.pathname.startsWith('/meet/') ? translate(locale, 'meet.title', { app: APP_NAME }) : undefined
+		fallbackTitle: meeting ? translate(locale, 'meet.title', { app: APP_NAME }) : undefined,
+		previewTitle: meeting ? translate(locale, 'meet.previewTitle', { app: APP_NAME }) : undefined,
+		description: meeting ? translate(locale, 'meet.previewDescription') : undefined
 	};
 	return resolve(event, {
 		transformPageChunk: ({ html }) =>

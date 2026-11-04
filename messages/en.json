@@ -775,6 +775,8 @@
 	},
 	"meet": {
 		"title": "Meeting — {app}",
+		"previewTitle": "Join the meeting on {app}",
+		"previewDescription": "Video meetings in your browser. No download or account needed to join.",
 		"yourName": "Your name",
 		"namePlaceholder": "Enter your name",
 		"guest": "Guest",
