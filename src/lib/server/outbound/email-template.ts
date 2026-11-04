@@ -1,4 +1,6 @@
 import { APP_NAME } from '$lib/constants';
+import type { OutboundAttachmentInput } from '$lib/types';
+import { EMAIL_LOGO_PNG } from './email-logo';
 import { escapeHtml } from './send-mail';
 
 /**
@@ -21,6 +23,17 @@ const PAGE = '#f4f6f4';
 const LINE = '#e6e9e6';
 const FONT =
 	"-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif";
+
+const LOGO_CID = 'zimail-logo';
+
+/**
+ * The header logo travels with the message as an inline part, so it shows even
+ * where remote images are held back until asked, Zimail's own reader included.
+ * Every message rendered with `renderEmailHtml` should carry it.
+ */
+export function emailLogoAttachment(): OutboundAttachmentInput {
+	return { filename: 'zimail.png', type: 'image/png', content: EMAIL_LOGO_PNG, disposition: 'inline', contentId: LOGO_CID };
+}
 
 export type EmailDetail = { label: string; value: string };
 
@@ -76,7 +89,7 @@ export function renderEmailHtml(content: EmailContent): string {
           <td style="padding:28px 28px 0 28px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td style="width:26px;height:26px;background:${SAGE};border-radius:8px;"></td>
+                <td style="width:26px;height:26px;"><img src="cid:${LOGO_CID}" width="26" height="26" alt="" style="display:block;width:26px;height:26px;border:0;border-radius:7px;"></td>
                 <td style="padding-left:10px;font:700 14px/1 ${FONT};color:${INK};letter-spacing:-0.01em;">${escapeHtml(APP_NAME)}</td>
               </tr>
             </table>

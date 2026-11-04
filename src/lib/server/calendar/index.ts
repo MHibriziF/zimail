@@ -1,7 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { getEmailProvider } from '../context';
 import type { EmailProvider } from '../email-provider';
-import { renderEmailHtml, renderEmailText } from '../outbound/email-template';
+import { emailLogoAttachment, renderEmailHtml, renderEmailText } from '../outbound/email-template';
 import { calendarAttachment, defaultSender, userTimeZone } from '../outbound/calendar-mail';
 import { sendOutboundEmail } from '../outbound/send-mail';
 import { ownEventUid } from '../invitations/answers';
@@ -66,7 +66,7 @@ async function emailGuests(
 				subject: content.title,
 				text: renderEmailText(content),
 				html: renderEmailHtml(content),
-				attachments: [attachment]
+				attachments: [attachment, emailLogoAttachment()]
 			})
 		)
 	);

@@ -6,7 +6,7 @@ import { createD1CalendarRepository } from '../calendar/repository';
 import { getEmailProvider } from '../context';
 import { listAddressesForUser } from '../domains';
 import type { EmailProvider } from '../email-provider';
-import { renderEmailHtml, renderEmailText, type EmailContent } from '../outbound/email-template';
+import { emailLogoAttachment, renderEmailHtml, renderEmailText, type EmailContent } from '../outbound/email-template';
 import { calendarAttachment, senderFor, userTimeZone } from '../outbound/calendar-mail';
 import { sendOutboundEmail } from '../outbound/send-mail';
 import { getReservationsService } from '../reservations';
@@ -84,7 +84,7 @@ async function sendCalendarMail(db: D1Database, provider: EmailProvider, userId:
 		subject: mail.subject,
 		text: renderEmailText(mail.content),
 		html: renderEmailHtml(mail.content),
-		attachments: [calendarAttachment(ics, mail.method)]
+		attachments: [calendarAttachment(ics, mail.method), emailLogoAttachment()]
 	});
 }
 
