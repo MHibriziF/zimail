@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { expandCalendar } from '../../../calendar/ics';
 import { calendarAttachment } from '../../outbound/calendar-mail';
-import { bookingEmailContent, bookingIcs, bookingMethod, type BookingDetails } from '../email';
+import { bookingEmailContent, bookingIcs, bookingMethod, bookingRecipients, type BookingDetails } from '../email';
 
 const inviteContentType = (kind: Parameters<typeof bookingMethod>[0]) => calendarAttachment('', bookingMethod(kind)).type;
 
@@ -77,6 +77,25 @@ describe('calendar invitation', () => {
 	test('quotes in a name are dropped rather than breaking the parameter', () => {
 		const ics = bookingIcs({ ...details, guestName: 'Ana "the" Guest' }, 'request', now);
 		assert.match(ics.replaceAll('\r\n ', ''), /ATTENDEE;CN="Ana the Guest";/);
+	});
+});
+
+describe('collaborators', () => {
+	const shared = { ...details, collaborators: ['me@other.test', 'kim@example.com'] };
+
+	test('are on the same message and listed as attendees, like a shared invite', () => {
+		assert.deepEqual(bookingRecipients(shared), [details.guestEmail, 'me@other.test', 'kim@example.com']);
+		const ics = bookingIcs(shared).replaceAll('\r\n ', '');
+		assert.match(ics, /ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:me@other\.test/);
+		assert.match(ics, /mailto:kim@example\.com/);
+		const guests = bookingEmailContent(shared).details?.find((row) => row.label === 'Guests');
+		assert.equal(guests?.value, `${details.guestEmail}, me@other.test, kim@example.com`);
+	});
+
+	test('a booking without any is just the guest', () => {
+		assert.deepEqual(bookingRecipients(details), [details.guestEmail]);
+		assert.equal(bookingEmailContent(details).details?.some((row) => row.label === 'Guests'), false);
+		assert.equal(bookingIcs(details).match(/ATTENDEE/g)?.length, 1);
 	});
 });
 

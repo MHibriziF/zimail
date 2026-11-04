@@ -9,6 +9,7 @@ const PAGE_ERRORS: Record<Exclude<PageWriteOutcome['type'], 'ok'>, [string, numb
 	invalid_hours: ['The daily hours must fit at least one slot.', 400],
 	invalid_weekdays: ['Pick at least one day of the week.', 400],
 	invalid_cutoff: ['Pick when guests can still reschedule.', 400],
+	invalid_collaborators: ['Collaborators must be valid email addresses, 5 at most.', 400],
 	duplicate_slug: ['That link is already taken.', 409],
 	limit_reached: ['You have reached the maximum number of reservation pages.', 409],
 	not_found: ['Reservation page not found', 404]

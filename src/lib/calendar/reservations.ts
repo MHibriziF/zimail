@@ -22,6 +22,8 @@ export const RESCHEDULE_CUTOFF_HOURS = [1, 4, 12, 24, 48, 72, 168] as const;
 export const DEFAULT_RESCHEDULE_CUTOFF_HOURS = 24;
 /** Moves one booking can take from its guest, so a slot can't be shuffled forever. */
 export const MAX_GUEST_RESCHEDULES = 3;
+/** Addresses a page can invite to every booking, besides the guest. */
+export const MAX_COLLABORATORS = 5;
 
 const DAY_MS = 86_400_000;
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
@@ -48,9 +50,11 @@ export type ReservationPageSettings = {
 	withMeeting: boolean;
 	/** Guests may move or cancel until this many hours before the start. */
 	rescheduleCutoffHours: number;
+	/** Lowercase addresses invited to every booking with the guest. */
+	collaborators: string[];
 };
 
-export type ReservationPage = ReservationPageSettings & { id: string };
+export type ReservationPage =ReservationPageSettings & { id: string };
 
 /** What a guest sees: nothing about the owner's other events. */
 export type PublicReservationPage = Pick<
@@ -65,7 +69,8 @@ export type ReservationPageError =
 	| 'invalid_dates'
 	| 'invalid_hours'
 	| 'invalid_weekdays'
-	| 'invalid_cutoff';
+	| 'invalid_cutoff'
+	| 'invalid_collaborators';
 
 export type GuestInput = { name: string; email: string; note: string };
 
@@ -157,6 +162,19 @@ function checkWindow(input: Record<string, unknown>): ReservationPageError | nul
 	return hoursOk ? null : 'invalid_hours';
 }
 
+/** Lowercased and deduplicated; `null` when the list isn't a few valid addresses. Missing means none. */
+export function cleanCollaborators(input: unknown): string[] | null {
+	if (input === undefined || input === null) return [];
+	if (!Array.isArray(input)) return null;
+	const emails = new Set<string>();
+	for (const entry of input) {
+		const email = typeof entry === 'string' ? entry.trim().toLowerCase() : '';
+		if (!isPlausibleEmail(email)) return null;
+		emails.add(email);
+	}
+	return emails.size <= MAX_COLLABORATORS ? [...emails] : null;
+}
+
 /** Validates an untrusted body. `slug` may be blank; the server then derives one. */
 export function validatePageSettings(
 	input: Record<string, unknown>
@@ -185,6 +203,8 @@ export function validatePageSettings(
 	if (typeof rescheduleCutoffHours !== 'number' || !(RESCHEDULE_CUTOFF_HOURS as readonly number[]).includes(rescheduleCutoffHours)) {
 		return { ok: false, error: 'invalid_cutoff' };
 	}
+	const collaborators = cleanCollaborators(input.collaborators);
+	if (!collaborators) return { ok: false, error: 'invalid_collaborators' };
 	return {
 		ok: true,
 		value: {
@@ -203,7 +223,8 @@ export function validatePageSettings(
 			noticeMinutes: input.noticeMinutes as number,
 			active: input.active !== false,
 			withMeeting: input.withMeeting === true,
-			rescheduleCutoffHours: rescheduleCutoffHours as number
+			rescheduleCutoffHours: rescheduleCutoffHours as number,
+			collaborators
 		}
 	};
 }

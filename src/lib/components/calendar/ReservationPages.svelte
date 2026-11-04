@@ -8,6 +8,7 @@
 	import { addDays, dateKeyToUtc } from '$lib/calendar/events';
 	import { dateKeyIn } from '$lib/calendar/grid';
 	import {
+		MAX_COLLABORATORS,
 		MAX_PAGE_DESCRIPTION_LENGTH,
 		MAX_PAGE_LOCATION_LENGTH,
 		DEFAULT_RESCHEDULE_CUTOFF_HOURS,
@@ -21,7 +22,12 @@
 	} from '$lib/calendar/reservations';
 	import { deleteReservationPage, fetchReservationPages, saveReservationPage } from '$lib/calendar/client';
 
-	type Draft = Omit<ReservationPageSettings, 'dayStart' | 'dayEnd'> & { dayStart: string; dayEnd: string };
+	type Draft = Omit<ReservationPageSettings, 'dayStart' | 'dayEnd' | 'collaborators'> & {
+		dayStart: string;
+		dayEnd: string;
+		/** Comma- or space-separated, as typed. */
+		collaborators: string;
+	};
 
 	const BUFFERS = [0, 5, 10, 15, 30, 60];
 	const NOTICES = [0, 60, 240, 720, 1440, 2880];
@@ -82,7 +88,8 @@
 			noticeMinutes: 240,
 			active: true,
 			withMeeting: meetingsAvailable,
-			rescheduleCutoffHours: DEFAULT_RESCHEDULE_CUTOFF_HOURS
+			rescheduleCutoffHours: DEFAULT_RESCHEDULE_CUTOFF_HOURS,
+			collaborators: ''
 		};
 	}
 
@@ -94,7 +101,8 @@
 			description: existing.description ?? '',
 			location: existing.location ?? '',
 			dayStart: minutesToTime(existing.dayStart),
-			dayEnd: minutesToTime(existing.dayEnd)
+			dayEnd: minutesToTime(existing.dayEnd),
+			collaborators: existing.collaborators.join(', ')
 		};
 	}
 
@@ -120,7 +128,8 @@
 			const settings: ReservationPageSettings = {
 				...draft,
 				dayStart: timeToMinutes(draft.dayStart) ?? -1,
-				dayEnd: timeToMinutes(draft.dayEnd) ?? -1
+				dayEnd: timeToMinutes(draft.dayEnd) ?? -1,
+				collaborators: draft.collaborators.split(/[\s,;]+/).filter(Boolean)
 			};
 			upsert(await saveReservationPage(settings, editingId ?? undefined));
 			draft = null;
@@ -258,6 +267,19 @@
 						<option value={hours}>{hours >= 24 ? t('calendar.reservations.noticeDays', { count: hours / 24 }) : t('calendar.reservations.noticeHours', { count: hours })}</option>
 					{/each}
 				</select>
+			</label>
+			<label class="resv-field">
+				<span>{t('calendar.reservations.collaborators')}</span>
+				<input
+					class="resv-input"
+					type="text"
+					bind:value={draft.collaborators}
+					autocomplete="off"
+					autocapitalize="none"
+					spellcheck="false"
+					placeholder={t('calendar.reservations.collaboratorsPlaceholder')}
+				/>
+				<small class="resv-hint">{t('calendar.reservations.collaboratorsHint', { count: MAX_COLLABORATORS })}</small>
 			</label>
 			<label class="resv-field">
 				<span>{t('calendar.reservations.slug')}</span>

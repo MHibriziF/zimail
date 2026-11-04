@@ -32,7 +32,14 @@ export type BookingDetails = {
 	manage?: { url: string; until: Date } | null;
 	/** The revision this message is; defaults to 0 for a new booking and 1 for its cancellation. */
 	sequence?: number;
+	/** Invited alongside the guest, on the same message and as attendees. */
+	collaborators?: string[];
 };
+
+/** Everyone the invitation goes to: the guest first, then the page's collaborators. */
+export function bookingRecipients(details: BookingDetails): string[] {
+	return [details.guestEmail, ...(details.collaborators ?? [])];
+}
 
 /** `moved` is an update to the time — still a REQUEST, with a higher SEQUENCE. */
 /** `guest-*`: the guest changed it themselves, through their link. */
@@ -88,6 +95,7 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 		content.details!.push({ label: 'Meeting', value: details.meetingUrl });
 		content.action = { label: 'Join the meeting', href: details.meetingUrl };
 	}
+	if (details.collaborators?.length) content.details!.push({ label: 'Guests', value: bookingRecipients(details).join(', ') });
 	if (details.note) content.details!.push({ label: 'Note', value: details.note });
 	return content;
 }
@@ -129,6 +137,9 @@ export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request'
 		'TRANSP:OPAQUE',
 		`ORGANIZER;CN=${icsParam(details.hostName)}:mailto:${details.hostEmail}`,
 		`ATTENDEE;CN=${icsParam(details.guestName)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${details.guestEmail}`,
+		...(details.collaborators ?? []).map(
+			(email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${email}`
+		),
 		// LOCATION is what calendars show: the place when there is one, else the join link. URL always carries the link.
 		...(details.location || details.meetingUrl ? [`LOCATION:${icsText(details.location ?? details.meetingUrl ?? '')}`] : []),
 		...(details.meetingUrl ? [`URL:${details.meetingUrl}`] : []),

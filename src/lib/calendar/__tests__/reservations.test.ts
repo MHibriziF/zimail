@@ -3,6 +3,7 @@ import { describe, test } from 'node:test';
 import { isPlausibleEmail } from '../events';
 import {
 	isValidSlug,
+	MAX_COLLABORATORS,
 	MAX_PAGE_LOCATION_LENGTH,
 	minutesToTime,
 	slugify,
@@ -36,9 +37,27 @@ const page: ReservationPageSettings = {
 	location: null,
 	active: true,
 	withMeeting: false,
-	rescheduleCutoffHours: 24
+	rescheduleCutoffHours: 24,
+	collaborators: []
 };
 const now = new Date('2026-09-24T00:00:00.000Z');
+
+describe('validatePageSettings collaborators', () => {
+	test('are lowercased and deduplicated, and default to none', () => {
+		const result = validatePageSettings({ ...settings, collaborators: [' Me@Other.test ', 'me@other.test', 'kim@example.com'] });
+		assert.deepEqual(result.ok && result.value.collaborators, ['me@other.test', 'kim@example.com']);
+		const none = validatePageSettings(settings);
+		assert.deepEqual(none.ok && none.value.collaborators, []);
+	});
+
+	test('refuse a bad address, a non-list, or more than the limit', () => {
+		const refused = { ok: false, error: 'invalid_collaborators' };
+		assert.deepEqual(validatePageSettings({ ...settings, collaborators: ['nope'] }), refused);
+		assert.deepEqual(validatePageSettings({ ...settings, collaborators: 'me@other.test' }), refused);
+		const many = Array.from({ length: MAX_COLLABORATORS + 1 }, (_, index) => `p${index}@example.com`);
+		assert.deepEqual(validatePageSettings({ ...settings, collaborators: many }), refused);
+	});
+});
 
 describe('validatePageSettings', () => {
 	test('accepts a sensible page and dedupes weekdays', () => {

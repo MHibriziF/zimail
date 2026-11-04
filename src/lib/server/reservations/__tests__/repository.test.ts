@@ -44,7 +44,8 @@ describe('ReservationsRepository', () => {
 			meetingCode: 'abc-defg-hij',
 			meetingUrl: 'https://mail.example/meet/abc-defg-hij',
 			manageTokenHash: 'hash-1',
-			eventLocation: 'https://mail.test/meet/abc-defg-hij'
+			eventLocation: 'https://mail.test/meet/abc-defg-hij',
+			collaborators: []
 		});
 		assert.equal(queries.length, 3);
 		assert.match(queries[0].sql, /INSERT INTO reservations/);
@@ -72,10 +73,80 @@ describe('ReservationsRepository', () => {
 			meetingCode: null,
 			meetingUrl: null,
 			manageTokenHash: 'hash-2',
-			eventLocation: null
+			eventLocation: null,
+			collaborators: []
 		});
 		assert.match(queries[2].sql, /INSERT INTO event_guests .*lower\(\?\)/s);
 		assert.deepEqual(queries[2].args, ['e', 'u', 'Ana@Example.com', 'Ana']);
+	});
+
+	test('a booking puts the page collaborators on the guest list too, in the same batch', async () => {
+		const { repo, queries } = setup();
+		await repo.insertBooking({
+			id: 'r',
+			pageId: 'p',
+			userId: 'u',
+			eventId: 'e',
+			guestName: 'Ana',
+			guestEmail: 'ana@example.com',
+			note: null,
+			start: 's',
+			end: 'e2',
+			createdAt: 'c',
+			eventTitle: 'Ana · Office hours',
+			eventNotes: 'Booked by Ana',
+			meetingCode: null,
+			meetingUrl: null,
+			manageTokenHash: 'hash-3',
+			eventLocation: null,
+			collaborators: ['me@other.test', 'kim@example.com']
+		});
+		assert.equal(queries.length, 5);
+		assert.match(queries[3].sql, /INSERT OR IGNORE INTO event_guests/);
+		assert.deepEqual(queries[3].args, ['e', 'u', 'me@other.test']);
+		assert.deepEqual(queries[4].args, ['e', 'u', 'kim@example.com']);
+	});
+
+	test('a booking reads back who else it was sent to, without the guest', async () => {
+		const { repo, queries } = setup((query) =>
+			query.sql.includes('FROM event_guests')
+				? [{ email: 'me@other.test' }]
+				: [{ guest_name: 'Ana', guest_email: 'Ana@example.com', starts_at: 's', ends_at: 'e', title: 'T', time_zone: 'UTC', sequence: 0 }]
+		);
+		const booking = await repo.getBookingByEvent('u', 'e');
+		assert.deepEqual(booking?.collaborators, ['me@other.test']);
+		const guests = queries.find((query) => query.sql.includes('FROM event_guests'));
+		assert.match(guests!.sql, /email <> lower\(\?\)/);
+		assert.deepEqual(guests!.args, ['e', 'u', 'Ana@example.com']);
+	});
+
+	test('collaborators round-trip through their JSON column, and a page without them reads as none', async () => {
+		const { repo, queries } = setup();
+		await repo.update('u', 'p', {
+			title: 'T',
+			description: null,
+			location: null,
+			slug: 's',
+			timeZone: 'UTC',
+			startDate: '2026-09-28',
+			endDate: '2026-10-09',
+			weekdays: [1],
+			dayStart: 540,
+			dayEnd: 720,
+			slotMinutes: 30,
+			bufferMinutes: 0,
+			noticeMinutes: 0,
+			active: true,
+			withMeeting: false,
+			rescheduleCutoffHours: 24,
+			collaborators: ['me@other.test']
+		});
+		assert.ok(queries[0].args.includes('["me@other.test"]'));
+		const read = (collaborators: string | null) =>
+			setup(() => [{ id: 'p', user_id: 'u', slug: 's', weekdays: '1', collaborators }]).repo.getBySlug('s');
+		assert.deepEqual((await read('["me@other.test"]'))?.collaborators, ['me@other.test']);
+		assert.deepEqual((await read(null))?.collaborators, []);
+		assert.deepEqual((await read('not json'))?.collaborators, []);
 	});
 
 	test('moving a booking moves both rows and bumps the event revision', async () => {
