@@ -139,14 +139,25 @@ describe('ReservationsRepository', () => {
 			active: true,
 			withMeeting: false,
 			rescheduleCutoffHours: 24,
-			collaborators: ['me@other.test']
+			collaborators: ['me@other.test'],
+			roomSettings: { requireApproval: false, waitForHost: true, screenSharePolicy: 'open', screenShareMode: 'multiple' }
 		});
 		assert.ok(queries[0].args.includes('["me@other.test"]'));
+		assert.ok(queries[0].args.some((arg) => typeof arg === 'string' && arg.includes('"waitForHost":true')));
 		const read = (collaborators: string | null) =>
 			setup(() => [{ id: 'p', user_id: 'u', slug: 's', weekdays: '1', collaborators }]).repo.getBySlug('s');
 		assert.deepEqual((await read('["me@other.test"]'))?.collaborators, ['me@other.test']);
 		assert.deepEqual((await read(null))?.collaborators, []);
 		assert.deepEqual((await read('not json'))?.collaborators, []);
+	});
+
+	test('room settings read back, and anything unreadable means the defaults', async () => {
+		const read = (roomSettings: string | null) =>
+			setup(() => [{ id: 'p', user_id: 'u', slug: 's', weekdays: '1', room_settings: roomSettings }]).repo.getBySlug('s');
+		const stored = { requireApproval: true, waitForHost: true, screenSharePolicy: 'approval', screenShareMode: 'single' };
+		assert.deepEqual((await read(JSON.stringify(stored)))?.roomSettings, stored);
+		assert.equal((await read(null))?.roomSettings, null);
+		assert.equal((await read('{"requireApproval":"x"}'))?.roomSettings, null);
 	});
 
 	test('moving a booking moves both rows and bumps the event revision', async () => {

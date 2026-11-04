@@ -122,7 +122,7 @@ function rooms(failOpen = false) {
 	return { meetings, open, closed, settings };
 }
 
-const locked: RoomSettings = { requireApproval: true, screenSharePolicy: 'approval', screenShareMode: 'single' };
+const locked: RoomSettings = { requireApproval: true, waitForHost: false, screenSharePolicy: 'approval', screenShareMode: 'single' };
 
 function mailbox() {
 	const sent: GuestMail[] = [];

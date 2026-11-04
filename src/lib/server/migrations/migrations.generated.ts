@@ -23,6 +23,10 @@ export const MIGRATIONS: PlannedMigration[] = [
 		sql: "-- Addresses invited to every booking on a page, alongside the guest.\n-- A JSON array of lowercase emails; NULL when the page has none.\nALTER TABLE reservation_pages ADD COLUMN collaborators TEXT;\n"
 	},
 	{
+		name: "0056_meeting_schedule.sql",
+		sql: "-- The room settings each booking's meeting is opened with; NULL means the defaults.\nALTER TABLE reservation_pages ADD COLUMN room_settings TEXT;\n\n-- Guests wait until the host has joined once.\nALTER TABLE meetings ADD COLUMN wait_for_host INTEGER NOT NULL DEFAULT 0;\n-- When the host first joined; written once, and only for rooms that wait for the host.\nALTER TABLE meetings ADD COLUMN started_at TEXT;\n\n-- When the room is booked for, as ISO instants; NULL for rooms with no schedule.\nALTER TABLE meetings ADD COLUMN scheduled_start TEXT;\nALTER TABLE meetings ADD COLUMN scheduled_end TEXT;\n"
+	},
+	{
 		name: "0001_init.sql",
 		archived: true,
 		sql: "CREATE TABLE users (\n\tid TEXT PRIMARY KEY,\n\temail TEXT NOT NULL UNIQUE COLLATE NOCASE,\n\tname TEXT NOT NULL,\n\tpassword_hash TEXT NOT NULL,\n\tis_admin INTEGER NOT NULL DEFAULT 0,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE sessions (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\ttoken_hash TEXT NOT NULL UNIQUE,\n\texpires_at TEXT NOT NULL,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE emails (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\tdirection TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),\n\tfrom_addr TEXT NOT NULL,\n\tto_addr TEXT NOT NULL,\n\tsubject TEXT NOT NULL,\n\tbody_text TEXT,\n\tbody_html TEXT,\n\tmessage_id TEXT,\n\tin_reply_to TEXT,\n\tis_read INTEGER NOT NULL DEFAULT 0,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE INDEX idx_emails_user_created ON emails(user_id, created_at DESC);\nCREATE INDEX idx_sessions_token ON sessions(token_hash);\n"

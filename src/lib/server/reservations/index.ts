@@ -25,8 +25,12 @@ export function meetingRooms(platform: App.Platform | undefined | null): Meeting
 		return meeting?.user_id === userId ? meeting : null;
 	};
 	return {
-		async open(userId, title, settings) {
-			return (await meetings.create(userId, { title, ...settings })).code;
+		async open(userId, title, settings, schedule) {
+			return (await meetings.create(userId, { title, ...settings, schedule })).code;
+		},
+		async reschedule(userId, code, schedule) {
+			const meeting = await owned(userId, code);
+			if (meeting) await meetings.setSchedule(userId, meeting.id, schedule);
 		},
 		async close(userId, code) {
 			const meeting = await owned(userId, code);
@@ -37,6 +41,7 @@ export function meetingRooms(platform: App.Platform | undefined | null): Meeting
 			return meeting
 				? {
 						requireApproval: meeting.require_approval,
+						waitForHost: meeting.wait_for_host,
 						screenSharePolicy: meeting.screen_share_policy,
 						screenShareMode: meeting.screen_share_mode
 					}

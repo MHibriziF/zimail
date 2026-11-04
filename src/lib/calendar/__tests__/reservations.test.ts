@@ -38,7 +38,8 @@ const page: ReservationPageSettings = {
 	active: true,
 	withMeeting: false,
 	rescheduleCutoffHours: 24,
-	collaborators: []
+	collaborators: [],
+	roomSettings: null
 };
 const now = new Date('2026-09-24T00:00:00.000Z');
 

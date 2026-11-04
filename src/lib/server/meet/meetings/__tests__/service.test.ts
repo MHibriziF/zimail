@@ -15,6 +15,10 @@ function meeting(overrides: Partial<Meeting> = {}): Meeting {
 		screen_share_policy: 'open',
 		screen_share_mode: 'multiple',
 		captions_enabled: false,
+		wait_for_host: false,
+		started_at: null,
+		scheduled_start: null,
+		scheduled_end: null,
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -46,6 +50,10 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 				screen_share_policy: input.screenSharePolicy,
 				screen_share_mode: input.screenShareMode,
 				captions_enabled: input.captionsEnabled,
+				wait_for_host: input.waitForHost,
+				started_at: null,
+				scheduled_start: input.scheduledStart,
+				scheduled_end: input.scheduledEnd,
 				created_at: input.createdAt
 			});
 		},
@@ -74,6 +82,17 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 			if (patch.screenSharePolicy !== undefined) row.screen_share_policy = patch.screenSharePolicy;
 			if (patch.screenShareMode !== undefined) row.screen_share_mode = patch.screenShareMode;
 			if (patch.captionsEnabled !== undefined) row.captions_enabled = patch.captionsEnabled;
+			if (patch.waitForHost !== undefined) row.wait_for_host = patch.waitForHost;
+			return true;
+		},
+		async markStarted(id, at) {
+			const row = rows.find((m) => m.id === id);
+			if (row && !row.started_at) row.started_at = at;
+		},
+		async setSchedule(userId, id, start, end) {
+			const row = rows.find((m) => m.id === id && m.user_id === userId);
+			if (!row) return false;
+			Object.assign(row, { scheduled_start: start, scheduled_end: end });
 			return true;
 		},
 		async updateCode(userId, id, code) {
@@ -373,6 +392,42 @@ describe('listPendingAdmissions', () => {
 		const pending = await service.listPendingAdmissions('user-1', 'meeting-1');
 		assert.equal(pending?.length, 1);
 		assert.equal(pending?.[0].name, 'Ada');
+	});
+});
+
+describe('waiting for the host to start', () => {
+	test('a guest waits until the host has joined once, then gets in for good', async () => {
+		const { repo, rows } = fakeMeetingsRepo([meeting({ wait_for_host: true })]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+
+		assert.deepEqual(await service.requestJoin('aaa-aaaa-aaa', { name: 'Ada' }), { type: 'waiting_for_host' });
+		assert.equal((await service.requestJoin('aaa-aaaa-aaa', { requesterId: 'user-1' })).type, 'admitted');
+		assert.ok(rows[0].started_at);
+		assert.equal((await service.requestJoin('aaa-aaaa-aaa', { name: 'Ada' })).type, 'admitted');
+	});
+
+	test('a room that doesn’t wait never records a start', async () => {
+		const { repo, rows } = fakeMeetingsRepo([meeting()]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		await service.requestJoin('aaa-aaaa-aaa', { requesterId: 'user-1' });
+		assert.equal(rows[0].started_at, null);
+	});
+
+	test('once started, a room that also asks to join still sends guests to the waiting room', async () => {
+		const { repo } = fakeMeetingsRepo([meeting({ wait_for_host: true, require_approval: true, started_at: 'earlier' })]);
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		assert.equal((await service.requestJoin('aaa-aaaa-aaa', { name: 'Ada' })).type, 'pending');
+	});
+
+	test('a room is created with its schedule, which its owner can move', async () => {
+		const { repo, rows } = fakeMeetingsRepo();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: fakeLiveKit });
+		const created = await service.create('user-1', { waitForHost: true, schedule: { start: 'S', end: 'E' } });
+		assert.equal(created.meeting.wait_for_host, true);
+		assert.deepEqual([rows[0].scheduled_start, rows[0].scheduled_end], ['S', 'E']);
+		assert.equal(await service.setSchedule('someone-else', created.meeting.id, { start: 'S2', end: 'E2' }), false);
+		assert.equal(await service.setSchedule('user-1', created.meeting.id, { start: 'S2', end: 'E2' }), true);
+		assert.equal(rows[0].scheduled_start, 'S2');
 	});
 });
 

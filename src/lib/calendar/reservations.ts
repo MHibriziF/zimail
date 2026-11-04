@@ -3,6 +3,7 @@
  * owner's form and the public booking page (which check them first).
  */
 import { isValidTimeZone } from '../timezone';
+import { parseRoomSettings, type RoomSettings } from '../meet/room-settings';
 import { dateKeyToUtc, isPlausibleEmail } from './events';
 
 export const SLOT_LENGTHS = [15, 20, 30, 45, 60, 90, 120] as const;
@@ -52,6 +53,8 @@ export type ReservationPageSettings = {
 	rescheduleCutoffHours: number;
 	/** Lowercase addresses invited to every booking with the guest. */
 	collaborators: string[];
+	/** How each booking's meeting room admits people; `null` for the defaults. */
+	roomSettings: RoomSettings | null;
 };
 
 export type ReservationPage =ReservationPageSettings & { id: string };
@@ -224,7 +227,8 @@ export function validatePageSettings(
 			active: input.active !== false,
 			withMeeting: input.withMeeting === true,
 			rescheduleCutoffHours: rescheduleCutoffHours as number,
-			collaborators
+			collaborators,
+			roomSettings: parseRoomSettings(input.roomSettings) ?? null
 		}
 	};
 }

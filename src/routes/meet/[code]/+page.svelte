@@ -13,6 +13,9 @@
 	import { DEFAULT_SCREEN_SHARE, type ScreenShareSettings } from '$lib/meet/screen-share';
 	import { transcriptFile, type CaptionLine } from '$lib/meet/captions';
 	import { downloadBlob } from '$lib/meet/recorder';
+	import { relativeTime } from '$lib/meet/schedule';
+	import { page } from '$app/stores';
+	import { DEFAULT_LOCALE, intlLocale } from '$lib/i18n/locales';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -34,7 +37,27 @@
 	let transcript = $state.raw<CaptionLine[]>([]);
 	let waitingAdmissionId = $state('');
 	let waitingDenied = $state(false);
+	let waitingForHost = $state(false);
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	let hostRetry: ReturnType<typeof setTimeout> | null = null;
+
+	const locale = $derived(intlLocale($page.data.locale ?? DEFAULT_LOCALE));
+	const scheduleText = $derived.by(() => {
+		if (!data.schedule) return '';
+		const start = new Date(data.schedule.start);
+		const end = new Date(data.schedule.end);
+		const day = new Intl.DateTimeFormat(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(start);
+		const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' });
+		return `${day}, ${time.formatRange(start, end)}`;
+	});
+	let now = $state(Date.now());
+	const scheduleRelative = $derived.by(() => {
+		if (!data.schedule) return '';
+		const start = new Date(data.schedule.start).getTime();
+		const end = new Date(data.schedule.end).getTime();
+		if (now >= start && now < end) return t('meet.scheduleNow');
+		return relativeTime(start - now, locale);
+	});
 
 	// Local device check before joining — lets people fix a muted mic or a
 	// covered camera instead of discovering it once everyone can already see them.
@@ -59,10 +82,19 @@
 
 	onMount(() => {
 		void startPreview();
-		return stopPreview;
+		const clock = setInterval(() => (now = Date.now()), 30_000);
+		return () => {
+			clearInterval(clock);
+			stopPreview();
+		};
 	});
 
-	onDestroy(stopWaiting);
+	/** A check still in flight when the page goes must not start another one. */
+	let destroyed = false;
+	onDestroy(() => {
+		destroyed = true;
+		stopWaiting();
+	});
 
 	function attachPreview(stream: MediaStream) {
 		previewStream = stream;
@@ -186,9 +218,17 @@
 		void applyDeviceSelection('camera');
 	}
 
-	async function join(event: SubmitEvent) {
+	function join(event: SubmitEvent) {
 		event.preventDefault();
 		if (joining) return;
+		void requestJoin();
+	}
+
+	/** Asks again every few seconds while the room is waiting for its host to start it. */
+	const HOST_RETRY_MS = 5000;
+
+	async function requestJoin() {
+		hostRetry = null;
 		joining = true;
 		error = '';
 
@@ -209,8 +249,16 @@
 				captionToken?: string;
 				pending?: boolean;
 				admissionId?: string;
+				waitingForHost?: boolean;
 				error?: string;
 			};
+			if (destroyed) return;
+			if (body.waitingForHost) {
+				waitingForHost = true;
+				hostRetry = setTimeout(() => void requestJoin(), HOST_RETRY_MS);
+				return;
+			}
+			waitingForHost = false;
 			if (body.pending && body.admissionId) {
 				waitingAdmissionId = body.admissionId;
 				pollAdmission(body.admissionId, displayName);
@@ -232,7 +280,10 @@
 				captionToken: body.captionToken ?? ''
 			};
 		} catch {
-			error = t('common.networkError');
+			// A dropped check while waiting for the host just tries again; otherwise say so.
+			if (destroyed) return;
+			if (waitingForHost) hostRetry = setTimeout(() => void requestJoin(), HOST_RETRY_MS);
+			else error = t('common.networkError');
 		} finally {
 			joining = false;
 		}
@@ -274,6 +325,7 @@
 				// A dropped poll just retries on the next tick — the request stays pending either way.
 			}
 		};
+		if (destroyed) return;
 		void check();
 		pollTimer = setInterval(() => void check(), 3000);
 	}
@@ -282,6 +334,8 @@
 		if (pollTimer) clearInterval(pollTimer);
 		pollTimer = null;
 		waitingAdmissionId = '';
+		if (hostRetry) clearTimeout(hostRetry);
+		hostRetry = null;
 	}
 
 	function onleave(lines: CaptionLine[]) {
@@ -330,6 +384,13 @@
 			<div class="auth-brand">
 				<div class="brand-icon"><Logo size={48} /></div>
 				<h1>{left ? t('meet.leftTitle') : t('meet.title', { app: APP_NAME })}</h1>
+				{#if scheduleText && !left}
+					<p class="meet-schedule">
+						<Icon name="calendar-line" size={15} />
+						<span>{t('meet.scheduledFor', { time: scheduleText })}</span>
+						<span class="meet-schedule-when">{scheduleRelative}</span>
+					</p>
+				{/if}
 			</div>
 
 			{#if !data.code}
@@ -435,7 +496,7 @@
 							placeholder={t('meet.namePlaceholder')}
 							autocomplete="name"
 							class="auth-input"
-							disabled={!!waitingAdmissionId}
+							disabled={!!waitingAdmissionId || waitingForHost}
 						/>
 					</div>
 
@@ -446,6 +507,8 @@
 					{#if waitingAdmissionId}
 						<!-- The host is deciding on the name they were shown, so only that stays fixed while waiting. -->
 						<p class="note" role="status">{t('meet.waitingForHost')}</p>
+					{:else if waitingForHost}
+						<p class="note" role="status">{t('meet.waitingForHostStart')}</p>
 					{:else}
 						<button type="submit" disabled={joining} class="btn-primary mt-2 w-full py-2.5">
 							{joining ? t('meet.joining') : t('meet.join')}
@@ -470,6 +533,22 @@
 		margin-bottom: 1rem;
 		border-radius: 0.75rem;
 		box-shadow: var(--shadow-sm);
+	}
+
+	.meet-schedule {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: center;
+		gap: 0.25rem 0.5rem;
+		margin-top: 0.5rem;
+		font-size: 0.875rem;
+		color: var(--color-text-secondary);
+	}
+
+	.meet-schedule-when {
+		font-weight: 500;
+		color: var(--color-accent-text);
 	}
 
 	.note {

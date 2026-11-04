@@ -4,7 +4,8 @@ import type { CalendarEvent } from '../../../calendar/events';
 import type { CalendarRepository } from '../../calendar/repository';
 import type { BookingDetails } from '../email';
 import type { NewBooking, ReservationsRepository, StoredPage } from '../repository';
-import { createReservationsService, MAX_UPCOMING_PER_GUEST } from '../service';
+import { createReservationsService, MAX_UPCOMING_PER_GUEST, type RoomSchedule } from '../service';
+import type { RoomSettings } from '../../../meet/room-settings';
 
 const NOW = new Date('2026-09-24T00:00:00.000Z');
 const BASE = 'https://mail.test';
@@ -158,17 +159,27 @@ function setup(options: SetupOptions = {}) {
 		}
 	} as unknown as CalendarRepository;
 
-	const rooms = { opened: [] as { userId: string; title: string; code: string }[], closed: [] as string[] };
+	const rooms = {
+		opened: [] as { userId: string; title: string; code: string }[],
+		closed: [] as string[],
+		/** What each opened room was given, in the same order as `opened`. */
+		setup: [] as { settings?: RoomSettings; schedule?: RoomSchedule }[],
+		moved: [] as { code: string; schedule: RoomSchedule }[]
+	};
 	const meetings = options.meetings
 		? {
-				async open(userId: string, title: string) {
+				async open(userId: string, title: string, settings?: RoomSettings, schedule?: RoomSchedule) {
 					if (options.roomFails) throw new Error('livekit down');
 					const code = `room-${rooms.opened.length + 1}`;
 					rooms.opened.push({ userId, title, code });
+					rooms.setup.push({ settings, schedule });
 					return code;
 				},
 				async close(_userId: string, code: string) {
 					rooms.closed.push(code);
+				},
+				async reschedule(_userId: string, code: string, schedule: RoomSchedule) {
+					rooms.moved.push({ code, schedule });
 				}
 			}
 		: null;
@@ -229,6 +240,39 @@ describe('ReservationsService pages', () => {
 		await service.update('owner', pages[0].id, { ...body, active: false });
 		assert.equal(await service.publicPage('office-hours'), null);
 		assert.equal(await service.slots('office-hours', null), null);
+	});
+});
+
+describe('ReservationsService booking rooms', () => {
+	const roomSettings: RoomSettings = { requireApproval: true, waitForHost: true, screenSharePolicy: 'approval', screenShareMode: 'single' };
+
+	test('a booking’s room opens with the page’s settings and the booked time', async () => {
+		const state = setup({ meetings: true });
+		await state.service.create('owner', { ...body, withMeeting: true, roomSettings });
+		await state.service.book('office-hours', guest, BASE);
+		assert.deepEqual(state.rooms.setup[0], {
+			settings: roomSettings,
+			schedule: { start: guest.start, end: '2026-09-28T03:00:00.000Z' }
+		});
+	});
+
+	test('a page without its own settings opens rooms with the defaults', async () => {
+		const state = setup({ meetings: true });
+		await state.service.create('owner', { ...body, withMeeting: true });
+		await state.service.book('office-hours', guest, BASE);
+		assert.equal(state.rooms.setup[0].settings, undefined);
+	});
+
+	test('moving a booking moves the time its room shows, whoever moves it', async () => {
+		const state = setup({ meetings: true });
+		await state.service.create('owner', { ...body, withMeeting: true });
+		const booked = await state.service.book('office-hours', guest, BASE);
+		assert.equal(booked.type, 'ok');
+		const eventId = state.bookings[0].eventId;
+		await state.service.rescheduleBooking('owner', eventId, new Date('2026-09-28T04:00:00.000Z'), new Date('2026-09-28T05:00:00.000Z'));
+		assert.deepEqual(state.rooms.moved, [
+			{ code: 'room-1', schedule: { start: '2026-09-28T04:00:00.000Z', end: '2026-09-28T05:00:00.000Z' } }
+		]);
 	});
 });
 

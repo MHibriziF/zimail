@@ -15,7 +15,7 @@ describe('event drafts', () => {
 	});
 
 	test('room settings are sent only with a room, and only when they are known', () => {
-		const locked = { requireApproval: true, screenSharePolicy: 'approval', screenShareMode: 'single' } as const;
+		const locked = { requireApproval: true, waitForHost: true, screenSharePolicy: 'approval', screenShareMode: 'single' } as const;
 		const base: CalendarEvent = {
 			id: 'e',
 			title: 'Sync',

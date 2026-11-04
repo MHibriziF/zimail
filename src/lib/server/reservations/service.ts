@@ -111,7 +111,9 @@ export type ReservationsServiceDeps = {
 
 export type MeetingRooms = {
 	/** Opens a room owned by `userId` and returns its join code; left out, settings default. */
-	open(userId: string, title: string, settings?: RoomSettings): Promise<string>;
+	open(userId: string, title: string, settings?: RoomSettings, schedule?: RoomSchedule): Promise<string>;
+	/** Moves the time a room says it is booked for; a room that's gone or not the user's is left alone. */
+	reschedule?(userId: string, code: string, schedule: RoomSchedule): Promise<void>;
 	close(userId: string, code: string): Promise<void>;
 	/** The room's settings, or `null` when it's gone or not the user's. */
 	settingsOf?(userId: string, code: string): Promise<RoomSettings | null>;
@@ -120,6 +122,9 @@ export type MeetingRooms = {
 };
 
 type Room = { code: string; url: string };
+
+/** When a room is booked for, as ISO instants. */
+export type RoomSchedule = { start: string; end: string };
 
 function isUniqueConstraintError(error: unknown): boolean {
 	return error instanceof Error && /unique constraint/i.test(error.message);
@@ -240,10 +245,11 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 	}
 
 	/** A booking's own room, when the page asks for one and meetings are set up. A failure books without one. */
-	async function openRoom(page: StoredPage, guestName: string, baseUrl: string): Promise<Room | null> {
+	async function openRoom(page: StoredPage, guestName: string, baseUrl: string, schedule: RoomSchedule): Promise<Room | null> {
 		if (!page.withMeeting || !deps.meetings) return null;
 		try {
-			const code = await deps.meetings.open(page.userId, `${page.title} · ${guestName}`.slice(0, 200));
+			const title = `${page.title} · ${guestName}`.slice(0, 200);
+			const code = await deps.meetings.open(page.userId, title, page.roomSettings ?? undefined, schedule);
 			return { code, url: new URL(`/meet/${code}`, baseUrl).href };
 		} catch {
 			return null;
@@ -252,6 +258,12 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 
 	async function closeRoom(userId: string, code: string): Promise<void> {
 		await deps.meetings?.close(userId, code).catch(() => undefined);
+	}
+
+	/** Best effort, like the email: a room still showing the old time doesn't undo the move. */
+	async function moveRoom(userId: string, code: string | null, start: Date, end: Date): Promise<void> {
+		if (!code) return;
+		await deps.meetings?.reschedule?.(userId, code, { start: start.toISOString(), end: end.toISOString() }).catch(() => undefined);
 	}
 
 	/** Best effort: the booking or cancellation already happened either way. */
@@ -362,7 +374,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const eventId = crypto.randomUUID();
 			const { name, email, note } = guest.value;
 			const manageToken = createLinkToken();
-			const room = await openRoom(page, name, baseUrl);
+			const room = await openRoom(page, name, baseUrl, { start: start.toISOString(), end: end.toISOString() });
 			try {
 				await repo.insertBooking({
 					id: crypto.randomUUID(),
@@ -434,6 +446,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				if (isUniqueConstraintError(error)) return 'slot_taken';
 				throw error;
 			}
+			await moveRoom(userId, booking.meetingCode, start, end);
 			await tellGuest(userId, 'moved', detailsFor(eventId, booking, { start, end }));
 			return 'ok';
 		},
@@ -487,6 +500,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				if (isUniqueConstraintError(error)) return { type: 'slot_taken' };
 				throw error;
 			}
+			await moveRoom(booking.userId, booking.meetingCode, start, end);
 			await tellGuest(booking.userId, 'guest-moved', {
 				...detailsFor(booking.eventId, booking, { start, end }),
 				manage: { url: manageLink(baseUrl, token), until: changeDeadline(start, page) }

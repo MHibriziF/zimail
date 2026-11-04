@@ -4,8 +4,12 @@ import { DEFAULT_ROOM_SETTINGS, parseRoomSettings } from '../room-settings';
 
 describe('parseRoomSettings', () => {
 	test('accepts a complete, valid set', () => {
-		const settings = { requireApproval: true, screenSharePolicy: 'approval', screenShareMode: 'single' };
+		const settings = { requireApproval: true, waitForHost: true, screenSharePolicy: 'approval', screenShareMode: 'single' };
 		assert.deepEqual(parseRoomSettings(settings), settings);
+		// Saved before waiting for the host existed: still valid, and off.
+		const { waitForHost: _, ...older } = settings;
+		assert.deepEqual(parseRoomSettings(older), { ...older, waitForHost: false });
+		assert.equal(parseRoomSettings({ ...settings, waitForHost: 'yes' }), undefined);
 		assert.deepEqual(parseRoomSettings(DEFAULT_ROOM_SETTINGS), DEFAULT_ROOM_SETTINGS);
 	});
 

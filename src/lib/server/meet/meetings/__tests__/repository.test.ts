@@ -13,6 +13,10 @@ type Row = {
 	screen_share_policy: string;
 	screen_share_mode: string;
 	captions_enabled: number;
+	wait_for_host: number;
+	started_at: string | null;
+	scheduled_start: string | null;
+	scheduled_end: string | null;
 	created_at: string;
 };
 
@@ -27,6 +31,10 @@ function row(overrides: Partial<Row> = {}): Row {
 		screen_share_policy: 'open',
 		screen_share_mode: 'multiple',
 		captions_enabled: 0,
+		wait_for_host: 0,
+		started_at: null,
+		scheduled_start: null,
+		scheduled_end: null,
 		created_at: '2026-01-01T00:00:00.000Z',
 		...overrides
 	};
@@ -48,21 +56,40 @@ function setup(seed: Row[] = []) {
 			return [{ count: rows.filter((entry) => entry.user_id === userId).length }];
 		}
 		if (sql.startsWith('INSERT INTO meetings')) {
-			const [id, userId, domainId, title, code, requireApproval, policy, mode, captions, createdAt] = args as [
-				string,
-				string,
-				string | null,
-				string | null,
-				string,
-				number,
-				string,
-				string,
-				number,
-				string
-			];
+			const [id, userId, domainId, title, code, requireApproval, policy, mode, captions, waitForHost, start, end, createdAt] =
+				args as [string, string, string | null, string | null, string, number, string, string, number, number, string | null, string | null, string];
 			assertCodeFree(code);
-			rows.push({ id, user_id: userId, domain_id: domainId, title, code, require_approval: requireApproval, screen_share_policy: policy, screen_share_mode: mode, captions_enabled: captions, created_at: createdAt });
+			rows.push({
+				id,
+				user_id: userId,
+				domain_id: domainId,
+				title,
+				code,
+				require_approval: requireApproval,
+				screen_share_policy: policy,
+				screen_share_mode: mode,
+				captions_enabled: captions,
+				wait_for_host: waitForHost,
+				started_at: null,
+				scheduled_start: start,
+				scheduled_end: end,
+				created_at: createdAt
+			});
 			return [];
+		}
+		if (sql.startsWith('UPDATE meetings SET started_at')) {
+			const [at, id] = args as [string, string];
+			const entry = rows.find((e) => e.id === id && e.started_at === null);
+			if (entry) entry.started_at = at;
+			return entry ? [entry] : [];
+		}
+		if (sql.startsWith('UPDATE meetings SET scheduled_start')) {
+			const [start, end, id, userId] = args as [string | null, string | null, string, string];
+			const entry = rows.find((e) => e.id === id && e.user_id === userId);
+			if (!entry) return [];
+			entry.scheduled_start = start;
+			entry.scheduled_end = end;
+			return [entry];
 		}
 		if (sql.includes('WHERE code = ?')) {
 			return rows.filter((entry) => entry.code === args[0]);
@@ -95,6 +122,7 @@ function setup(seed: Row[] = []) {
 			if (sql.includes('screen_share_policy = ?')) entry.screen_share_policy = args[cursor++] as string;
 			if (sql.includes('screen_share_mode = ?')) entry.screen_share_mode = args[cursor++] as string;
 			if (sql.includes('captions_enabled = ?')) entry.captions_enabled = args[cursor++] as number;
+			if (sql.includes('wait_for_host = ?')) entry.wait_for_host = args[cursor++] as number;
 			return [entry];
 		}
 		throw new Error(`Unhandled query in fake D1: ${sql}`);
@@ -112,7 +140,7 @@ describe('MeetingsRepository', () => {
 
 	test('insert then findByCode round-trips, and rejects a duplicate code', async () => {
 		const { repo } = setup();
-		await repo.insert({ id: 'a', userId: 'user-1', domainId: null, title: 'Standup', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'approval', screenShareMode: 'single', captionsEnabled: true, createdAt: '2026-01-01' });
+		await repo.insert({ id: 'a', userId: 'user-1', domainId: null, title: 'Standup', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'approval', screenShareMode: 'single', captionsEnabled: true, waitForHost: true, scheduledStart: 'S', scheduledEnd: 'E', createdAt: '2026-01-01' });
 
 		const found = await repo.findByCode('aaa-aaaa-aaa');
 		assert.equal(found?.id, 'a');
@@ -120,12 +148,30 @@ describe('MeetingsRepository', () => {
 		assert.equal(found?.screen_share_mode, 'single');
 		assert.equal(found?.captions_enabled, true);
 		assert.equal(found?.created_at, '2026-01-01');
+		assert.equal(found?.wait_for_host, true);
+		assert.equal(found?.started_at, null);
+		assert.equal(found?.scheduled_start, 'S');
+		assert.equal(found?.scheduled_end, 'E');
 		assert.equal(await repo.findByCode('missing'), null);
 
 		await assert.rejects(
-			repo.insert({ id: 'b', userId: 'user-1', domainId: null, title: 'Other', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'open', screenShareMode: 'multiple', captionsEnabled: false, createdAt: '2026-01-01' }),
+			repo.insert({ id: 'b', userId: 'user-1', domainId: null, title: 'Other', code: 'aaa-aaaa-aaa', requireApproval: false, screenSharePolicy: 'open', screenShareMode: 'multiple', captionsEnabled: false, waitForHost: false, scheduledStart: null, scheduledEnd: null, createdAt: '2026-01-01' }),
 			/unique constraint/i
 		);
+	});
+
+	test('the first start is kept; a later one changes nothing', async () => {
+		const { repo, rows } = setup([row()]);
+		await repo.markStarted('meeting-1', 'first');
+		await repo.markStarted('meeting-1', 'second');
+		assert.equal(rows[0].started_at, 'first');
+	});
+
+	test('a schedule moves only for the meeting’s owner', async () => {
+		const { repo, rows } = setup([row({ scheduled_start: 'S', scheduled_end: 'E' })]);
+		assert.equal(await repo.setSchedule('someone-else', 'meeting-1', 'S2', 'E2'), false);
+		assert.equal(await repo.setSchedule('user-1', 'meeting-1', 'S2', 'E2'), true);
+		assert.deepEqual([rows[0].scheduled_start, rows[0].scheduled_end], ['S2', 'E2']);
 	});
 
 	test('listForUser only returns the requesting user\'s own rows', async () => {
