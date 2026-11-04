@@ -30,6 +30,8 @@
 	let note = $state('');
 	let submitting = $state(false);
 	let submitError = $state('');
+	let takenError = $state('');
+	let dialog = $state<HTMLDialogElement>();
 	let booked = $state<{ start: string; end: string; meetingUrl: string | null; manageUrl: string | null } | null>(null);
 
 	async function submit(event: SubmitEvent) {
@@ -55,13 +57,32 @@
 				booked = { start: body.start, end: body.end, meetingUrl: body.meetingUrl ?? null, manageUrl: body.manageUrl ?? null };
 				return;
 			}
-			submitError = body.error ?? t('book.couldNotBook');
-			if (body.code === 'slot_taken') picker?.drop(chosen);
+			const message = body.error ?? t('book.couldNotBook');
+			if (body.code === 'slot_taken') {
+				takenError = message;
+				picker?.drop(chosen);
+				picker?.reload();
+			} else {
+				submitError = message;
+			}
 		} catch {
 			submitError = t('common.networkError');
 		} finally {
 			submitting = false;
 		}
+	}
+
+	$effect(() => {
+		if (!dialog) return;
+		if (chosen && !dialog.open) {
+			submitError = '';
+			takenError = '';
+			dialog.showModal();
+		} else if (!chosen && dialog.open) dialog.close();
+	});
+
+	function closeForm() {
+		if (!submitting) chosen = '';
 	}
 </script>
 
@@ -109,6 +130,7 @@
 				{/if}
 			</div>
 		{:else}
+			{#if takenError}<p class="book-error" role="alert">{takenError}</p>{/if}
 			<SlotPicker
 				bind:this={picker}
 				bind:chosen
@@ -119,9 +141,25 @@
 				{locale}
 			/>
 
-			{#if chosen}
+			<dialog
+				bind:this={dialog}
+				class="book-dialog"
+				aria-labelledby="book-chosen"
+				oncancel={(event) => {
+					event.preventDefault();
+					closeForm();
+				}}
+				onclick={(event) => {
+					if (event.target === dialog) closeForm();
+				}}
+			>
 				<form class="book-form" onsubmit={submit}>
-					<p class="book-chosen">{fullFormat.format(new Date(chosen))}</p>
+					<div class="book-dialog-head">
+						<p id="book-chosen" class="book-chosen">{chosen ? fullFormat.format(new Date(chosen)) : ''}</p>
+						<button type="button" class="icon-btn" aria-label={t('common.close')} onclick={closeForm}>
+							<Icon name="close-line" size={18} />
+						</button>
+					</div>
 					<label>
 						<span>{t('book.name')}</span>
 						<input type="text" bind:value={name} maxlength={MAX_GUEST_NAME_LENGTH} autocomplete="name" required />
@@ -139,7 +177,7 @@
 						{submitting ? t('book.booking') : t('book.confirm')}
 					</button>
 				</form>
-			{/if}
+			</dialog>
 		{/if}
 	</section>
 	<p class="book-foot">{t('book.poweredBy', { app: APP_NAME })}</p>
@@ -199,12 +237,32 @@
 		white-space: pre-line;
 	}
 
+	.book-dialog {
+		width: min(28rem, calc(100vw - 2rem));
+		padding: 0;
+		border: none;
+		border-radius: 0.875rem;
+		color: var(--color-text);
+		background: var(--color-surface);
+		box-shadow: 0 0 0 1px var(--color-line), 0 16px 48px rgba(0, 0, 0, 0.24);
+	}
+
+	.book-dialog::backdrop {
+		background: rgba(0, 0, 0, 0.4);
+	}
+
 	.book-form {
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
-		padding-top: 1rem;
-		box-shadow: inset 0 1px 0 var(--color-line);
+		padding: 1.25rem;
+	}
+
+	.book-dialog-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.5rem;
 	}
 
 	.book-chosen {

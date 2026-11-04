@@ -30,6 +30,9 @@
 	let busy = $state<'reschedule' | 'cancel' | null>(null);
 	let confirmingCancel = $state(false);
 	let error = $state('');
+	let moveError = $state('');
+	let takenError = $state('');
+	let dialog = $state<HTMLDialogElement>();
 	/** What happened on this visit, so the page can say so without a reload. */
 	let done = $state<{ kind: 'moved'; start: string } | { kind: 'cancelled' } | null>(null);
 	const start = $derived(done?.kind === 'moved' ? done.start : booking.start);
@@ -38,6 +41,7 @@
 		if (busy) return;
 		busy = action;
 		error = '';
+		moveError = '';
 		try {
 			const response = await fetch(`/api/book/manage/${encodeURIComponent(data.token)}`, {
 				method: 'POST',
@@ -49,13 +53,36 @@
 				done = action === 'cancel' ? { kind: 'cancelled' } : { kind: 'moved', start: body.start ?? chosen };
 				return;
 			}
-			error = body.error ?? t('common.networkError');
-			if (body.code === 'slot_taken') picker?.drop(chosen);
+			const message = body.error ?? t('common.networkError');
+			if (body.code === 'slot_taken') {
+				takenError = message;
+				picker?.drop(chosen);
+				picker?.reload();
+			} else if (action === 'reschedule') {
+				moveError = message;
+			} else {
+				error = message;
+			}
 		} catch {
-			error = t('common.networkError');
+			if (action === 'reschedule') moveError = t('common.networkError');
+			else error = t('common.networkError');
 		} finally {
 			busy = null;
 		}
+	}
+
+	$effect(() => {
+		if (!dialog) return;
+		if (chosen && !dialog.open) {
+			error = '';
+			moveError = '';
+			takenError = '';
+			dialog.showModal();
+		} else if (!chosen && dialog.open) dialog.close();
+	});
+
+	function closeMove() {
+		if (busy !== 'reschedule') chosen = '';
 	}
 </script>
 
@@ -93,6 +120,7 @@
 					<p class="manage-hint">{t(BLOCK_KEYS[booking.rescheduleBlock])}</p>
 				{:else}
 					<p class="manage-hint">{t('book.reschedulesLeft', { count: booking.reschedulesLeft })}</p>
+					{#if takenError}<p class="manage-error" role="alert">{takenError}</p>{/if}
 					<SlotPicker
 						bind:this={picker}
 						bind:chosen
@@ -102,14 +130,34 @@
 						{guestZone}
 						{locale}
 					/>
-					{#if chosen}
-						<div class="manage-actions">
-							<span class="manage-chosen">{fullFormat.format(new Date(chosen))}</span>
-							<button type="button" class="btn-primary" disabled={busy !== null} onclick={() => act('reschedule')}>
-								{busy === 'reschedule' ? t('book.moving') : t('book.moveHere')}
-							</button>
+					<dialog
+						bind:this={dialog}
+						class="manage-dialog"
+						aria-labelledby="manage-chosen"
+						oncancel={(event) => {
+							event.preventDefault();
+							closeMove();
+						}}
+						onclick={(event) => {
+							if (event.target === dialog) closeMove();
+						}}
+					>
+						<div class="manage-dialog-body">
+							<p class="manage-hint">{fullFormat.format(new Date(start))}</p>
+							<p id="manage-chosen" class="manage-chosen">
+								<Icon name="arrow-right-line" size={16} />{chosen ? fullFormat.format(new Date(chosen)) : ''}
+							</p>
+							{#if moveError}<p class="manage-error" role="alert">{moveError}</p>{/if}
+							<div class="manage-actions">
+								<button type="button" class="btn-ghost" disabled={busy === 'reschedule'} onclick={closeMove}>
+									{t('common.cancel')}
+								</button>
+								<button type="button" class="btn-primary" disabled={busy !== null} onclick={() => act('reschedule')}>
+									{busy === 'reschedule' ? t('book.moving') : t('book.moveHere')}
+								</button>
+							</div>
 						</div>
-					{/if}
+					</dialog>
 				{/if}
 			</section>
 
@@ -226,8 +274,36 @@
 		gap: 0.75rem;
 	}
 
+	.manage-dialog {
+		width: min(26rem, calc(100vw - 2rem));
+		padding: 0;
+		border: none;
+		border-radius: 0.875rem;
+		color: var(--color-text);
+		background: var(--color-surface);
+		box-shadow: 0 0 0 1px var(--color-line), 0 16px 48px rgba(0, 0, 0, 0.24);
+	}
+
+	.manage-dialog::backdrop {
+		background: rgba(0, 0, 0, 0.4);
+	}
+
+	.manage-dialog-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 1.25rem;
+	}
+
+	.manage-dialog .manage-actions {
+		margin-top: 0.5rem;
+	}
+
 	.manage-chosen {
-		margin-right: auto;
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		margin: 0;
 		font-weight: 600;
 	}
 

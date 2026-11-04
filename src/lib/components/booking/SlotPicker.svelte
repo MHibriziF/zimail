@@ -53,8 +53,10 @@
 	const hasPrevious = $derived(fromKey !== null && firstDay !== null && firstDay > dateKeyIn(new Date(), pageZone));
 	const hasNext = $derived(lastDay !== null && lastDay < endDate);
 
+	let version = $state(0);
 	let request = 0;
 	$effect(() => {
+		void version;
 		const current = ++request;
 		const query = fromKey ? `?from=${fromKey}` : '';
 		loading = true;
@@ -85,6 +87,11 @@
 	export function drop(slot: string) {
 		days = days.map((day) => ({ ...day, slots: day.slots.filter((entry) => entry !== slot) }));
 		if (chosen === slot) chosen = '';
+	}
+
+	/** Fetches the shown week again, so slots others booked meanwhile disappear. */
+	export function reload() {
+		version++;
 	}
 </script>
 
