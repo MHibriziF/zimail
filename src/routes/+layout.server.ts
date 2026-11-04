@@ -51,57 +51,58 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 	depends('app:labels');
 	depends('app:calendar');
 
-	// Cleanup (emptying old trash, and the saved sweep when it is on) rides along with a page load rather than a timer. The
-	// claim inside is throttled to once a day, so this is a single cheap UPDATE
-	// on all but one request in twenty-four hours.
-	if (db && locals.user) {
-		try {
-			await runDueCleanup(db, platform?.env.ATTACHMENTS, locals.user.id);
-		} catch {
-			// Never block the mailbox on housekeeping.
-		}
-	}
-
-	// The cron trigger is what normally sends scheduled mail, but `vite dev`
-	// never runs the Worker and so never fires it. Sweeping this user's own due
-	// messages on load keeps scheduling working in development, and is a cheap
-	// no-op in production where the trigger has already been round.
+	const user = locals.user;
 	const bucket = platform?.env.ATTACHMENTS;
-	if (db && bucket && locals.user) {
-		try {
-			await runDueScheduledSends({ DB: db, ATTACHMENTS: bucket }, getEmailProvider(platform), {
-				userId: locals.user.id
-			});
-		} catch {
-			// A message that cannot go out records its own failure; the mailbox
-			// still has to load.
-		}
-	}
+	// Both can change the counts below, so they finish first, side by side.
+	await Promise.all([
+		// Cleanup (emptying old trash, and the saved sweep when it is on) rides along with a page load rather than a timer. The
+		// claim inside is throttled to once a day, so this is a single cheap UPDATE
+		// on all but one request in twenty-four hours.
+		(async () => {
+			if (!db || !user) return;
+			try {
+				await runDueCleanup(db, bucket, user.id);
+			} catch {
+				// Never block the mailbox on housekeeping.
+			}
+		})(),
+		// The cron trigger is what normally sends scheduled mail, but `vite dev`
+		// never runs the Worker and so never fires it. Sweeping this user's own due
+		// messages on load keeps scheduling working in development, and is a cheap
+		// no-op in production where the trigger has already been round.
+		(async () => {
+			if (!db || !bucket || !user) return;
+			try {
+				await runDueScheduledSends({ DB: db, ATTACHMENTS: bucket }, getEmailProvider(platform), { userId: user.id });
+			} catch {
+				// No provider configured, or a message that cannot go out records its own failure; the mailbox still has to load.
+			}
+		})()
+	]);
 
-	// The sidebar shows these on every page, so they load with the shell.
-	const counts =
-		db && locals.user
-			? await getMailStoreService(platform).getMailboxCounts(locals.user.id, locals.activeDomainId)
-			: EMPTY_COUNTS;
-
-	const timezoneRow =
-		db && locals.user
-			? await db
+	const userId = db && user ? user.id : null;
+	const timeZone =
+		db && userId
+			? db
 					.prepare('SELECT timezone FROM users WHERE id = ?')
-					.bind(locals.user.id)
+					.bind(userId)
 					.first<{ timezone: string | null }>()
-			: null;
-
-	// Sidebar label list — changes only when labels are managed, so it has its own dependency.
-	const labels = db && locals.user ? await getLabelsService(platform).list(locals.user.id) : [];
-
-	const upcoming = await loadUpcoming(platform, locals.user?.id, timezoneRow?.timezone);
+					.then((row) => row?.timezone ?? null)
+			: Promise.resolve(null);
+	// The sidebar shows these on every page, so they load with the shell.
+	const [counts, labels, timezone, upcoming] = await Promise.all([
+		userId ? getMailStoreService(platform).getMailboxCounts(userId, locals.activeDomainId) : EMPTY_COUNTS,
+		// Sidebar label list — changes only when labels are managed, so it has its own dependency.
+		userId ? getLabelsService(platform).list(userId) : [],
+		timeZone,
+		timeZone.then((zone) => loadUpcoming(platform, userId ?? undefined, zone))
+	]);
 
 	return {
 		user: locals.user,
 		labels,
 		upcoming,
-		timeZone: timezoneRow?.timezone ?? null,
+		timeZone: timezone,
 		domains: locals.domains,
 		addresses: locals.addresses,
 		activeDomainId: locals.activeDomainId,

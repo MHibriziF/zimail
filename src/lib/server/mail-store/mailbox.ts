@@ -43,22 +43,21 @@ export async function loadMailbox(
 		return { view, mailbox: EMPTY, filters, tabCounts: null };
 	}
 
-	const mailbox = await listMailbox(db, userId, {
-		view,
-		domainId,
-		addressId: filters.addressId || null,
-		q: filters.q,
-		unreadOnly: filters.unreadOnly,
-		starredOnly: filters.starredOnly,
-		attachmentsOnly: filters.attachmentsOnly,
-		labelId: filters.labelId || null,
-		category: filters.tab || null,
-		page: Number(url.searchParams.get('page')) || 1
-	});
-
-	const tabCounts = filters.tab
-		? await mailStoreServiceForDb(db).countInboxUnreadByCategory(userId, domainId)
-		: null;
+	const [mailbox, tabCounts] = await Promise.all([
+		listMailbox(db, userId, {
+			view,
+			domainId,
+			addressId: filters.addressId || null,
+			q: filters.q,
+			unreadOnly: filters.unreadOnly,
+			starredOnly: filters.starredOnly,
+			attachmentsOnly: filters.attachmentsOnly,
+			labelId: filters.labelId || null,
+			category: filters.tab || null,
+			page: Number(url.searchParams.get('page')) || 1
+		}),
+		filters.tab ? mailStoreServiceForDb(db).countInboxUnreadByCategory(userId, domainId) : null
+	]);
 
 	return { view, mailbox, filters, tabCounts };
 }
