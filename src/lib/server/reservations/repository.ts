@@ -20,7 +20,18 @@ type PageRow = {
 	active: number;
 	with_meeting: number;
 	reschedule_cutoff_hours: number;
+	collaborators: string | null;
 };
+
+function parseCollaborators(value: string | null): string[] {
+	if (!value) return [];
+	try {
+		const parsed: unknown = JSON.parse(value);
+		return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : [];
+	} catch {
+		return [];
+	}
+}
 
 export type StoredPage = ReservationPage & { userId: string };
 
@@ -46,12 +57,13 @@ function toPage(row: PageRow): StoredPage {
 		noticeMinutes: row.notice_minutes,
 		active: row.active === 1,
 		withMeeting: row.with_meeting === 1,
-		rescheduleCutoffHours: row.reschedule_cutoff_hours
+		rescheduleCutoffHours: row.reschedule_cutoff_hours,
+		collaborators: parseCollaborators(row.collaborators)
 	};
 }
 
 const COLUMNS = `id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
-	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours`;
+	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours, collaborators`;
 
 export type NewBooking = {
 	id: string;
@@ -74,6 +86,8 @@ export type NewBooking = {
 	eventLocation: string | null;
 	/** SHA-256 of the guest's link to change the booking. */
 	manageTokenHash: string;
+	/** Invited with the guest, as the event's other guests. */
+	collaborators: string[];
 };
 
 /**
@@ -129,6 +143,8 @@ export type StoredBooking = {
 	location: string | null;
 	/** The invitation revision the guest last received. */
 	sequence: number;
+	/** Who else this booking was sent to: the event's guests besides the booker. */
+	collaborators: string[];
 };
 
 function settingsValues(page: ReservationPageSettings): unknown[] {
@@ -148,7 +164,8 @@ function settingsValues(page: ReservationPageSettings): unknown[] {
 		page.noticeMinutes,
 		page.active ? 1 : 0,
 		page.withMeeting ? 1 : 0,
-		page.rescheduleCutoffHours
+		page.rescheduleCutoffHours,
+		page.collaborators.length > 0 ? JSON.stringify(page.collaborators) : null
 	];
 }
 
@@ -191,8 +208,9 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				.prepare(
 					`INSERT INTO reservation_pages
 					 (id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
-					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours,
+					  collaborators)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(page.id, page.userId, ...settingsValues(page))
 				.run();
@@ -204,7 +222,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					`UPDATE reservation_pages
 					 SET slug = ?, title = ?, description = ?, location = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
 					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?,
-					     with_meeting = ?, reschedule_cutoff_hours = ?
+					     with_meeting = ?, reschedule_cutoff_hours = ?, collaborators = ?
 					 WHERE id = ? AND user_id = ?`
 				)
 				.bind(...settingsValues(page), id, userId)
@@ -282,6 +300,10 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					sequence: number;
 				}>();
 			if (!row) return null;
+			const { results: guests } = await db
+				.prepare('SELECT email FROM event_guests WHERE event_id = ? AND user_id = ? AND email <> lower(?) ORDER BY email')
+				.bind(eventId, userId, row.guest_email)
+				.all<{ email: string }>();
 			return {
 				guestName: row.guest_name,
 				guestEmail: row.guest_email,
@@ -294,7 +316,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				// Bookings from before meeting_url existed kept the link in the event's location.
 				meetingUrl: row.meeting_code ? (row.meeting_url ?? row.location) : null,
 				location: row.page_location,
-				sequence: row.sequence
+				sequence: row.sequence,
+				collaborators: guests.map((guest) => guest.email)
 			};
 		},
 
@@ -339,7 +362,12 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					),
 				db
 					.prepare('INSERT INTO event_guests (event_id, user_id, email, name) VALUES (?, ?, lower(?), ?)')
-					.bind(booking.eventId, booking.userId, booking.guestEmail, booking.guestName)
+					.bind(booking.eventId, booking.userId, booking.guestEmail, booking.guestName),
+				...booking.collaborators.map((email) =>
+					db
+						.prepare('INSERT OR IGNORE INTO event_guests (event_id, user_id, email) VALUES (?, ?, lower(?))')
+						.bind(booking.eventId, booking.userId, email)
+				)
 			]);
 		},
 

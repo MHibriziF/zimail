@@ -152,6 +152,7 @@ function detailsFor(eventId: string, booking: StoredBooking, changes: Partial<Bo
 		meetingUrl: booking.meetingUrl,
 		location: booking.location,
 		sequence: booking.sequence + 1,
+		collaborators: booking.collaborators,
 		...changes
 	};
 }
@@ -261,7 +262,12 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 	): Promise<void> {
 		const host = await deps.hostOf(userId);
 		if (!host) return;
-		await deps.notify(userId, { ...details, hostName: host.name, hostEmail: host.email }, kind).catch(() => undefined);
+		// The host already gets a Bcc copy, and the guest is on To in their own right.
+		const others = new Set([host.email.toLowerCase(), details.guestEmail.toLowerCase()]);
+		const collaborators = (details.collaborators ?? []).filter((email) => !others.has(email.toLowerCase()));
+		await deps
+			.notify(userId, { ...details, collaborators, hostName: host.name, hostEmail: host.email }, kind)
+			.catch(() => undefined);
 	}
 
 	async function write(
@@ -376,7 +382,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 					meetingCode: room?.code ?? null,
 					meetingUrl: room?.url ?? null,
 					eventLocation: page.location ?? room?.url ?? null,
-					manageTokenHash: await hashToken(manageToken)
+					manageTokenHash: await hashToken(manageToken),
+					collaborators: page.collaborators
 				});
 			} catch (error) {
 				// The slot went to someone else; the room opened for this attempt has no use.
@@ -396,7 +403,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				timeZone: page.timeZone,
 				meetingUrl: room?.url ?? null,
 				location: page.location,
-				manage: { url: manageLink(baseUrl, manageToken), until: changeDeadline(start, page) }
+				manage: { url: manageLink(baseUrl, manageToken), until: changeDeadline(start, page) },
+				collaborators: page.collaborators
 			});
 			return {
 				type: 'ok',

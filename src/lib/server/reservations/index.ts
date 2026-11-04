@@ -5,7 +5,7 @@ import { getMeetingsService } from '../meet/meetings';
 import { renderEmailHtml, renderEmailText } from '../outbound/email-template';
 import { calendarAttachment, defaultSender } from '../outbound/calendar-mail';
 import { sendOutboundEmail } from '../outbound/send-mail';
-import { bookingEmailContent, bookingIcs, bookingMethod, type BookingDetails, type InviteKind } from './email';
+import { bookingEmailContent, bookingIcs, bookingMethod, bookingRecipients, type BookingDetails, type InviteKind } from './email';
 import { createD1ReservationsRepository } from './repository';
 import { createReservationsService, type MeetingRooms, type ReservationsService } from './service';
 
@@ -77,7 +77,7 @@ export function getReservationsService(platform: App.Platform | undefined | null
 			await sendOutboundEmail(getEmailProvider(platform), {
 				from: found.address,
 				senderName: found.name,
-				to: booking.guestEmail,
+				to: bookingRecipients(booking),
 				bcc: found.address.address,
 				subject: content.title,
 				text: renderEmailText(content),

@@ -94,7 +94,8 @@ function setup(options: SetupOptions = {}) {
 				meetingCode: booking.meetingCode,
 				meetingUrl: booking.meetingUrl,
 				location: page.location,
-				sequence: sequences.get(booking.eventId) ?? 0
+				sequence: sequences.get(booking.eventId) ?? 0,
+				collaborators: booking.collaborators.filter((email) => email !== booking.guestEmail)
 			};
 		},
 		async insertBooking(booking) {
@@ -228,6 +229,52 @@ describe('ReservationsService pages', () => {
 		await service.update('owner', pages[0].id, { ...body, active: false });
 		assert.equal(await service.publicPage('office-hours'), null);
 		assert.equal(await service.slots('office-hours', null), null);
+	});
+});
+
+describe('ReservationsService collaborators', () => {
+	const collaborators = ['me@other.test', 'ME@example.test', 'kim@example.com'];
+
+	test('every booking invites the collaborators with the guest, but not the host twice', async () => {
+		const state = setup();
+		await state.service.create('owner', { ...body, collaborators });
+		const outcome = await state.service.book('office-hours', guest, BASE);
+		assert.equal(outcome.type, 'ok');
+		assert.deepEqual(state.bookings[0].collaborators, ['me@other.test', 'me@example.test', 'kim@example.com']);
+		assert.deepEqual(state.notified[0].booking.collaborators, ['me@other.test', 'kim@example.com']);
+	});
+
+	test('a booker who is also a collaborator is only invited once', async () => {
+		const state = setup();
+		await state.service.create('owner', { ...body, collaborators: ['ana@example.com', 'kim@example.com'] });
+		await state.service.book('office-hours', guest, BASE);
+		assert.deepEqual(state.notified[0].booking.collaborators, ['kim@example.com']);
+	});
+
+	test('moves and cancellations reach the people the booking was sent to', async () => {
+		const state = setup();
+		await state.service.create('owner', { ...body, collaborators: ['kim@example.com'] });
+		await state.service.book('office-hours', guest, BASE);
+		// Removing a collaborator later doesn't strand them on an invite they already accepted.
+		await state.service.update('owner', state.pages[0].id, { ...body, collaborators: [] });
+		const eventId = state.bookings[0].eventId;
+		await state.service.rescheduleBooking('owner', eventId, new Date('2026-09-28T03:00:00.000Z'), new Date('2026-09-28T04:00:00.000Z'));
+		await state.service.cancelBooking('owner', eventId);
+		assert.deepEqual(
+			state.notified.map((entry) => [entry.kind, entry.booking.collaborators]),
+			[
+				['request', ['kim@example.com']],
+				['moved', ['kim@example.com']],
+				['cancel', ['kim@example.com']]
+			]
+		);
+	});
+
+	test('a page with a bad address is refused', async () => {
+		const { service } = setup();
+		assert.deepEqual(await service.create('owner', { ...body, collaborators: ['not an email'] }), {
+			type: 'invalid_collaborators'
+		});
 	});
 });
 
