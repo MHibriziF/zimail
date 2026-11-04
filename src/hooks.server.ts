@@ -187,16 +187,23 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const user = event.locals.user;
 	const member = db && user && !user.must_change_password ? user : null;
-	if (member) await loadMailboxContext(event, member.id);
+	const isApi = pathname.startsWith('/api/');
+	// Independent reads, so a page waits on one round trip to D1 instead of three.
+	if (member) {
+		await Promise.all([
+			loadMailboxContext(event, member.id),
+			isApi ? null : loadPreferences(event, member.id)
+		]);
+	}
 
-	if (pathname.startsWith('/api/')) return guardApi(event, resolve);
+	if (isApi) return guardApi(event, resolve);
 
-	if (member) await loadPreferences(event, member.id);
-
+	// Anyone signed in proves an account exists, so only visitors need the count.
+	const needsSetup = db && !user ? (await getAuthService(event.platform).countUsers()) === 0 : false;
 	const target = pageRedirect({
 		pathname,
 		user: event.locals.user,
-		needsSetup: db ? (await getAuthService(event.platform).countUsers()) === 0 : false,
+		needsSetup,
 		needsOnboarding: event.locals.domains.length === 0 || event.locals.addresses.length === 0
 	});
 	if (target) throw redirect(303, target);

@@ -14,6 +14,7 @@
 	import { getTheme } from '$lib/ui-theme/registry';
 	import MailboxLiveSync from '$lib/components/mailbox/MailboxLiveSync.svelte';
 	import SendToast from '$lib/components/mailbox/SendToast.svelte';
+	import NavigationProgress from '$lib/components/NavigationProgress.svelte';
 	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import type { LayoutData } from './$types';
 
@@ -100,6 +101,8 @@
 		/>
 	{/if}
 </svelte:head>
+
+<NavigationProgress />
 
 {#if showShell && shellData}
 	<MailboxLiveSync />
