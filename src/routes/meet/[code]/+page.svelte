@@ -350,8 +350,6 @@
 					<button type="button" class="btn-secondary" onclick={rejoin}>{t('meet.rejoin')}</button>
 					<a href="/" class="btn-primary">{t('meet.returnHome')}</a>
 				</div>
-			{:else if waitingAdmissionId}
-				<p class="note">{t('meet.waitingForHost')}</p>
 			{:else if waitingDenied}
 				<p class="note">{t('meet.admissionDenied')}</p>
 				<div class="left-actions">
@@ -437,6 +435,7 @@
 							placeholder={t('meet.namePlaceholder')}
 							autocomplete="name"
 							class="auth-input"
+							disabled={!!waitingAdmissionId}
 						/>
 					</div>
 
@@ -444,9 +443,14 @@
 						<p class="text-sm text-[var(--color-danger)]">{error}</p>
 					{/if}
 
-					<button type="submit" disabled={joining} class="btn-primary mt-2 w-full py-2.5">
-						{joining ? t('meet.joining') : t('meet.join')}
-					</button>
+					{#if waitingAdmissionId}
+						<!-- The host is deciding on the name they were shown, so only that stays fixed while waiting. -->
+						<p class="note" role="status">{t('meet.waitingForHost')}</p>
+					{:else}
+						<button type="submit" disabled={joining} class="btn-primary mt-2 w-full py-2.5">
+							{joining ? t('meet.joining') : t('meet.join')}
+						</button>
+					{/if}
 				</form>
 			{/if}
 		</div>
