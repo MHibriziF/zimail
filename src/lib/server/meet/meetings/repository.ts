@@ -16,11 +16,20 @@ export type Meeting = {
 	screen_share_policy: ScreenSharePolicy;
 	screen_share_mode: ScreenShareMode;
 	captions_enabled: boolean;
+	wait_for_host: boolean;
+	/** When the host first joined a room that waits for them; null until then. */
+	started_at: string | null;
+	scheduled_start: string | null;
+	scheduled_end: string | null;
 	created_at: string;
 };
 
-type MeetingRow = Omit<Meeting, 'require_approval' | 'screen_share_policy' | 'screen_share_mode' | 'captions_enabled'> & {
+type MeetingRow = Omit<
+	Meeting,
+	'require_approval' | 'screen_share_policy' | 'screen_share_mode' | 'captions_enabled' | 'wait_for_host'
+> & {
 	require_approval: number;
+	wait_for_host: number;
 	screen_share_policy: string;
 	screen_share_mode: string;
 	captions_enabled: number;
@@ -31,6 +40,7 @@ function toMeeting(row: MeetingRow): Meeting {
 		...row,
 		require_approval: !!row.require_approval,
 		captions_enabled: !!row.captions_enabled,
+		wait_for_host: !!row.wait_for_host,
 		screen_share_policy: parseScreenSharePolicy(row.screen_share_policy) ?? DEFAULT_SCREEN_SHARE.policy,
 		screen_share_mode: parseScreenShareMode(row.screen_share_mode) ?? DEFAULT_SCREEN_SHARE.mode
 	};
@@ -46,6 +56,9 @@ export type NewMeeting = {
 	screenSharePolicy: ScreenSharePolicy;
 	screenShareMode: ScreenShareMode;
 	captionsEnabled: boolean;
+	waitForHost: boolean;
+	scheduledStart: string | null;
+	scheduledEnd: string | null;
 	createdAt: string;
 };
 
@@ -55,6 +68,7 @@ export type MeetingFieldPatch = {
 	screenSharePolicy?: ScreenSharePolicy;
 	screenShareMode?: ScreenShareMode;
 	captionsEnabled?: boolean;
+	waitForHost?: boolean;
 };
 
 /**
@@ -73,10 +87,13 @@ export type MeetingsRepository = {
 	getForUser(userId: string, id: string): Promise<Meeting | null>;
 	updateFields(userId: string, id: string, patch: MeetingFieldPatch): Promise<boolean>;
 	updateCode(userId: string, id: string, code: string): Promise<boolean>;
+	/** Records the host's first join; later calls change nothing. */
+	markStarted(id: string, at: string): Promise<void>;
+	setSchedule(userId: string, id: string, start: string | null, end: string | null): Promise<boolean>;
 };
 
-const SELECT_FIELDS =
-	'id, user_id, code, title, require_approval, screen_share_policy, screen_share_mode, captions_enabled, created_at';
+const SELECT_FIELDS = `id, user_id, code, title, require_approval, screen_share_policy, screen_share_mode, captions_enabled,
+	wait_for_host, started_at, scheduled_start, scheduled_end, created_at`;
 
 export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 	return {
@@ -91,8 +108,9 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 		async insert(meeting) {
 			await db
 				.prepare(
-					`INSERT INTO meetings (id, user_id, domain_id, title, code, require_approval, screen_share_policy, screen_share_mode, captions_enabled, created_at)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					`INSERT INTO meetings (id, user_id, domain_id, title, code, require_approval, screen_share_policy, screen_share_mode, captions_enabled,
+					  wait_for_host, scheduled_start, scheduled_end, created_at)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(
 					meeting.id,
@@ -104,6 +122,9 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 					meeting.screenSharePolicy,
 					meeting.screenShareMode,
 					meeting.captionsEnabled ? 1 : 0,
+					meeting.waitForHost ? 1 : 0,
+					meeting.scheduledStart,
+					meeting.scheduledEnd,
 					meeting.createdAt
 				)
 				.run();
@@ -167,6 +188,10 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 				sets.push('captions_enabled = ?');
 				values.push(patch.captionsEnabled ? 1 : 0);
 			}
+			if (patch.waitForHost !== undefined) {
+				sets.push('wait_for_host = ?');
+				values.push(patch.waitForHost ? 1 : 0);
+			}
 			if (sets.length === 0) return false;
 
 			const result = await db
@@ -181,6 +206,18 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 			const result = await db
 				.prepare('UPDATE meetings SET code = ? WHERE id = ? AND user_id = ?')
 				.bind(code, id, userId)
+				.run();
+			return (result.meta.changes ?? 0) > 0;
+		},
+
+		async markStarted(id, at) {
+			await db.prepare('UPDATE meetings SET started_at = ? WHERE id = ? AND started_at IS NULL').bind(at, id).run();
+		},
+
+		async setSchedule(userId, id, start, end) {
+			const result = await db
+				.prepare('UPDATE meetings SET scheduled_start = ?, scheduled_end = ? WHERE id = ? AND user_id = ?')
+				.bind(start, end, id, userId)
 				.run();
 			return (result.meta.changes ?? 0) > 0;
 		}

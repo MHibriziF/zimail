@@ -24,6 +24,8 @@ export type CreatedMeeting = {
 export type JoinOutcome =
 	| { type: 'not_found' }
 	| { type: 'pending'; admissionId: string }
+	/** The room waits for its host, who hasn't joined yet; the guest asks again. */
+	| { type: 'waiting_for_host' }
 	| AdmittedOutcome;
 
 type AdmittedOutcome = {
@@ -54,6 +56,7 @@ export type MeetingChanges = {
 	screenSharePolicy?: ScreenSharePolicy;
 	screenShareMode?: ScreenShareMode;
 	captionsEnabled?: boolean;
+	waitForHost?: boolean;
 };
 
 /** What a participant may publish under the meeting's policy — the host is never restricted. */
@@ -107,8 +110,13 @@ export type MeetingsService = {
 			screenSharePolicy?: ScreenSharePolicy;
 			screenShareMode?: ScreenShareMode;
 			captionsEnabled?: boolean;
+			waitForHost?: boolean;
+			/** When the room is booked for, as ISO instants. */
+			schedule?: { start: string; end: string };
 		}
 	): Promise<CreatedMeeting>;
+	/** Owner-only; `false` when the meeting doesn't exist or isn't theirs. */
+	setSchedule(userId: string, id: string, schedule: { start: string; end: string } | null): Promise<boolean>;
 	list(userId: string, limit?: number): Promise<Meeting[]>;
 	/** Owner-only. False when the meeting doesn't exist or isn't the caller's. */
 	remove(userId: string, id: string): Promise<boolean>;
@@ -215,6 +223,9 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			const screenSharePolicy = options.screenSharePolicy ?? DEFAULT_SCREEN_SHARE.policy;
 			const screenShareMode = options.screenShareMode ?? DEFAULT_SCREEN_SHARE.mode;
 			const captionsEnabled = options.captionsEnabled ?? false;
+			const waitForHost = options.waitForHost ?? false;
+			const scheduledStart = options.schedule?.start ?? null;
+			const scheduledEnd = options.schedule?.end ?? null;
 			const createdAt = new Date().toISOString();
 
 			for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
@@ -230,6 +241,9 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 						screenSharePolicy,
 						screenShareMode,
 						captionsEnabled,
+						waitForHost,
+						scheduledStart,
+						scheduledEnd,
 						createdAt
 					});
 
@@ -244,6 +258,10 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 							screen_share_policy: screenSharePolicy,
 							screen_share_mode: screenShareMode,
 							captions_enabled: captionsEnabled,
+							wait_for_host: waitForHost,
+							started_at: null,
+							scheduled_start: scheduledStart,
+							scheduled_end: scheduledEnd,
 							created_at: createdAt
 						}
 					};
@@ -254,6 +272,8 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 
 			throw new Error('Could not generate a unique meeting code');
 		},
+
+		setSchedule: (userId, id, schedule) => repo.setSchedule(userId, id, schedule?.start ?? null, schedule?.end ?? null),
 
 		list: (userId, limit) => repo.listForUser(userId, limit),
 
@@ -268,6 +288,7 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			if (changes.screenSharePolicy !== undefined) patch.screenSharePolicy = changes.screenSharePolicy;
 			if (changes.screenShareMode !== undefined) patch.screenShareMode = changes.screenShareMode;
 			if (changes.captionsEnabled !== undefined) patch.captionsEnabled = changes.captionsEnabled;
+			if (changes.waitForHost !== undefined) patch.waitForHost = changes.waitForHost;
 
 			if (Object.keys(patch).length === 0) return repo.getForUser(userId, id);
 
@@ -340,6 +361,10 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			if (!meeting) return { type: 'not_found' };
 
 			const isOwner = requesterId === meeting.user_id;
+			if (meeting.wait_for_host) {
+				if (isOwner && !meeting.started_at) await repo.markStarted(meeting.id, new Date().toISOString());
+				if (!isOwner && !meeting.started_at) return { type: 'waiting_for_host' };
+			}
 			if (meeting.require_approval && !isOwner) {
 				const admission = await admissionsRepo.create(meeting.id, name ?? 'Guest');
 				return { type: 'pending', admissionId: admission.id };

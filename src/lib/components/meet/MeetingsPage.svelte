@@ -110,6 +110,10 @@
 					screen_share_policy: DEFAULT_SCREEN_SHARE.policy,
 					screen_share_mode: DEFAULT_SCREEN_SHARE.mode,
 					captions_enabled: false,
+					wait_for_host: false,
+					started_at: null,
+					scheduled_start: null,
+					scheduled_end: null,
 					created_at: new Date().toISOString()
 				},
 				...created

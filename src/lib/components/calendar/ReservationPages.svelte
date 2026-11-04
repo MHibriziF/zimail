@@ -5,6 +5,8 @@
 	import { DEFAULT_LOCALE, intlLocale } from '$lib/i18n/locales';
 	import { detectTimeZone } from '$lib/timezone';
 	import Icon from '../Icon.svelte';
+	import RoomOptions from './RoomOptions.svelte';
+	import { DEFAULT_ROOM_SETTINGS, type RoomSettings } from '$lib/meet/room-settings';
 	import { addDays, dateKeyToUtc } from '$lib/calendar/events';
 	import { dateKeyIn } from '$lib/calendar/grid';
 	import {
@@ -22,11 +24,12 @@
 	} from '$lib/calendar/reservations';
 	import { deleteReservationPage, fetchReservationPages, saveReservationPage } from '$lib/calendar/client';
 
-	type Draft = Omit<ReservationPageSettings, 'dayStart' | 'dayEnd' | 'collaborators'> & {
+	type Draft = Omit<ReservationPageSettings, 'dayStart' | 'dayEnd' | 'collaborators' | 'roomSettings'> & {
 		dayStart: string;
 		dayEnd: string;
 		/** Comma- or space-separated, as typed. */
 		collaborators: string;
+		roomSettings: RoomSettings;
 	};
 
 	const BUFFERS = [0, 5, 10, 15, 30, 60];
@@ -89,7 +92,8 @@
 			active: true,
 			withMeeting: meetingsAvailable,
 			rescheduleCutoffHours: DEFAULT_RESCHEDULE_CUTOFF_HOURS,
-			collaborators: ''
+			collaborators: '',
+			roomSettings: DEFAULT_ROOM_SETTINGS
 		};
 	}
 
@@ -102,8 +106,13 @@
 			location: existing.location ?? '',
 			dayStart: minutesToTime(existing.dayStart),
 			dayEnd: minutesToTime(existing.dayEnd),
-			collaborators: existing.collaborators.join(', ')
+			collaborators: existing.collaborators.join(', '),
+			roomSettings: existing.roomSettings ?? DEFAULT_ROOM_SETTINGS
 		};
+	}
+
+	function setRoom(patch: Partial<RoomSettings>) {
+		if (draft) draft.roomSettings = { ...draft.roomSettings, ...patch };
 	}
 
 	function toggleWeekday(day: number) {
@@ -295,6 +304,9 @@
 					<small>{meetingsAvailable ? t('calendar.reservations.withMeetingHint') : t('calendar.reservations.withMeetingUnavailable')}</small>
 				</span>
 			</label>
+			{#if draft.withMeeting && meetingsAvailable}
+				<RoomOptions room={draft.roomSettings} name="resv-room" onchange={setRoom} />
+			{/if}
 			<p class="resv-hint">{t('calendar.reservations.zoneNote', { zone: draft.timeZone })}</p>
 			<div class="resv-actions">
 				<button type="button" class="btn-ghost" onclick={() => (draft = null)}>{t('common.cancel')}</button>

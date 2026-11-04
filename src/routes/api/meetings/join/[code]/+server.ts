@@ -36,6 +36,9 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 		if (outcome.type === 'pending') {
 			return json({ pending: true, admissionId: outcome.admissionId });
 		}
+		if (outcome.type === 'waiting_for_host') {
+			return json({ waitingForHost: true });
+		}
 		return json({
 			url: outcome.url,
 			token: outcome.token,

@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ReservationPage, ReservationPageSettings } from '../../calendar/reservations';
+import { parseRoomSettings, type RoomSettings } from '../../meet/room-settings';
 
 type PageRow = {
 	id: string;
@@ -21,7 +22,17 @@ type PageRow = {
 	with_meeting: number;
 	reschedule_cutoff_hours: number;
 	collaborators: string | null;
+	room_settings: string | null;
 };
+
+function parseStoredRoom(value: string | null): RoomSettings | null {
+	if (!value) return null;
+	try {
+		return parseRoomSettings(JSON.parse(value)) ?? null;
+	} catch {
+		return null;
+	}
+}
 
 function parseCollaborators(value: string | null): string[] {
 	if (!value) return [];
@@ -58,12 +69,14 @@ function toPage(row: PageRow): StoredPage {
 		active: row.active === 1,
 		withMeeting: row.with_meeting === 1,
 		rescheduleCutoffHours: row.reschedule_cutoff_hours,
-		collaborators: parseCollaborators(row.collaborators)
+		collaborators: parseCollaborators(row.collaborators),
+		roomSettings: parseStoredRoom(row.room_settings)
 	};
 }
 
 const COLUMNS = `id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
-	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours, collaborators`;
+	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours, collaborators,
+	room_settings`;
 
 export type NewBooking = {
 	id: string;
@@ -165,7 +178,8 @@ function settingsValues(page: ReservationPageSettings): unknown[] {
 		page.active ? 1 : 0,
 		page.withMeeting ? 1 : 0,
 		page.rescheduleCutoffHours,
-		page.collaborators.length > 0 ? JSON.stringify(page.collaborators) : null
+		page.collaborators.length > 0 ? JSON.stringify(page.collaborators) : null,
+		page.roomSettings ? JSON.stringify(page.roomSettings) : null
 	];
 }
 
@@ -209,8 +223,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					`INSERT INTO reservation_pages
 					 (id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
 					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours,
-					  collaborators)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					  collaborators, room_settings)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(page.id, page.userId, ...settingsValues(page))
 				.run();
@@ -222,7 +236,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					`UPDATE reservation_pages
 					 SET slug = ?, title = ?, description = ?, location = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
 					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?,
-					     with_meeting = ?, reschedule_cutoff_hours = ?, collaborators = ?
+					     with_meeting = ?, reschedule_cutoff_hours = ?, collaborators = ?, room_settings = ?
 					 WHERE id = ? AND user_id = ?`
 				)
 				.bind(...settingsValues(page), id, userId)

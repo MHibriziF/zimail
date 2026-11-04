@@ -9,6 +9,7 @@ export const load: PageLoad = ({ params, data }) => {
 	return {
 		code: params.code,
 		userName: data.userName,
-		isLoggedIn: data.isLoggedIn
+		isLoggedIn: data.isLoggedIn,
+		schedule: data.schedule
 	};
 };
