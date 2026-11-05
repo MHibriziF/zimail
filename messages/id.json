@@ -1125,6 +1125,8 @@
 		"noneLeft": "Tidak ada lagi waktu kosong.",
 		"couldNotLoad": "Tidak dapat memuat waktu yang tersedia.",
 		"couldNotBook": "Tidak dapat memesan waktu itu.",
+		"guestLimit": "Anda sudah punya {count} reservasi mendatang di halaman ini. Batalkan salah satunya lewat email konfirmasi untuk memesan lagi.",
+		"pageBusy": "Halaman ini sudah menerima banyak reservasi hari ini. Silakan coba lagi besok.",
 		"name": "Nama Anda",
 		"email": "Email",
 		"note": "Ada tambahan? (opsional)",

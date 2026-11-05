@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import type { BookingOutcome, GuestChangeOutcome, PageWriteOutcome } from './service';
+import { MAX_UPCOMING_PER_GUEST, type BookingOutcome, type GuestChangeOutcome, type PageWriteOutcome } from './service';
 
 const PAGE_ERRORS: Record<Exclude<PageWriteOutcome['type'], 'ok'>, [string, number]> = {
 	invalid_title: ['Give the page a title.', 400],
@@ -26,7 +26,11 @@ const BOOKING_ERRORS: Record<Exclude<BookingOutcome['type'], 'ok'>, [string, num
 	invalid_name: ['Please enter your name.', 400],
 	invalid_email: ['Please enter a valid email address.', 400],
 	slot_taken: ['That time is no longer available. Please pick another.', 409],
-	too_many: ['This page can’t take more bookings right now.', 429]
+	guest_limit: [
+		`You already have ${MAX_UPCOMING_PER_GUEST} upcoming bookings on this page. Cancel one from its confirmation email to book another.`,
+		429
+	],
+	page_busy: ['This page has taken a lot of bookings today. Please try again tomorrow.', 429]
 };
 
 const GUEST_CHANGE_ERRORS: Record<Exclude<GuestChangeOutcome['type'], 'ok'>, [string, number]> = {

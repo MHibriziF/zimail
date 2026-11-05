@@ -1125,6 +1125,8 @@
 		"noneLeft": "Ya no quedan horarios libres.",
 		"couldNotLoad": "No se pudieron cargar los horarios.",
 		"couldNotBook": "No se pudo reservar ese horario.",
+		"guestLimit": "Ya tienes {count} reservas próximas en esta página. Cancela una desde su correo de confirmación para reservar otra.",
+		"pageBusy": "Esta página ha recibido muchas reservas hoy. Vuelve a intentarlo mañana.",
 		"name": "Tu nombre",
 		"email": "Correo",
 		"note": "¿Algo que añadir? (opcional)",

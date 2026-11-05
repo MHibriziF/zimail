@@ -20,6 +20,9 @@ export const MAX_PAGES_PER_USER = 20;
 export const SLOT_DAYS_PER_REQUEST = 7;
 /** The most one request may ask for: a month seen from any time zone, with a day either side. */
 export const MAX_SLOT_DAYS = 42;
+/** A page takes at most this many bookings a day, and one guest address this many upcoming ones. */
+export const MAX_BOOKINGS_PER_DAY = 30;
+export const MAX_UPCOMING_PER_GUEST = 3;
 
 /** A `?days=` value, clamped; anything unreadable is the default. */
 export function slotDays(value: string | null): number {

@@ -4,7 +4,7 @@ import type { CalendarEvent } from '../../../calendar/events';
 import type { CalendarRepository } from '../../calendar/repository';
 import type { BookingDetails } from '../email';
 import type { NewBooking, ReservationsRepository, StoredPage } from '../repository';
-import { createReservationsService, MAX_UPCOMING_PER_GUEST, type RoomSchedule } from '../service';
+import { createReservationsService, MAX_BOOKINGS_PER_DAY, MAX_UPCOMING_PER_GUEST, type RoomSchedule } from '../service';
 import type { RoomSettings } from '../../../meet/room-settings';
 import { MAX_SLOT_DAYS } from '../../../calendar/reservations';
 
@@ -453,7 +453,32 @@ describe('ReservationsService slots and booking', () => {
 		const outcomes = [];
 		for (const start of starts) outcomes.push((await service.book('office-hours', { ...guest, start }, BASE)).type);
 		assert.equal(outcomes.filter((type) => type === 'ok').length, MAX_UPCOMING_PER_GUEST);
-		assert.equal(outcomes.at(-1), 'too_many');
+		assert.equal(outcomes.at(-1), 'guest_limit');
+	});
+
+	test('a page that took a day’s worth of bookings says so, apart from the guest limit', async () => {
+		const { service, bookings, pages } = await withPage();
+		for (let index = 0; index < MAX_BOOKINGS_PER_DAY; index += 1) {
+			bookings.push({
+				id: `b${index}`,
+				pageId: pages[0].id,
+				userId: 'owner',
+				eventId: `e${index}`,
+				guestName: 'Guest',
+				guestEmail: `guest${index}@example.com`,
+				note: null,
+				start: `2027-01-01T${String(index).padStart(2, '0')}:00:00.000Z`,
+				end: `2027-01-01T${String(index).padStart(2, '0')}:30:00.000Z`,
+				createdAt: '2026-09-27T00:00:00.000Z',
+				eventTitle: 'Office hours',
+				eventNotes: '',
+				meetingCode: null,
+				meetingUrl: null,
+				eventLocation: null,
+				manageTokenHash: `h${index}`
+			} as NewBooking);
+		}
+		assert.deepEqual(await service.book('office-hours', guest, BASE), { type: 'page_busy' });
 	});
 
 	test('cancelling a booking removes it, frees the slot and sends a cancellation for the same event', async () => {

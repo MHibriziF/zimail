@@ -2,9 +2,11 @@ import { eventInterval } from '../../calendar/events';
 import { dateKeyIn, startOfDayIn } from '../../calendar/grid';
 import {
 	guestChangeBlock,
+	MAX_BOOKINGS_PER_DAY,
 	MAX_GUEST_RESCHEDULES,
 	MAX_PAGES_PER_USER,
 	MAX_SLOT_DAYS,
+	MAX_UPCOMING_PER_GUEST,
 	SLOT_DAYS_PER_REQUEST,
 	slugify,
 	validateGuest,
@@ -24,9 +26,7 @@ import type { ManagedBooking, ReservationsRepository, StoredBooking, StoredPage 
 import { createLinkToken, hashToken } from '../util/crypto';
 
 const DAY_MS = 86_400_000;
-/** A page takes at most this many bookings a day, and one guest address this many upcoming ones. */
-export const MAX_BOOKINGS_PER_DAY = 30;
-export const MAX_UPCOMING_PER_GUEST = 3;
+export { MAX_BOOKINGS_PER_DAY, MAX_UPCOMING_PER_GUEST };
 /**
  * How long a booking waits for the host's calendars to refresh before it is
  * checked against what is stored. A slow or unreachable calendar server never
@@ -63,7 +63,10 @@ export type BookingOutcome =
 	| { type: 'invalid_name' }
 	| { type: 'invalid_email' }
 	| { type: 'slot_taken' }
-	| { type: 'too_many' };
+	/** This guest address already holds `MAX_UPCOMING_PER_GUEST` upcoming bookings on the page. */
+	| { type: 'guest_limit' }
+	/** The page took `MAX_BOOKINGS_PER_DAY` bookings in the last 24 hours. */
+	| { type: 'page_busy' };
 
 export type ReservationsService = {
 	list(userId: string): Promise<ReservationPage[]>;
@@ -238,12 +241,13 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		start: Date,
 		at: Date,
 		email: string
-	): Promise<'slot_taken' | 'too_many' | null> {
+	): Promise<'slot_taken' | 'guest_limit' | 'page_busy' | null> {
 		const dateKey = dateKeyIn(start, page.timeZone);
 		if (!isFreeSlot(page, await busyNear(page, dateKey, 1), start, at, dateKey)) return 'slot_taken';
+		// The guest's own limit first: it's the one they can do something about.
+		if ((await repo.countUpcomingFor(page.id, email, at.toISOString())) >= MAX_UPCOMING_PER_GUEST) return 'guest_limit';
 		const since = new Date(at.getTime() - DAY_MS).toISOString();
-		if ((await repo.countCreatedSince(page.id, since)) >= MAX_BOOKINGS_PER_DAY) return 'too_many';
-		if ((await repo.countUpcomingFor(page.id, email, at.toISOString())) >= MAX_UPCOMING_PER_GUEST) return 'too_many';
+		if ((await repo.countCreatedSince(page.id, since)) >= MAX_BOOKINGS_PER_DAY) return 'page_busy';
 		return null;
 	}
 
