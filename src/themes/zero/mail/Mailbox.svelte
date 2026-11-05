@@ -4,6 +4,7 @@
 	import { page } from '$app/stores';
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { runMailAction } from '$lib/mail/client';
+	import { markThreadReadInSnapshots } from '$lib/mail/mailbox-cache';
 	import { initials, participantName } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -72,6 +73,7 @@
 			: items.map((thread) =>
 					thread.thread_id === threadId ? { ...thread, is_read: true } : thread
 				);
+		markThreadReadInSnapshots(threadId);
 		void invalidateAll();
 	}
 

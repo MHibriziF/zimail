@@ -11,7 +11,7 @@
 	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
 	import SendButton from '$lib/components/mailbox/SendButton.svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
-	import { describeMailError, sendMessage, type SendMessageInput } from '$lib/mail/client';
+	import { describeMailError, sendMessage, type SendMessageInput, mailWrite } from '$lib/mail/client';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';
 	import { isBodyEmpty, signatureFor, swapSignature } from '$lib/mail/signature';
 	import { composerBody, hasSignatureBlock } from '$lib/email-signature';
@@ -103,7 +103,7 @@
 		error = '';
 
 		try {
-			const res = await fetch('/api/drafts', {
+			const res = await mailWrite('/api/drafts', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -148,7 +148,7 @@
 			window.location.href = '/inbox';
 			return;
 		}
-		await fetch(`/api/drafts/${draftId}`, { method: 'DELETE' });
+		await mailWrite(`/api/drafts/${draftId}`, { method: 'DELETE' });
 		window.location.href = '/drafts';
 	}
 
