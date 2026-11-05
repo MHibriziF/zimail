@@ -11,12 +11,6 @@ export type ReminderKind = 'day' | 'hour';
 const HOUR_MS = 3_600_000;
 const LEAD_MS: Record<ReminderKind, number> = { day: 24 * HOUR_MS, hour: HOUR_MS };
 
-/**
- * A reminder this close to when it would be scheduled isn't sent: someone who
- * booked an hour ago has their confirmation fresh in their inbox.
- */
-export const REMINDER_QUIET_MS = 2 * HOUR_MS;
-
 export function parseReminderSetting(value: unknown): ReminderSetting | undefined {
 	return REMINDER_SETTINGS.find((setting) => setting === value);
 }
@@ -31,6 +25,22 @@ export function nextReminderAt(start: Date, setting: ReminderSetting, notBefore:
 	const due = kindsFor(setting)
 		.map((kind) => start.getTime() - LEAD_MS[kind])
 		.filter((at) => at > notBefore.getTime() && at < start.getTime())
+		.sort((a, b) => a - b);
+	return due.length > 0 ? new Date(due[0]) : null;
+}
+
+/**
+ * A new or moved booking's first reminder. One is only worth sending if at
+ * least as long has passed since the confirmation as it is ahead of the start:
+ * a day-before reminder for bookings made two or more days ahead, an hour-before
+ * one for bookings made two or more hours ahead. Anything sooner would land on
+ * top of a confirmation the guest still remembers.
+ */
+export function firstReminderAt(start: Date, setting: ReminderSetting, bookedAt: Date): Date | null {
+	const ahead = start.getTime() - bookedAt.getTime();
+	const due = kindsFor(setting)
+		.filter((kind) => ahead >= 2 * LEAD_MS[kind])
+		.map((kind) => start.getTime() - LEAD_MS[kind])
 		.sort((a, b) => a - b);
 	return due.length > 0 ? new Date(due[0]) : null;
 }
