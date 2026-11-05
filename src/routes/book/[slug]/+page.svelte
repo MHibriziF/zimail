@@ -7,7 +7,7 @@
 	import { APP_NAME } from '$lib/constants';
 	import Icon from '$lib/components/Icon.svelte';
 	import { detectTimeZone } from '$lib/timezone';
-	import { MAX_GUEST_NAME_LENGTH, MAX_GUEST_NOTE_LENGTH } from '$lib/calendar/reservations';
+	import { MAX_GUEST_NAME_LENGTH, MAX_GUEST_NOTE_LENGTH, MAX_UPCOMING_PER_GUEST } from '$lib/calendar/reservations';
 	import SlotPicker from '$lib/components/booking/SlotPicker.svelte';
 	import type { PageData } from './$types';
 
@@ -35,6 +35,13 @@
 	let dialog = $state<HTMLDialogElement>();
 	let booked = $state<{ start: string; end: string; meetingUrl: string | null; manageUrl: string | null } | null>(null);
 
+	/** The anti-spam limits, in the guest's language and saying which one they hit. */
+	function limitMessage(code: string | undefined): string | null {
+		if (code === 'guest_limit') return t('book.guestLimit', { count: MAX_UPCOMING_PER_GUEST });
+		if (code === 'page_busy') return t('book.pageBusy');
+		return null;
+	}
+
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 		if (!chosen || submitting) return;
@@ -58,7 +65,7 @@
 				booked = { start: body.start, end: body.end, meetingUrl: body.meetingUrl ?? null, manageUrl: body.manageUrl ?? null };
 				return;
 			}
-			const message = body.error ?? t('book.couldNotBook');
+			const message = limitMessage(body.code) ?? body.error ?? t('book.couldNotBook');
 			if (body.code === 'slot_taken') {
 				takenError = message;
 				picker?.drop(chosen);

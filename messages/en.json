@@ -1135,6 +1135,8 @@
 		"noneLeft": "There are no open times left.",
 		"couldNotLoad": "Could not load the available times.",
 		"couldNotBook": "Could not book that time.",
+		"guestLimit": "You already have {count} upcoming bookings on this page. Cancel one from its confirmation email to book another.",
+		"pageBusy": "This page has taken a lot of bookings today. Please try again tomorrow.",
 		"name": "Your name",
 		"email": "Email",
 		"note": "Anything to add? (optional)",

@@ -1135,6 +1135,8 @@
 		"noneLeft": "Il n'y a plus de créneau libre.",
 		"couldNotLoad": "Impossible de charger les créneaux.",
 		"couldNotBook": "Impossible de réserver ce créneau.",
+		"guestLimit": "Vous avez déjà {count} réservations à venir sur cette page. Annulez-en une depuis son e-mail de confirmation pour en faire une autre.",
+		"pageBusy": "Cette page a reçu beaucoup de réservations aujourd’hui. Réessayez demain.",
 		"name": "Votre nom",
 		"email": "E-mail",
 		"note": "Quelque chose à ajouter ? (facultatif)",
