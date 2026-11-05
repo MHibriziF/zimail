@@ -44,7 +44,8 @@ const page: ReservationPageSettings = {
 	rescheduleCutoffHours: 24,
 	collaborators: [],
 	roomSettings: null,
-	maxPerDay: null
+	maxPerDay: null,
+	reminders: 'day'
 };
 const now = new Date('2026-09-24T00:00:00.000Z');
 

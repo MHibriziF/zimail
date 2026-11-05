@@ -7,6 +7,7 @@
 	import { APP_NAME } from '$lib/constants';
 	import Icon from '$lib/components/Icon.svelte';
 	import SlotPicker from '$lib/components/booking/SlotPicker.svelte';
+	import AddToCalendar from '$lib/components/booking/AddToCalendar.svelte';
 	import { detectTimeZone } from '$lib/timezone';
 	import type { GuestChangeBlock } from '$lib/calendar/reservations';
 	import type { PageData } from './$types';
@@ -104,6 +105,18 @@
 					<a href={booking.meetingUrl}><Icon name="vidicon-line" size={15} />{t('book.joinLink')}</a>
 				{/if}
 			</p>
+			{#if done?.kind !== 'cancelled'}
+				<AddToCalendar
+					event={{
+						title: booking.host ? `${booking.pageTitle} · ${booking.host}` : booking.pageTitle,
+						start: new Date(start),
+						end: new Date(Date.parse(start) + Date.parse(booking.end) - Date.parse(booking.start)),
+						description: booking.meetingUrl ?? undefined,
+						location: booking.location ?? booking.meetingUrl ?? undefined
+					}}
+					icsUrl="/book/manage/{encodeURIComponent(data.token)}/ics"
+				/>
+			{/if}
 		</header>
 
 		{#if done?.kind === 'cancelled'}

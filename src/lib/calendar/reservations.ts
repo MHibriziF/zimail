@@ -5,6 +5,7 @@
 import { isValidTimeZone } from '../timezone';
 import { parseRoomSettings, type RoomSettings } from '../meet/room-settings';
 import { dateKeyToUtc, isPlausibleEmail } from './events';
+import { DEFAULT_REMINDERS, parseReminderSetting, type ReminderSetting } from './reminders';
 
 export const SLOT_LENGTHS = [15, 20, 30, 45, 60, 90, 120] as const;
 export const MAX_WINDOW_DAYS = 180;
@@ -70,6 +71,8 @@ export type ReservationPageSettings = {
 	roomSettings: RoomSettings | null;
 	/** The most bookings on one day, in the page's zone; `null` for no limit. */
 	maxPerDay: number | null;
+	/** Reminder emails to the guest before each booking. */
+	reminders: ReminderSetting;
 };
 
 export type ReservationPage =ReservationPageSettings & { id: string };
@@ -89,7 +92,8 @@ export type ReservationPageError =
 	| 'invalid_weekdays'
 	| 'invalid_cutoff'
 	| 'invalid_collaborators'
-	| 'invalid_max_per_day';
+	| 'invalid_max_per_day'
+	| 'invalid_reminders';
 
 export type GuestInput = { name: string; email: string; note: string };
 
@@ -226,6 +230,8 @@ export function validatePageSettings(
 	if (!collaborators) return { ok: false, error: 'invalid_collaborators' };
 	const maxPerDay = input.maxPerDay ?? null;
 	if (maxPerDay !== null && !isInt(maxPerDay, 1, MAX_PER_DAY_LIMIT)) return { ok: false, error: 'invalid_max_per_day' };
+	const reminders = input.reminders === undefined ? DEFAULT_REMINDERS : parseReminderSetting(input.reminders);
+	if (!reminders) return { ok: false, error: 'invalid_reminders' };
 	return {
 		ok: true,
 		value: {
@@ -247,7 +253,8 @@ export function validatePageSettings(
 			rescheduleCutoffHours: rescheduleCutoffHours as number,
 			collaborators,
 			roomSettings: parseRoomSettings(input.roomSettings) ?? null,
-			maxPerDay: maxPerDay as number | null
+			maxPerDay: maxPerDay as number | null,
+			reminders
 		}
 	};
 }

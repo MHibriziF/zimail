@@ -45,7 +45,8 @@ describe('ReservationsRepository', () => {
 			meetingUrl: 'https://mail.example/meet/abc-defg-hij',
 			manageTokenHash: 'hash-1',
 			eventLocation: 'https://mail.test/meet/abc-defg-hij',
-			collaborators: []
+			collaborators: [],
+			nextReminderAt: null
 		});
 		assert.equal(queries.length, 3);
 		assert.match(queries[0].sql, /INSERT INTO reservations/);
@@ -74,7 +75,8 @@ describe('ReservationsRepository', () => {
 			meetingUrl: null,
 			manageTokenHash: 'hash-2',
 			eventLocation: null,
-			collaborators: []
+			collaborators: [],
+			nextReminderAt: null
 		});
 		assert.match(queries[2].sql, /INSERT INTO event_guests .*lower\(\?\)/s);
 		assert.deepEqual(queries[2].args, ['e', 'u', 'Ana@Example.com', 'Ana']);
@@ -99,7 +101,8 @@ describe('ReservationsRepository', () => {
 			meetingUrl: null,
 			manageTokenHash: 'hash-3',
 			eventLocation: null,
-			collaborators: ['me@other.test', 'kim@example.com']
+			collaborators: ['me@other.test', 'kim@example.com'],
+			nextReminderAt: null
 		});
 		assert.equal(queries.length, 5);
 		assert.match(queries[3].sql, /INSERT OR IGNORE INTO event_guests/);
@@ -141,11 +144,13 @@ describe('ReservationsRepository', () => {
 			rescheduleCutoffHours: 24,
 			collaborators: ['me@other.test'],
 			roomSettings: { requireApproval: false, waitForHost: true, screenSharePolicy: 'open', screenShareMode: 'multiple' },
-			maxPerDay: 4
+			maxPerDay: 4,
+			reminders: 'both'
 		});
 		assert.ok(queries[0].args.includes('["me@other.test"]'));
-		assert.match(queries[0].sql, /max_per_day = \?/);
-		assert.equal(queries[0].args.at(-3), 4);
+		assert.match(queries[0].sql, /max_per_day = \?, reminders = \?/);
+		assert.equal(queries[0].args.at(-4), 4);
+		assert.equal(queries[0].args.at(-3), 'both');
 		assert.ok(queries[0].args.some((arg) => typeof arg === 'string' && arg.includes('"waitForHost":true')));
 		const read = (collaborators: string | null) =>
 			setup(() => [{ id: 'p', user_id: 'u', slug: 's', weekdays: '1', collaborators }]).repo.getBySlug('s');

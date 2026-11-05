@@ -24,6 +24,7 @@
 		type ReservationPageSettings
 	} from '$lib/calendar/reservations';
 	import { deleteReservationPage, fetchReservationPages, saveReservationPage } from '$lib/calendar/client';
+	import { DEFAULT_REMINDERS, REMINDER_SETTINGS } from '$lib/calendar/reminders';
 
 	type Draft = Omit<ReservationPageSettings, 'dayStart' | 'dayEnd' | 'collaborators' | 'roomSettings'> & {
 		dayStart: string;
@@ -95,7 +96,8 @@
 			rescheduleCutoffHours: DEFAULT_RESCHEDULE_CUTOFF_HOURS,
 			collaborators: '',
 			roomSettings: DEFAULT_ROOM_SETTINGS,
-			maxPerDay: null
+			maxPerDay: null,
+			reminders: DEFAULT_REMINDERS
 		};
 	}
 
@@ -280,6 +282,15 @@
 						<option value={hours}>{hours >= 24 ? t('calendar.reservations.noticeDays', { count: hours / 24 }) : t('calendar.reservations.noticeHours', { count: hours })}</option>
 					{/each}
 				</select>
+			</label>
+			<label class="resv-field">
+				<span>{t('calendar.reservations.reminders')}</span>
+				<select class="resv-input" bind:value={draft.reminders}>
+					{#each REMINDER_SETTINGS as setting (setting)}
+						<option value={setting}>{t(`calendar.reservations.reminders_${setting}`)}</option>
+					{/each}
+				</select>
+				<small class="resv-hint">{t('calendar.reservations.remindersHint')}</small>
 			</label>
 			<label class="resv-field">
 				<span>{t('calendar.reservations.maxPerDay')}</span>

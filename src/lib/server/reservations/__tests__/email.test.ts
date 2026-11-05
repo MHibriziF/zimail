@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import { expandCalendar } from '../../../calendar/ics';
 import { calendarAttachment } from '../../outbound/calendar-mail';
-import { bookingEmailContent, bookingIcs, bookingMethod, bookingRecipients, type BookingDetails } from '../email';
+import { bookingEmailContent, bookingIcs, bookingMethod, bookingRecipients, bookingReminderContent, type BookingDetails } from '../email';
 
 const inviteContentType = (kind: Parameters<typeof bookingMethod>[0]) => calendarAttachment('', bookingMethod(kind)).type;
 
@@ -184,5 +184,24 @@ describe('changes the guest made', () => {
 		const ics = bookingIcs({ ...details, sequence: 2 }, 'guest-cancel', now);
 		assert.match(ics, /\r\nMETHOD:CANCEL\r\n/);
 		assert.match(ics, /\r\nSTATUS:CANCELLED\r\n/);
+	});
+});
+
+describe('add to calendar and reminders', () => {
+	const manage = { url: 'https://mail.test/book/manage/tok', until: new Date('2026-09-27T02:00:00.000Z') };
+
+	test('the confirmation offers Google, Outlook and the guest’s own .ics', () => {
+		const links = bookingEmailContent({ ...details, manage }).links;
+		assert.equal(links?.label, 'Add to calendar');
+		assert.deepEqual(links?.items.map((item) => item.label), ['Google Calendar', 'Outlook', 'Download .ics']);
+		assert.equal(links?.items[2].href, 'https://mail.test/book/manage/tok/ics');
+		assert.match(links!.items[0].href, /dates=20260928T020000Z%2F20260928T030000Z/);
+	});
+
+	test('a reminder says when, and links to join', () => {
+		const day = bookingReminderContent({ ...details, meetingUrl: 'https://mail.test/meet/abc' }, 'day');
+		assert.equal(day.title, 'Reminder: Office hours; weekly tomorrow');
+		assert.equal(day.action?.href, 'https://mail.test/meet/abc');
+		assert.equal(bookingReminderContent(details, 'hour').title, 'Reminder: Office hours; weekly in about an hour');
 	});
 });

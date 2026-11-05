@@ -9,6 +9,7 @@
 	import { detectTimeZone } from '$lib/timezone';
 	import { MAX_GUEST_NAME_LENGTH, MAX_GUEST_NOTE_LENGTH, MAX_UPCOMING_PER_GUEST } from '$lib/calendar/reservations';
 	import SlotPicker from '$lib/components/booking/SlotPicker.svelte';
+	import AddToCalendar from '$lib/components/booking/AddToCalendar.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -134,6 +135,16 @@
 					<p class="book-hint book-link">{booked.meetingUrl}</p>
 				{/if}
 				<p class="book-hint">{t('book.confirmationSent', { email })}</p>
+				<AddToCalendar
+					event={{
+						title: `${reservation.title} · ${reservation.host}`,
+						start: new Date(booked.start),
+						end: new Date(booked.end),
+						description: booked.meetingUrl ?? undefined,
+						location: reservation.location ?? booked.meetingUrl ?? undefined
+					}}
+					icsUrl={booked.manageUrl ? `${booked.manageUrl}/ics` : null}
+				/>
 				{#if booked.manageUrl}
 					<a class="book-manage" href={booked.manageUrl}>{t('book.manageLink')}</a>
 				{/if}

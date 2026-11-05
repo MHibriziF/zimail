@@ -10,6 +10,8 @@
  */
 import { icsDocument, icsParam, icsText, icsTime } from '../../calendar/ics/write';
 import type { EmailContent } from '../outbound/email-template';
+import { googleCalendarLink, outlookCalendarLink, type CalendarLinkEvent } from '../../calendar/add-to-calendar';
+import type { ReminderKind } from '../../calendar/reminders';
 
 export type BookingDetails = {
 	/** Stable per booking — the cancellation has to name the same event. */
@@ -43,15 +45,39 @@ export function bookingRecipients(details: BookingDetails): string[] {
 
 /** `moved` is an update to the time — still a REQUEST, with a higher SEQUENCE. */
 /** `guest-*`: the guest changed it themselves, through their link. */
-export type InviteKind = 'request' | 'moved' | 'cancel' | 'guest-moved' | 'guest-cancel';
+/** `publish`: a file the guest downloads and imports, not an invitation to answer. */
+export type InviteKind = 'request' | 'moved' | 'cancel' | 'guest-moved' | 'guest-cancel' | 'publish';
 
 const METHOD: Record<InviteKind, string> = {
 	request: 'REQUEST',
 	moved: 'REQUEST',
 	cancel: 'CANCEL',
 	'guest-moved': 'REQUEST',
-	'guest-cancel': 'CANCEL'
+	'guest-cancel': 'CANCEL',
+	publish: 'PUBLISH'
 };
+
+/** The event as calendars show it, shared by the invitation and the add-to-calendar links. */
+function calendarEvent(details: BookingDetails): CalendarLinkEvent {
+	return {
+		title: `${details.pageTitle} with ${details.hostName}`,
+		start: details.start,
+		end: details.end,
+		description: description(details) || undefined,
+		location: details.location ?? details.meetingUrl ?? undefined
+	};
+}
+
+/** For mail that doesn't turn the invitation into an event by itself. */
+function addToCalendar(details: BookingDetails): NonNullable<EmailContent['links']> {
+	const event = calendarEvent(details);
+	const items = [
+		{ label: 'Google Calendar', href: googleCalendarLink(event) },
+		{ label: 'Outlook', href: outlookCalendarLink(event) }
+	];
+	if (details.manage) items.push({ label: 'Download .ics', href: `${details.manage.url}/ics` });
+	return { label: 'Add to calendar', items };
+}
 
 const isCancel = (kind: InviteKind) => kind === 'cancel' || kind === 'guest-cancel';
 
@@ -85,6 +111,7 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 		title: kind === 'request' ? `You're booked: ${details.pageTitle}` : `New time: ${details.pageTitle}`,
 		lead: bookingLead(details, kind),
 		details: [{ label: 'When', value: formatWhen(details) }, withHost, { label: 'Name', value: details.guestName }],
+		links: addToCalendar(details),
 		footer: details.manage
 			? `You can reschedule or cancel with the link above until ${formatWhen({ ...details, start: details.manage.until })}. After that, reply to this email.`
 			: 'Need to change something? Reply to this email.'
@@ -96,6 +123,25 @@ export function bookingEmailContent(details: BookingDetails, kind: InviteKind = 
 		content.action = { label: 'Join the meeting', href: details.meetingUrl };
 	}
 	if (details.collaborators?.length) content.details!.push({ label: 'Guests', value: bookingRecipients(details).join(', ') });
+	if (details.note) content.details!.push({ label: 'Note', value: details.note });
+	return content;
+}
+
+/** The reminder before a booking. No invitation attached: the guest already has (or chose not to keep) the event. */
+export function bookingReminderContent(details: BookingDetails, kind: ReminderKind): EmailContent {
+	const when = kind === 'day' ? 'tomorrow' : 'in about an hour';
+	const content: EmailContent = {
+		title: `Reminder: ${details.pageTitle} ${when}`,
+		lead: `Your reservation with ${details.hostName} starts ${when}.`,
+		details: [{ label: 'When', value: formatWhen(details) }, { label: 'With', value: `${details.hostName} <${details.hostEmail}>` }],
+		links: addToCalendar(details),
+		footer: 'Need to change it? Use the link in your confirmation email, or reply to this email.'
+	};
+	if (details.location) content.details!.push({ label: 'Where', value: details.location });
+	if (details.meetingUrl) {
+		content.details!.push({ label: 'Meeting', value: details.meetingUrl });
+		content.action = { label: 'Join the meeting', href: details.meetingUrl };
+	}
 	if (details.note) content.details!.push({ label: 'Note', value: details.note });
 	return content;
 }
@@ -114,6 +160,13 @@ function description(details: BookingDetails): string {
 	return [details.meetingUrl ? `Join the Zimail meeting: ${details.meetingUrl}` : '', details.note]
 		.filter(Boolean)
 		.join('\n\n');
+}
+
+function attendeeLines(details: BookingDetails): string[] {
+	return [
+		`ATTENDEE;CN=${icsParam(details.guestName)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${details.guestEmail}`,
+		...(details.collaborators ?? []).map((email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${email}`)
+	];
 }
 
 export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request', now = new Date()): string {
@@ -136,10 +189,8 @@ export function bookingIcs(details: BookingDetails, kind: InviteKind = 'request'
 		`STATUS:${cancelled ? 'CANCELLED' : 'CONFIRMED'}`,
 		'TRANSP:OPAQUE',
 		`ORGANIZER;CN=${icsParam(details.hostName)}:mailto:${details.hostEmail}`,
-		`ATTENDEE;CN=${icsParam(details.guestName)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${details.guestEmail}`,
-		...(details.collaborators ?? []).map(
-			(email) => `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${email}`
-		),
+		// An imported file is just the event; attendees with RSVP would make some apps treat it as an invitation to answer.
+		...(kind === 'publish' ? [] : attendeeLines(details)),
 		// LOCATION is what calendars show: the place when there is one, else the join link. URL always carries the link.
 		...(details.location || details.meetingUrl ? [`LOCATION:${icsText(details.location ?? details.meetingUrl ?? '')}`] : []),
 		...(details.meetingUrl ? [`URL:${details.meetingUrl}`] : []),
