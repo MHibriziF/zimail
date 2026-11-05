@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import {
+		DisconnectReason,
 		Room,
 		RoomEvent,
 		Track,
@@ -110,7 +111,8 @@
 		/** From before a rejoin, so leaving and coming back doesn't lose it. */
 		initialTranscript?: CaptionLine[];
 		/** Gets the call's transcript, so the page can still offer it once the call is gone. */
-		onleave: (transcript: CaptionLine[]) => void;
+		/** `ended` when the host closed the call for everyone; `deleted` when they also deleted the meeting. */
+		onleave: (transcript: CaptionLine[], reason?: 'left' | 'ended' | 'deleted') => void;
 	} = $props();
 
 	// getDisplayMedia has no mobile browser support (iOS/WebKit or Chrome
@@ -1119,8 +1121,9 @@
 	}
 
 	/** A failed connect fires Disconnected too; that one stays on the stage as an error with Retry. */
-	function handleDisconnected() {
-		if (!awaitingConnect) onleave(captionLines);
+	function handleDisconnected(reason?: DisconnectReason) {
+		if (awaitingConnect || endingMeeting) return;
+		onleave(captionLines, reason === DisconnectReason.ROOM_DELETED ? 'ended' : 'left');
 	}
 
 	function retryConnect() {
@@ -1920,13 +1923,34 @@
 		recordingChoices({ isHost, meetingSupported: canRecordMeeting, viewSupported: canRecordView })
 	);
 
-	async function leave() {
+	async function leave(reason: 'left' | 'ended' | 'deleted' = 'left') {
 		// Save first: MediaRecorder only hands over its last chunk after stop() settles.
 		await finishRecording();
 		playLeaveChime();
 		stopAdmissionsPolling();
 		room?.disconnect();
-		onleave(captionLines);
+		onleave(captionLines, reason);
+	}
+
+	/** Set while the host's own end request is out, so the room closing under them isn't read as being ended. */
+	let endingMeeting = false;
+
+	async function endMeeting(remove: boolean) {
+		if (endingMeeting || !meetingId) return;
+		endingMeeting = true;
+		try {
+			const response = await fetch(`/api/meetings/${encodeURIComponent(meetingId)}/end`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ delete: remove })
+			});
+			if (!response.ok) throw new Error(String(response.status));
+			await leave(remove ? 'deleted' : 'ended');
+		} catch {
+			showNotice(t('meet.endFailed'));
+		} finally {
+			endingMeeting = false;
+		}
 	}
 </script>
 
@@ -2189,7 +2213,8 @@
 		onTogglePanel={togglePanel}
 		onToggleHand={toggleHand}
 		onSendReaction={sendReaction}
-		onLeave={leave}
+		onLeave={() => leave()}
+		onEndMeeting={meetingId ? endMeeting : undefined}
 	/>
 </div>
 

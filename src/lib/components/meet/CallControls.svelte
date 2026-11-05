@@ -52,7 +52,8 @@
 		onTogglePanel,
 		onToggleHand,
 		onSendReaction,
-		onLeave
+		onLeave,
+		onEndMeeting
 	}: {
 		deafened: boolean;
 		micEnabled: boolean;
@@ -103,7 +104,23 @@
 		onToggleHand: () => void;
 		onSendReaction: (emoji: Reaction) => void;
 		onLeave: () => void;
+		/** Host only: ends the call for everyone, and with `remove` deletes the meeting. */
+		onEndMeeting?: (remove: boolean) => void;
 	} = $props();
+
+	let leaveMenuOpen = $state(false);
+	let confirmDelete = $state(false);
+	let leaveEl = $state<HTMLDivElement>();
+
+	function toggleLeaveMenu() {
+		leaveMenuOpen = !leaveMenuOpen;
+		confirmDelete = false;
+	}
+
+	function endMeeting(remove: boolean) {
+		leaveMenuOpen = false;
+		onEndMeeting?.(remove);
+	}
 
 	let reactionMenuOpen = $state(false);
 	let reactionEl = $state<HTMLDivElement>();
@@ -115,11 +132,13 @@
 		const target = event.target as Node;
 		if (reactionMenuOpen && !reactionEl?.contains(target)) reactionMenuOpen = false;
 		if (moreMenuOpen && !moreEl?.contains(target)) moreMenuOpen = false;
+		if (leaveMenuOpen && !leaveEl?.contains(target)) leaveMenuOpen = false;
 	}
 
 	function closeMenus() {
 		reactionMenuOpen = false;
 		moreMenuOpen = false;
+		leaveMenuOpen = false;
 	}
 
 	const handLabel = $derived(`${handRaised ? t('meet.lowerHand') : t('meet.raiseHand')} (Ctrl+Alt+H)`);
@@ -390,9 +409,55 @@
 			{/if}
 		</div>
 
-		<button type="button" class="call-btn call-btn-leave" onclick={onLeave} aria-label={t('meet.leave')} title={t('meet.leave')}>
-			<Icon name="phone-line" size={20} />
-		</button>
+		{#if isHost && onEndMeeting}
+			<div class="call-menu-anchor" bind:this={leaveEl}>
+				<button
+					type="button"
+					class="call-btn call-btn-leave"
+					onclick={toggleLeaveMenu}
+					aria-label={t('meet.leave')}
+					aria-haspopup="menu"
+					aria-expanded={leaveMenuOpen}
+					title={t('meet.leave')}
+				>
+					<Icon name="phone-line" size={20} />
+				</button>
+				{#if leaveMenuOpen}
+					<div class="call-menu call-leave-menu" role="menu">
+						<div class="call-menu-section">
+							{#if confirmDelete}
+								<p class="call-menu-confirm">{t('meet.deleteMeetingConfirm')}</p>
+								<button type="button" role="menuitem" class="call-menu-alert" onclick={() => endMeeting(true)}>
+									<Icon name="delete-bin-line" size={18} />
+									<span>{t('meet.deleteMeeting')}</span>
+								</button>
+								<button type="button" role="menuitem" onclick={() => (confirmDelete = false)}>
+									<Icon name="arrow-left-line" size={18} />
+									<span>{t('common.cancel')}</span>
+								</button>
+							{:else}
+								<button type="button" role="menuitem" onclick={onLeave}>
+									<Icon name="logout-box-r-line" size={18} />
+									<span>{t('meet.leaveCall')}<small>{t('meet.leaveCallHint')}</small></span>
+								</button>
+								<button type="button" role="menuitem" class="call-menu-alert" onclick={() => endMeeting(false)}>
+									<Icon name="phone-line" size={18} />
+									<span>{t('meet.endForAll')}<small>{t('meet.endForAllHint')}</small></span>
+								</button>
+								<button type="button" role="menuitem" class="call-menu-alert" onclick={() => (confirmDelete = true)}>
+									<Icon name="delete-bin-line" size={18} />
+									<span>{t('meet.deleteMeeting')}<small>{t('meet.deleteMeetingHint')}</small></span>
+								</button>
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</div>
+		{:else}
+			<button type="button" class="call-btn call-btn-leave" onclick={onLeave} aria-label={t('meet.leave')} title={t('meet.leave')}>
+				<Icon name="phone-line" size={20} />
+			</button>
+		{/if}
 	</div>
 
 	<div class="call-group call-group-panels desktop-only">
@@ -633,6 +698,13 @@
 		color: #f87171;
 	}
 
+	.call-menu-confirm {
+		padding: 0.5rem 0.625rem;
+		font-size: 0.8125rem;
+		line-height: 1.45;
+		color: #d4d4d8;
+	}
+
 	.call-menu small {
 		display: block;
 		margin-top: 0.125rem;
@@ -729,6 +801,10 @@
 			left: auto;
 			right: calc(-48px - 0.5rem);
 			transform: none;
+		}
+
+		.call-leave-menu {
+			right: 0;
 		}
 	}
 

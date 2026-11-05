@@ -139,6 +139,11 @@ export type MeetingsService = {
 	 * the rule stops being seen regardless.
 	 */
 	stopScreenShare(userId: string, meetingId: string, identity: string): Promise<'meeting_not_found' | 'ok'>;
+	/**
+	 * Owner-only: ends the call for everyone in it. With `remove`, the meeting is
+	 * deleted too and its code stops working; otherwise the link stays usable.
+	 */
+	end(userId: string, meetingId: string, options: { remove: boolean }): Promise<'meeting_not_found' | 'ok'>;
 	rotateCode(userId: string, id: string): Promise<string | null>;
 	/** Owner-only — `null` when the meeting doesn't exist or isn't the caller's. */
 	listPendingAdmissions(userId: string, meetingId: string): Promise<PendingAdmission[] | null>;
@@ -322,6 +327,16 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			for (const track of target?.tracks.filter(isScreenShareTrack) ?? []) {
 				await liveKit.muteTrack(meeting.id, identity, track.sid);
 			}
+			return 'ok';
+		},
+
+		async end(userId, meetingId, { remove }) {
+			const meeting = await repo.getForUser(userId, meetingId);
+			if (!meeting) return 'meeting_not_found';
+			// The room first: if it can't be closed, the meeting is still there to end again.
+			await getLiveKit().deleteRoom(meeting.id);
+			if (remove) await repo.deleteForUser(userId, meeting.id);
+			else await repo.clearStarted(meeting.id);
 			return 'ok';
 		},
 
