@@ -23,6 +23,7 @@ type PageRow = {
 	reschedule_cutoff_hours: number;
 	collaborators: string | null;
 	room_settings: string | null;
+	max_per_day: number | null;
 };
 
 function parseStoredRoom(value: string | null): RoomSettings | null {
@@ -70,13 +71,14 @@ function toPage(row: PageRow): StoredPage {
 		withMeeting: row.with_meeting === 1,
 		rescheduleCutoffHours: row.reschedule_cutoff_hours,
 		collaborators: parseCollaborators(row.collaborators),
-		roomSettings: parseStoredRoom(row.room_settings)
+		roomSettings: parseStoredRoom(row.room_settings),
+		maxPerDay: row.max_per_day ?? null
 	};
 }
 
 const COLUMNS = `id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
 	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours, collaborators,
-	room_settings`;
+	room_settings, max_per_day`;
 
 export type NewBooking = {
 	id: string;
@@ -118,6 +120,8 @@ export type ReservationsRepository = {
 	delete(userId: string, id: string): Promise<boolean>;
 	/** Bookings made on the page since `since` — a flood check. */
 	countCreatedSince(pageId: string, since: string): Promise<number>;
+	/** Start times of the page's bookings in `[from, to)`, optionally leaving one calendar event out. */
+	listStartsBetween(pageId: string, from: string, to: string, excludingEventId?: string): Promise<string[]>;
 	/** Upcoming bookings by one guest address. */
 	countUpcomingFor(pageId: string, email: string, now: string): Promise<number>;
 	/** The reservation and its calendar event, in one batch. Throws on a taken slot. */
@@ -179,7 +183,8 @@ function settingsValues(page: ReservationPageSettings): unknown[] {
 		page.withMeeting ? 1 : 0,
 		page.rescheduleCutoffHours,
 		page.collaborators.length > 0 ? JSON.stringify(page.collaborators) : null,
-		page.roomSettings ? JSON.stringify(page.roomSettings) : null
+		page.roomSettings ? JSON.stringify(page.roomSettings) : null,
+		page.maxPerDay
 	];
 }
 
@@ -223,8 +228,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					`INSERT INTO reservation_pages
 					 (id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
 					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours,
-					  collaborators, room_settings)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					  collaborators, room_settings, max_per_day)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(page.id, page.userId, ...settingsValues(page))
 				.run();
@@ -236,7 +241,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					`UPDATE reservation_pages
 					 SET slug = ?, title = ?, description = ?, location = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
 					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?,
-					     with_meeting = ?, reschedule_cutoff_hours = ?, collaborators = ?, room_settings = ?
+					     with_meeting = ?, reschedule_cutoff_hours = ?, collaborators = ?, room_settings = ?,
+					     max_per_day = ?
 					 WHERE id = ? AND user_id = ?`
 				)
 				.bind(...settingsValues(page), id, userId)
@@ -259,6 +265,15 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				.bind(pageId, since)
 				.first<{ count: number }>();
 			return row?.count ?? 0;
+		},
+
+		async listStartsBetween(pageId, from, to, excludingEventId) {
+			// Served by the unique index on (page_id, starts_at).
+			const { results } = await db
+				.prepare('SELECT starts_at, event_id FROM reservations WHERE page_id = ? AND starts_at >= ? AND starts_at < ?')
+				.bind(pageId, from, to)
+				.all<{ starts_at: string; event_id: string }>();
+			return results.filter((row) => row.event_id !== excludingEventId).map((row) => row.starts_at);
 		},
 
 		async countUpcomingFor(pageId, email, now) {

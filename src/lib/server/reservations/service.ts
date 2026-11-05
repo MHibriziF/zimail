@@ -1,4 +1,4 @@
-import { eventInterval } from '../../calendar/events';
+import { addDays, eventInterval } from '../../calendar/events';
 import { dateKeyIn, startOfDayIn } from '../../calendar/grid';
 import {
 	guestChangeBlock,
@@ -55,6 +55,7 @@ export type GuestChangeOutcome =
 	| { type: 'ok'; start: string; end: string }
 	| { type: 'not_found' }
 	| { type: 'slot_taken' }
+	| { type: 'day_full' }
 	| { type: GuestChangeBlock };
 
 export type BookingOutcome =
@@ -63,6 +64,8 @@ export type BookingOutcome =
 	| { type: 'invalid_name' }
 	| { type: 'invalid_email' }
 	| { type: 'slot_taken' }
+	/** The day already holds the page's `maxPerDay` bookings. */
+	| { type: 'day_full' }
 	/** This guest address already holds `MAX_UPCOMING_PER_GUEST` upcoming bookings on the page. */
 	| { type: 'guest_limit' }
 	/** The page took `MAX_BOOKINGS_PER_DAY` bookings in the last 24 hours. */
@@ -209,8 +212,27 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		const requested = fromKey && /^\d{4}-\d{2}-\d{2}$/.test(fromKey) ? fromKey : today;
 		const start = [requested, today, page.startDate].sort((a, b) => a.localeCompare(b))[2];
 		const count = Math.min(Math.max(1, days), MAX_SLOT_DAYS);
-		const busy = await busyNear(page, start, count, excluding);
-		return computeSlots(page, busy, { fromKey: start, days: count, now: at });
+		const [busy, full] = await Promise.all([busyNear(page, start, count, excluding), fullDays(page, start, count, excluding)]);
+		const found = computeSlots(page, busy, { fromKey: start, days: count, now: at });
+		return full.size === 0 ? found : found.map((day) => (full.has(day.date) ? { ...day, slots: [] } : day));
+	}
+
+	/**
+	 * Days in `[fromKey, fromKey + days)` that already hold the page's daily
+	 * cap of bookings, in its zone. Nothing to read when the page has no cap.
+	 * `excluding` is a booking being moved, which doesn't count against its own day.
+	 */
+	async function fullDays(page: StoredPage, fromKey: string, days: number, excluding?: string): Promise<Set<string>> {
+		const cap = page.maxPerDay;
+		if (!cap) return new Set();
+		const from = startOfDayIn(fromKey, page.timeZone).toISOString();
+		const to = startOfDayIn(addDays(fromKey, days), page.timeZone).toISOString();
+		const perDay = new Map<string, number>();
+		for (const start of await repo.listStartsBetween(page.id, from, to, excluding)) {
+			const key = dateKeyIn(new Date(start), page.timeZone);
+			perDay.set(key, (perDay.get(key) ?? 0) + 1);
+		}
+		return new Set([...perDay].filter(([, count]) => count >= cap).map(([key]) => key));
 	}
 
 	const manageLink = (baseUrl: string, token: string) => new URL(`/book/manage/${token}`, baseUrl).href;
@@ -241,9 +263,10 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		start: Date,
 		at: Date,
 		email: string
-	): Promise<'slot_taken' | 'guest_limit' | 'page_busy' | null> {
+	): Promise<'slot_taken' | 'day_full' | 'guest_limit' | 'page_busy' | null> {
 		const dateKey = dateKeyIn(start, page.timeZone);
 		if (!isFreeSlot(page, await busyNear(page, dateKey, 1), start, at, dateKey)) return 'slot_taken';
+		if ((await fullDays(page, dateKey, 1)).has(dateKey)) return 'day_full';
 		// The guest's own limit first: it's the one they can do something about.
 		if ((await repo.countUpcomingFor(page.id, email, at.toISOString())) >= MAX_UPCOMING_PER_GUEST) return 'guest_limit';
 		const since = new Date(at.getTime() - DAY_MS).toISOString();
@@ -498,6 +521,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const dateKey = dateKeyIn(start, page.timeZone);
 			const busy = await busyNear(page, dateKey, 1, booking.eventId);
 			if (!isFreeSlot(page, busy, start, now(), dateKey)) return { type: 'slot_taken' };
+			if ((await fullDays(page, dateKey, 1, booking.eventId)).has(dateKey)) return { type: 'day_full' };
 
 			const end = new Date(start.getTime() + page.slotMinutes * 60_000);
 			try {

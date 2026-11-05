@@ -4,6 +4,7 @@ import { isPlausibleEmail } from '../events';
 import {
 	isValidSlug,
 	MAX_COLLABORATORS,
+	MAX_PER_DAY_LIMIT,
 	MAX_PAGE_LOCATION_LENGTH,
 	MAX_SLOT_DAYS,
 	SLOT_DAYS_PER_REQUEST,
@@ -42,7 +43,8 @@ const page: ReservationPageSettings = {
 	withMeeting: false,
 	rescheduleCutoffHours: 24,
 	collaborators: [],
-	roomSettings: null
+	roomSettings: null,
+	maxPerDay: null
 };
 const now = new Date('2026-09-24T00:00:00.000Z');
 
@@ -68,6 +70,24 @@ describe('validatePageSettings collaborators', () => {
 		assert.deepEqual(validatePageSettings({ ...settings, collaborators: 'me@other.test' }), refused);
 		const many = Array.from({ length: MAX_COLLABORATORS + 1 }, (_, index) => `p${index}@example.com`);
 		assert.deepEqual(validatePageSettings({ ...settings, collaborators: many }), refused);
+	});
+});
+
+describe('validatePageSettings max per day', () => {
+	test('is a whole number in range, or no limit when left out', () => {
+		const capped = validatePageSettings({ ...settings, maxPerDay: 4 });
+		assert.equal(capped.ok && capped.value.maxPerDay, 4);
+		const none = validatePageSettings(settings);
+		assert.equal(none.ok && none.value.maxPerDay, null);
+		const cleared = validatePageSettings({ ...settings, maxPerDay: null });
+		assert.equal(cleared.ok && cleared.value.maxPerDay, null);
+	});
+
+	test('refuses zero, fractions, text and too many', () => {
+		const refused = { ok: false, error: 'invalid_max_per_day' };
+		for (const maxPerDay of [0, 2.5, '3', MAX_PER_DAY_LIMIT + 1]) {
+			assert.deepEqual(validatePageSettings({ ...settings, maxPerDay }), refused, String(maxPerDay));
+		}
 	});
 });
 

@@ -10,6 +10,7 @@ const PAGE_ERRORS: Record<Exclude<PageWriteOutcome['type'], 'ok'>, [string, numb
 	invalid_weekdays: ['Pick at least one day of the week.', 400],
 	invalid_cutoff: ['Pick when guests can still reschedule.', 400],
 	invalid_collaborators: ['Collaborators must be valid email addresses, 5 at most.', 400],
+	invalid_max_per_day: ['Max bookings per day must be a whole number from 1 to 100, or left blank.', 400],
 	duplicate_slug: ['That link is already taken.', 409],
 	limit_reached: ['You have reached the maximum number of reservation pages.', 409],
 	not_found: ['Reservation page not found', 404]
@@ -26,6 +27,7 @@ const BOOKING_ERRORS: Record<Exclude<BookingOutcome['type'], 'ok'>, [string, num
 	invalid_name: ['Please enter your name.', 400],
 	invalid_email: ['Please enter a valid email address.', 400],
 	slot_taken: ['That time is no longer available. Please pick another.', 409],
+	day_full: ['That day just filled up. Please pick another day.', 409],
 	guest_limit: [
 		`You already have ${MAX_UPCOMING_PER_GUEST} upcoming bookings on this page. Cancel one from its confirmation email to book another.`,
 		429
@@ -36,6 +38,7 @@ const BOOKING_ERRORS: Record<Exclude<BookingOutcome['type'], 'ok'>, [string, num
 const GUEST_CHANGE_ERRORS: Record<Exclude<GuestChangeOutcome['type'], 'ok'>, [string, number]> = {
 	not_found: ['This link doesn’t match a reservation any more.', 404],
 	slot_taken: ['That time is no longer available. Please pick another.', 409],
+	day_full: ['That day just filled up. Please pick another day.', 409],
 	past: ['This reservation has already started.', 409],
 	too_late: ['It’s too close to the start to change this here. Reply to your confirmation email instead.', 409],
 	limit_reached: ['This reservation can’t be moved again. You can still cancel it.', 409]

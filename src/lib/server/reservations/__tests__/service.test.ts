@@ -78,6 +78,11 @@ function setup(options: SetupOptions = {}) {
 		async countCreatedSince(pageId) {
 			return bookings.filter((booking) => booking.pageId === pageId).length;
 		},
+		async listStartsBetween(pageId, from, to, excludingEventId) {
+			return bookings
+				.filter((booking) => booking.pageId === pageId && booking.start >= from && booking.start < to && booking.eventId !== excludingEventId)
+				.map((booking) => booking.start);
+		},
 		async countUpcomingFor(pageId, email) {
 			return bookings.filter((booking) => booking.pageId === pageId && booking.guestEmail === email).length;
 		},
@@ -197,7 +202,7 @@ function setup(options: SetupOptions = {}) {
 		defer: (work) => deferred.push(work),
 		now: () => options.clock?.now ?? NOW
 	});
-	return { service, pages, bookings, notified, deletedEvents, rooms, deferred };
+	return { service, repo, pages, bookings, notified, deletedEvents, rooms, deferred };
 }
 
 async function withPage(options: SetupOptions = {}) {
@@ -456,6 +461,37 @@ describe('ReservationsService slots and booking', () => {
 		assert.equal(outcomes.at(-1), 'guest_limit');
 	});
 
+	test('a day that reached the page’s cap shows no times and refuses another booking', async () => {
+		const state = setup();
+		assert.equal((await state.service.create('owner', { ...body, maxPerDay: 2 })).type, 'ok');
+		const { service } = state;
+		for (const [email, start] of [
+			['a@example.com', '2026-09-28T02:00:00.000Z'],
+			['b@example.com', '2026-09-28T03:00:00.000Z']
+		]) {
+			assert.equal((await service.book('office-hours', { ...guest, email, start }, BASE)).type, 'ok');
+		}
+
+		const days = await service.slots('office-hours', '2026-09-28', 2);
+		assert.deepEqual(days?.find((day) => day.date === '2026-09-28')?.slots, [], 'Monday is full');
+		assert.equal(days?.find((day) => day.date === '2026-09-29')?.slots.length, 3, 'Tuesday is untouched');
+
+		const late = await service.book('office-hours', { ...guest, email: 'c@example.com', start: '2026-09-28T04:00:00.000Z' }, BASE);
+		assert.deepEqual(late, { type: 'day_full' });
+	});
+
+	test('a page without a cap never looks up its bookings for slots', async () => {
+		const state = await withPage();
+		let lookups = 0;
+		const original = state.repo.listStartsBetween;
+		state.repo.listStartsBetween = async (...args) => {
+			lookups += 1;
+			return original(...args);
+		};
+		await state.service.slots('office-hours', '2026-09-28', 7);
+		assert.equal(lookups, 0);
+	});
+
 	test('a page that took a day’s worth of bookings says so, apart from the guest limit', async () => {
 		const { service, bookings, pages } = await withPage();
 		for (let index = 0; index < MAX_BOOKINGS_PER_DAY; index += 1) {
@@ -639,6 +675,18 @@ describe('ReservationsService guest changes', () => {
 		assert.equal(bookings[0].start, '2026-09-28T03:00:00.000Z');
 		assert.equal(notified.at(-1)?.kind, 'guest-moved');
 		assert.equal((await service.managedBooking(token))?.reschedulesLeft, 2);
+	});
+
+	test('with a daily cap, a guest can move within their own day but not into a full one', async () => {
+		const { service, token } = await bookWithLink({}, { maxPerDay: 1 });
+		assert.equal((await service.book('office-hours', { ...guest, email: 'bo@example.com', start: '2026-09-29T02:00:00.000Z' }, BASE)).type, 'ok');
+
+		const days = await service.rescheduleSlots(token, null);
+		assert.deepEqual(days?.find((day) => day.date === '2026-09-29')?.slots, [], 'Tuesday is full');
+		assert.ok(days?.find((day) => day.date === '2026-09-28')?.slots.length, 'their own Monday still has times');
+
+		assert.deepEqual(await service.rescheduleByGuest(token, { start: '2026-09-29T03:00:00.000Z' }, BASE), { type: 'day_full' });
+		assert.equal((await service.rescheduleByGuest(token, { start: '2026-09-28T03:00:00.000Z' }, BASE)).type, 'ok');
 	});
 
 	test('after three moves only cancelling is left', async () => {

@@ -39,6 +39,7 @@
 	function limitMessage(code: string | undefined): string | null {
 		if (code === 'guest_limit') return t('book.guestLimit', { count: MAX_UPCOMING_PER_GUEST });
 		if (code === 'page_busy') return t('book.pageBusy');
+		if (code === 'day_full') return t('book.dayFull');
 		return null;
 	}
 
@@ -66,7 +67,8 @@
 				return;
 			}
 			const message = limitMessage(body.code) ?? body.error ?? t('book.couldNotBook');
-			if (body.code === 'slot_taken') {
+			// Either way the calendar was stale: reloading drops the slot, or the whole day once it's full.
+			if (body.code === 'slot_taken' || body.code === 'day_full') {
 				takenError = message;
 				picker?.drop(chosen);
 				picker?.reload();

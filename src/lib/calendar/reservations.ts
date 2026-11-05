@@ -23,6 +23,8 @@ export const MAX_SLOT_DAYS = 42;
 /** A page takes at most this many bookings a day, and one guest address this many upcoming ones. */
 export const MAX_BOOKINGS_PER_DAY = 30;
 export const MAX_UPCOMING_PER_GUEST = 3;
+/** The highest daily cap a page can set; a day can't hold more slots than this anyway. */
+export const MAX_PER_DAY_LIMIT = 100;
 
 /** A `?days=` value, clamped; anything unreadable is the default. */
 export function slotDays(value: string | null): number {
@@ -66,6 +68,8 @@ export type ReservationPageSettings = {
 	collaborators: string[];
 	/** How each booking's meeting room admits people; `null` for the defaults. */
 	roomSettings: RoomSettings | null;
+	/** The most bookings on one day, in the page's zone; `null` for no limit. */
+	maxPerDay: number | null;
 };
 
 export type ReservationPage =ReservationPageSettings & { id: string };
@@ -84,7 +88,8 @@ export type ReservationPageError =
 	| 'invalid_hours'
 	| 'invalid_weekdays'
 	| 'invalid_cutoff'
-	| 'invalid_collaborators';
+	| 'invalid_collaborators'
+	| 'invalid_max_per_day';
 
 export type GuestInput = { name: string; email: string; note: string };
 
@@ -219,6 +224,8 @@ export function validatePageSettings(
 	}
 	const collaborators = cleanCollaborators(input.collaborators);
 	if (!collaborators) return { ok: false, error: 'invalid_collaborators' };
+	const maxPerDay = input.maxPerDay ?? null;
+	if (maxPerDay !== null && !isInt(maxPerDay, 1, MAX_PER_DAY_LIMIT)) return { ok: false, error: 'invalid_max_per_day' };
 	return {
 		ok: true,
 		value: {
@@ -239,7 +246,8 @@ export function validatePageSettings(
 			withMeeting: input.withMeeting === true,
 			rescheduleCutoffHours: rescheduleCutoffHours as number,
 			collaborators,
-			roomSettings: parseRoomSettings(input.roomSettings) ?? null
+			roomSettings: parseRoomSettings(input.roomSettings) ?? null,
+			maxPerDay: maxPerDay as number | null
 		}
 	};
 }
