@@ -33,6 +33,11 @@
 		captionToken: string;
 	} | null>(null);
 	let left = $state(false);
+	let leftReason = $state<'left' | 'ended' | 'deleted'>('left');
+	const leftTitle = $derived.by(() => {
+		if (leftReason === 'deleted') return t('meet.deletedTitle');
+		return leftReason === 'ended' ? t('meet.endedTitle') : t('meet.leftTitle');
+	});
 	/** Kept across leaving, so it can be saved afterwards and carries on if they rejoin. */
 	let transcript = $state.raw<CaptionLine[]>([]);
 	let waitingAdmissionId = $state('');
@@ -367,9 +372,10 @@
 		hostRetry = null;
 	}
 
-	function onleave(lines: CaptionLine[]) {
+	function onleave(lines: CaptionLine[], reason: 'left' | 'ended' | 'deleted' = 'left') {
 		transcript = $state.snapshot(lines);
 		session = null;
+		leftReason = reason;
 		left = true;
 	}
 
@@ -422,7 +428,7 @@
 					<span class="wait-timer">{t('meet.waitingFor', { time: waitedFor })}</span>
 				{:else}
 					<div class="brand-icon"><Logo size={48} /></div>
-					<h1>{left ? t('meet.leftTitle') : t('meet.title', { app: APP_NAME })}</h1>
+					<h1>{left ? leftTitle : t('meet.title', { app: APP_NAME })}</h1>
 				{/if}
 				{#if scheduleText && !left}
 					<p class="meet-schedule">
@@ -448,7 +454,9 @@
 					</div>
 				{/if}
 				<div class="left-actions">
-					<button type="button" class="btn-secondary" onclick={rejoin}>{t('meet.rejoin')}</button>
+					{#if leftReason !== 'deleted'}
+						<button type="button" class="btn-secondary" onclick={rejoin}>{t('meet.rejoin')}</button>
+					{/if}
 					<a href="/" class="btn-primary">{t('meet.returnHome')}</a>
 				</div>
 			{:else if waitingDenied}

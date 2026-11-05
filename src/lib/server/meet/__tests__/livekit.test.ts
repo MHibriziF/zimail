@@ -245,6 +245,19 @@ describe('screen-share permissions', () => {
 		assert.deepEqual(await client.listParticipants('room-1'), []);
 	});
 
+	test('deleteRoom asks RoomService to close the room, and a room no one is in is fine', async () => {
+		const { calls, fetchImpl } = recordingFetch(() => Response.json({}));
+		await createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl).deleteRoom('room-1');
+		assert.match(calls[0].url, /DeleteRoom$/);
+		assert.deepEqual(calls[0].body, { room: 'room-1' });
+
+		const missing = recordingFetch(() => Response.json({ code: 'not_found', msg: 'room not found' }, { status: 404 }));
+		await createLiveKitClient('k', 's', 'wss://example.livekit.cloud', missing.fetchImpl).deleteRoom('room-1');
+
+		const down = recordingFetch(() => Response.json({ code: 'unavailable' }, { status: 503 }));
+		await assert.rejects(createLiveKitClient('k', 's', 'wss://example.livekit.cloud', down.fetchImpl).deleteRoom('room-1'));
+	});
+
 	test('other RoomService failures surface as errors', async () => {
 		const { fetchImpl } = recordingFetch(() => Response.json({ code: 'unauthenticated' }, { status: 401 }));
 		const client = createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl);

@@ -89,6 +89,10 @@ function fakeMeetingsRepo(seed: Meeting[] = [], options: { forceCollisions?: num
 			const row = rows.find((m) => m.id === id);
 			if (row && !row.started_at) row.started_at = at;
 		},
+		async clearStarted(id) {
+			const row = rows.find((m) => m.id === id);
+			if (row) row.started_at = null;
+		},
 		async setSchedule(userId, id, start, end) {
 			const row = rows.find((m) => m.id === id && m.user_id === userId);
 			if (!row) return false;
@@ -156,6 +160,7 @@ function fakeLiveKit(): LiveKitClient {
 		},
 		async setPublishSources() {},
 		async muteTrack() {},
+		async deleteRoom() {},
 		async createCaptionToken(identity, room) {
 			return `captions:${identity}:${room}`;
 		},
@@ -176,6 +181,7 @@ function recordingLiveKit(inRoom: RoomParticipant[] = []) {
 	const tokens: Parameters<LiveKitClient['createAccessToken']>[0][] = [];
 	const permissionChanges: { room: string; identity: string; sources: TrackSourceName[] }[] = [];
 	const mutedTracks: { room: string; identity: string; trackSid: string }[] = [];
+	const deletedRooms: string[] = [];
 	const client: LiveKitClient = {
 		url: 'wss://livekit.test',
 		async createAccessToken(options) {
@@ -191,11 +197,76 @@ function recordingLiveKit(inRoom: RoomParticipant[] = []) {
 		async muteTrack(room, identity, trackSid) {
 			mutedTracks.push({ room, identity, trackSid });
 		},
+		async deleteRoom(room) {
+			deletedRooms.push(room);
+		},
 		createCaptionToken: fakeLiveKit().createCaptionToken,
 		verifyCaptionToken: fakeLiveKit().verifyCaptionToken
 	};
-	return { client, tokens, permissionChanges, mutedTracks };
+	return { client, tokens, permissionChanges, mutedTracks, deletedRooms };
 }
+
+describe('end', () => {
+	const started = (): Meeting => ({
+		id: 'meeting-1',
+		user_id: 'owner',
+		code: 'abc-defg-hij',
+		title: 'Sync',
+		require_approval: false,
+		screen_share_policy: 'open',
+		screen_share_mode: 'multiple',
+		captions_enabled: false,
+		wait_for_host: true,
+		started_at: '2026-11-05T01:00:00.000Z',
+		scheduled_start: null,
+		scheduled_end: null,
+		created_at: '2026-11-05T00:00:00.000Z'
+	});
+
+	test('closes the room and keeps the meeting, which waits for the host again', async () => {
+		const { repo, rows } = fakeMeetingsRepo([started()]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.end('owner', 'meeting-1', { remove: false }), 'ok');
+		assert.deepEqual(liveKit.deletedRooms, ['meeting-1']);
+		assert.equal(rows.length, 1);
+		assert.equal(rows[0].started_at, null);
+	});
+
+	test('with remove, the meeting and its code are gone', async () => {
+		const { repo } = fakeMeetingsRepo([started()]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.end('owner', 'meeting-1', { remove: true }), 'ok');
+		assert.equal(await service.findByCode('abc-defg-hij'), null);
+	});
+
+	test('only the owner can end it', async () => {
+		const { repo, rows } = fakeMeetingsRepo([started()]);
+		const liveKit = recordingLiveKit();
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => liveKit.client });
+
+		assert.equal(await service.end('someone-else', 'meeting-1', { remove: true }), 'meeting_not_found');
+		assert.deepEqual(liveKit.deletedRooms, []);
+		assert.equal(rows.length, 1);
+	});
+
+	test('a room that could not be closed leaves the meeting in place', async () => {
+		const { repo, rows } = fakeMeetingsRepo([started()]);
+		const failing: LiveKitClient = {
+			...fakeLiveKit(),
+			async deleteRoom() {
+				throw new Error('LiveKit down');
+			}
+		};
+		const service = createMeetingsService({ repo, admissionsRepo: fakeAdmissionsRepo(), getLiveKit: () => failing });
+
+		await assert.rejects(service.end('owner', 'meeting-1', { remove: true }));
+		assert.equal(rows.length, 1);
+	});
+});
 
 describe('create', () => {
 	test('the first meeting is "Meeting #1", the next is "#2", per user', async () => {

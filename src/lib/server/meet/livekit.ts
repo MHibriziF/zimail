@@ -89,6 +89,8 @@ export type LiveKitClient = {
   ): Promise<void>;
   /** Mutes one published track at the server, whatever the publisher's client does. */
   muteTrack(room: string, identity: string, trackSid: string): Promise<void>;
+  /** Closes the room, disconnecting everyone in it. A room no one is in is already gone. */
+  deleteRoom(room: string): Promise<void>;
   /**
    * Proves its holder was admitted to `room`, for the captions endpoint. A
    * LiveKit token only lives long enough to connect, so this one lasts the
@@ -245,6 +247,16 @@ export function createLiveKitClient(
         track_sid: trackSid,
         muted: true,
       });
+    },
+
+    async deleteRoom(room) {
+      try {
+        await roomService("DeleteRoom", room, {});
+      } catch (error) {
+        if (error instanceof LiveKitError && /not_found/.test(error.message))
+          return;
+        throw error;
+      }
     },
 
     createCaptionToken(identity, room) {

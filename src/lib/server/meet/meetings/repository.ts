@@ -89,6 +89,8 @@ export type MeetingsRepository = {
 	updateCode(userId: string, id: string, code: string): Promise<boolean>;
 	/** Records the host's first join; later calls change nothing. */
 	markStarted(id: string, at: string): Promise<void>;
+	/** After the host ends the call, so a wait-for-host meeting waits for them again. */
+	clearStarted(id: string): Promise<void>;
 	setSchedule(userId: string, id: string, start: string | null, end: string | null): Promise<boolean>;
 };
 
@@ -212,6 +214,10 @@ export function createD1MeetingsRepository(db: D1Database): MeetingsRepository {
 
 		async markStarted(id, at) {
 			await db.prepare('UPDATE meetings SET started_at = ? WHERE id = ? AND started_at IS NULL').bind(at, id).run();
+		},
+
+		async clearStarted(id) {
+			await db.prepare('UPDATE meetings SET started_at = NULL WHERE id = ?').bind(id).run();
 		},
 
 		async setSchedule(userId, id, start, end) {
