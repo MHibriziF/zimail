@@ -20,9 +20,16 @@ import {
 } from '../../calendar/reservations';
 import { computeSlots, isFreeSlot, type DaySlots, type Interval } from '../../calendar/slots';
 import type { CalendarRepository } from '../calendar/repository';
-import type { BookingDetails, InviteKind } from './email';
+import { bookingIcs, type BookingDetails, type InviteKind } from './email';
+import {
+	nextReminderAt,
+	REMINDER_QUIET_MS,
+	reminderKind,
+	type ReminderKind,
+	type ReminderSetting
+} from '../../calendar/reminders';
 import type { RoomSettings } from '../../meet/room-settings';
-import type { ManagedBooking, ReservationsRepository, StoredBooking, StoredPage } from './repository';
+import type { DueReminder, ManagedBooking, ReservationsRepository, StoredBooking, StoredPage } from './repository';
 import { createLinkToken, hashToken } from '../util/crypto';
 
 const DAY_MS = 86_400_000;
@@ -100,6 +107,10 @@ export type ReservationsService = {
 	/** `baseUrl` is for the link in the updated invitation. */
 	rescheduleByGuest(token: string, body: Record<string, unknown>, baseUrl: string): Promise<GuestChangeOutcome>;
 	cancelByGuest(token: string): Promise<GuestChangeOutcome>;
+	/** Sends the reminders that are due, for the cron trigger. Each is claimed before it's sent, so none goes twice. */
+	sendDueReminders(): Promise<{ sent: number; skipped: number }>;
+	/** The booking behind a guest's link as a calendar file they can import; `null` for a link that matches none. */
+	bookingIcsFor(token: string): Promise<{ ics: string; title: string } | null>;
 };
 
 export type ReservationsServiceDeps = {
@@ -110,6 +121,8 @@ export type ReservationsServiceDeps = {
 	meetings: MeetingRooms | null;
 	/** Best effort; a failed email never undoes a booking or a cancellation. */
 	notify: (hostUserId: string, booking: BookingDetails, kind: InviteKind) => Promise<void>;
+	/** Sends one reminder. Optional: without it, due reminders are claimed and dropped. */
+	remind?: (hostUserId: string, booking: BookingDetails, kind: ReminderKind) => Promise<void>;
 	/** Brings the host's subscribed calendars up to date. Optional; failures are ignored. */
 	refreshCalendars?: (userId: string) => Promise<void>;
 	/** Keeps work running after the response is sent — the Worker's `waitUntil`. */
@@ -152,6 +165,16 @@ function randomSuffix(): string {
 }
 
 /** What every email about an existing booking says, at its next revision; `changes` overrides. */
+/** A booking's first reminder; none due right after the confirmation it was just sent. */
+function firstReminder(start: Date, setting: ReminderSetting, at: Date): string | null {
+	return nextReminderAt(start, setting, new Date(at.getTime() + REMINDER_QUIET_MS))?.toISOString() ?? null;
+}
+
+/** How many due reminders one sweep handles; the rest wait a minute for the next. */
+export const REMINDER_BATCH = 20;
+/** After a reminder goes out, the next one has to be at least this far off, or it's skipped. */
+const REMINDER_GAP_MS = 30 * 60_000;
+
 function detailsFor(eventId: string, booking: StoredBooking, changes: Partial<BookingDetails> = {}) {
 	return {
 		uid: inviteUid(eventId),
@@ -296,6 +319,23 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		await deps.meetings?.reschedule?.(userId, code, { start: start.toISOString(), end: end.toISOString() }).catch(() => undefined);
 	}
 
+	/** Sends one claimed reminder. A failure costs this one reminder rather than risking a second copy. */
+	async function deliverReminder(due: DueReminder, kind: ReminderKind): Promise<boolean> {
+		if (!deps.remind) return false;
+		try {
+			const booking = await repo.getBookingByEvent(due.userId, due.eventId);
+			const host = booking ? await deps.hostOf(due.userId) : null;
+			if (!booking || !host) return false;
+			// Not a new revision: the reminder doesn't change the event the guest already has.
+			const details = { ...detailsFor(due.eventId, booking), sequence: booking.sequence, hostName: host.name, hostEmail: host.email };
+			await deps.remind(due.userId, details, kind);
+			return true;
+		} catch (error) {
+			console.error('booking reminder failed', error);
+			return false;
+		}
+	}
+
 	/** Best effort: the booking or cancellation already happened either way. */
 	async function tellGuest(
 		userId: string,
@@ -425,7 +465,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 					meetingUrl: room?.url ?? null,
 					eventLocation: page.location ?? room?.url ?? null,
 					manageTokenHash: await hashToken(manageToken),
-					collaborators: page.collaborators
+					collaborators: page.collaborators,
+					nextReminderAt: firstReminder(start, page.reminders, at)
 				});
 			} catch (error) {
 				// The slot went to someone else; the room opened for this attempt has no use.
@@ -471,7 +512,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const booking = await repo.getBookingByEvent(userId, eventId);
 			if (!booking) return 'not_found';
 			try {
-				if (!(await repo.moveBooking(userId, eventId, start.toISOString(), end.toISOString()))) return 'not_found';
+				const reminder = firstReminder(start, booking.reminders, now());
+				if (!(await repo.moveBooking(userId, eventId, start.toISOString(), end.toISOString(), false, reminder))) return 'not_found';
 			} catch (error) {
 				if (isUniqueConstraintError(error)) return 'slot_taken';
 				throw error;
@@ -525,7 +567,8 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 
 			const end = new Date(start.getTime() + page.slotMinutes * 60_000);
 			try {
-				const moved = await repo.moveBooking(booking.userId, booking.eventId, start.toISOString(), end.toISOString(), true);
+				const reminder = firstReminder(start, page.reminders, now());
+				const moved = await repo.moveBooking(booking.userId, booking.eventId, start.toISOString(), end.toISOString(), true, reminder);
 				if (!moved) return { type: 'not_found' };
 			} catch (error) {
 				if (isUniqueConstraintError(error)) return { type: 'slot_taken' };
@@ -537,6 +580,34 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 				manage: { url: manageLink(baseUrl, token), until: changeDeadline(start, page) }
 			});
 			return { type: 'ok', start: start.toISOString(), end: end.toISOString() };
+		},
+
+		async sendDueReminders() {
+			const at = now();
+			let sent = 0;
+			let skipped = 0;
+			for (const due of await repo.dueReminders(at.toISOString(), REMINDER_BATCH)) {
+				const start = new Date(due.start);
+				const kind = reminderKind(start, new Date(due.dueAt));
+				// The page may have turned this reminder off since the booking was made; then only move on.
+				const wanted = due.reminders === 'both' || due.reminders === kind;
+				const later = nextReminderAt(start, due.reminders, new Date(Math.max(at.getTime(), Date.parse(due.dueAt)) + REMINDER_GAP_MS));
+				const claimed = await repo.claimReminder(due.id, due.dueAt, later?.toISOString() ?? null);
+				const delivered = claimed && wanted && start > at && (await deliverReminder(due, kind));
+				if (delivered) sent += 1;
+				else skipped += 1;
+			}
+			return { sent, skipped };
+		},
+
+		async bookingIcsFor(token) {
+			const loaded = await loadManaged(token);
+			if (!loaded) return null;
+			const { booking } = loaded;
+			const host = await deps.hostOf(booking.userId);
+			if (!host) return null;
+			const details = { ...detailsFor(booking.eventId, booking), sequence: booking.sequence, hostName: host.name, hostEmail: host.email };
+			return { ics: bookingIcs(details, 'publish', now()), title: booking.pageTitle };
 		},
 
 		async cancelByGuest(token) {

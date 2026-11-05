@@ -10,6 +10,7 @@ const PAGE_ERRORS: Record<Exclude<PageWriteOutcome['type'], 'ok'>, [string, numb
 	invalid_weekdays: ['Pick at least one day of the week.', 400],
 	invalid_cutoff: ['Pick when guests can still reschedule.', 400],
 	invalid_collaborators: ['Collaborators must be valid email addresses, 5 at most.', 400],
+	invalid_reminders: ['Pick when guests get a reminder.', 400],
 	invalid_max_per_day: ['Max bookings per day must be a whole number from 1 to 100, or left blank.', 400],
 	duplicate_slug: ['That link is already taken.', 409],
 	limit_reached: ['You have reached the maximum number of reservation pages.', 409],

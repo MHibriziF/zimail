@@ -40,6 +40,7 @@ function setup(options: SetupOptions = {}) {
 	const pages: StoredPage[] = [];
 	const bookings: NewBooking[] = [];
 	const notified: { hostUserId: string; booking: BookingDetails; kind: string }[] = [];
+	const reminded: { booking: BookingDetails; kind: string }[] = [];
 	const deletedEvents: string[] = [];
 	/** Guest reschedules per booking event. */
 	const guestMoves = new Map<string, number>();
@@ -102,7 +103,8 @@ function setup(options: SetupOptions = {}) {
 				meetingUrl: booking.meetingUrl,
 				location: page.location,
 				sequence: sequences.get(booking.eventId) ?? 0,
-				collaborators: booking.collaborators.filter((email) => email !== booking.guestEmail)
+				collaborators: booking.collaborators.filter((email) => email !== booking.guestEmail),
+				reminders: page.reminders
 			};
 		},
 		async insertBooking(booking) {
@@ -112,15 +114,35 @@ function setup(options: SetupOptions = {}) {
 			}
 			bookings.push(booking);
 		},
-		async moveBooking(userId, eventId, start, end, byGuest = false) {
+		async moveBooking(userId, eventId, start, end, byGuest = false, nextReminderAt = null) {
 			const booking = bookings.find((entry) => entry.userId === userId && entry.eventId === eventId);
 			if (!booking) return false;
 			if (bookings.some((entry) => entry !== booking && entry.pageId === booking.pageId && entry.start === start)) {
 				throw new Error('UNIQUE constraint failed: reservations.page_id, reservations.starts_at');
 			}
-			Object.assign(booking, { start, end });
+			Object.assign(booking, { start, end, nextReminderAt });
 			sequences.set(eventId, (sequences.get(eventId) ?? 0) + 1);
 			if (byGuest) guestMoves.set(eventId, (guestMoves.get(eventId) ?? 0) + 1);
+			return true;
+		},
+		async dueReminders(now, limit) {
+			return bookings
+				.filter((booking) => booking.nextReminderAt !== null && booking.nextReminderAt <= now)
+				.sort((a, b) => a.nextReminderAt!.localeCompare(b.nextReminderAt!))
+				.slice(0, limit)
+				.map((booking) => ({
+					id: booking.id,
+					userId: booking.userId,
+					eventId: booking.eventId,
+					start: booking.start,
+					dueAt: booking.nextReminderAt!,
+					reminders: pages.find((page) => page.id === booking.pageId)!.reminders
+				}));
+		},
+		async claimReminder(id, from, to) {
+			const booking = bookings.find((entry) => entry.id === id);
+			if (!booking || booking.nextReminderAt !== from) return false;
+			booking.nextReminderAt = to;
 			return true;
 		},
 		async getBookingByToken(tokenHash) {
@@ -198,11 +220,15 @@ function setup(options: SetupOptions = {}) {
 			if (options.notifyFails) throw new Error('provider down');
 			notified.push({ hostUserId, booking, kind });
 		},
+		remind: async (_hostUserId, booking, kind) => {
+			if (options.notifyFails) throw new Error('provider down');
+			reminded.push({ booking, kind });
+		},
 		refreshCalendars: options.refresh,
 		defer: (work) => deferred.push(work),
 		now: () => options.clock?.now ?? NOW
 	});
-	return { service, repo, pages, bookings, notified, deletedEvents, rooms, deferred };
+	return { service, repo, pages, bookings, notified, reminded, deletedEvents, rooms, deferred };
 }
 
 async function withPage(options: SetupOptions = {}) {
@@ -511,8 +537,10 @@ describe('ReservationsService slots and booking', () => {
 				meetingCode: null,
 				meetingUrl: null,
 				eventLocation: null,
-				manageTokenHash: `h${index}`
-			} as NewBooking);
+				manageTokenHash: `h${index}`,
+				collaborators: [],
+				nextReminderAt: null
+			});
 		}
 		assert.deepEqual(await service.book('office-hours', guest, BASE), { type: 'page_busy' });
 	});
@@ -729,5 +757,93 @@ describe('ReservationsService guest changes', () => {
 		assert.equal(rooms.closed.length, 1);
 		assert.equal(notified.at(-1)?.kind, 'guest-cancel');
 		assert.equal(await service.managedBooking(token), null, 'the link is spent');
+	});
+});
+
+describe('ReservationsService reminders', () => {
+	/** A page with `reminders`, one booking by `guest` (Mon 28 Sep, 09:00 Jakarta), and a clock to move. */
+	async function booked(reminders: string, bookedAt = NOW) {
+		const clock = { now: bookedAt };
+		const state = setup({ clock });
+		assert.equal((await state.service.create('owner', { ...body, reminders })).type, 'ok');
+		assert.equal((await state.service.book('office-hours', guest, BASE)).type, 'ok');
+		const token = decodeURIComponent(new URL(state.notified.at(-1)!.booking.manage!.url).pathname.split('/').at(-1)!);
+		return { ...state, clock, token };
+	}
+
+	test('a day ahead by default, sent once when it falls due', async () => {
+		const { service, bookings, reminded, clock } = await booked('day');
+		assert.equal(bookings[0].nextReminderAt, '2026-09-27T02:00:00.000Z');
+
+		clock.now = new Date('2026-09-27T01:59:00.000Z');
+		assert.deepEqual(await service.sendDueReminders(), { sent: 0, skipped: 0 });
+
+		clock.now = new Date('2026-09-27T02:00:30.000Z');
+		assert.deepEqual(await service.sendDueReminders(), { sent: 1, skipped: 0 });
+		assert.equal(reminded[0].kind, 'day');
+		assert.equal(reminded[0].booking.guestEmail, guest.email);
+		assert.equal(reminded[0].booking.hostName, 'Izi');
+		assert.equal(reminded[0].booking.sequence, 0, 'a reminder is not a new revision of the invitation');
+		assert.equal(bookings[0].nextReminderAt, null);
+		assert.deepEqual(await service.sendDueReminders(), { sent: 0, skipped: 0 }, 'never twice');
+	});
+
+	test('"both" sends the day-before one, then the hour-before one', async () => {
+		const { service, bookings, reminded, clock } = await booked('both');
+		clock.now = new Date('2026-09-27T02:00:00.000Z');
+		await service.sendDueReminders();
+		assert.equal(bookings[0].nextReminderAt, '2026-09-28T01:00:00.000Z');
+		clock.now = new Date('2026-09-28T01:00:10.000Z');
+		await service.sendDueReminders();
+		assert.deepEqual(reminded.map((entry) => entry.kind), ['day', 'hour']);
+		assert.equal(bookings[0].nextReminderAt, null);
+	});
+
+	test('a booking made shortly before it starts gets no reminder on top of its confirmation', async () => {
+		const { bookings } = await booked('both', new Date('2026-09-28T00:30:00.000Z'));
+		assert.equal(bookings[0].nextReminderAt, null);
+	});
+
+	test('a page that turned reminders off since the booking sends none', async () => {
+		const { service, pages, reminded, clock } = await booked('day');
+		pages[0].reminders = 'none';
+		clock.now = new Date('2026-09-27T02:00:30.000Z');
+		assert.deepEqual(await service.sendDueReminders(), { sent: 0, skipped: 1 });
+		assert.equal(reminded.length, 0);
+	});
+
+	test('a reminder follows the booking when the guest moves it', async () => {
+		const { service, bookings, token } = await booked('day');
+		assert.equal((await service.rescheduleByGuest(token, { start: '2026-09-29T03:00:00.000Z' }, BASE)).type, 'ok');
+		assert.equal(bookings[0].nextReminderAt, '2026-09-28T03:00:00.000Z');
+	});
+
+	test('a failed send is not retried, so it can never arrive twice', async () => {
+		const state = setup({ clock: { now: NOW }, notifyFails: false });
+		assert.equal((await state.service.create('owner', { ...body, reminders: 'day' })).type, 'ok');
+		assert.equal((await state.service.book('office-hours', guest, BASE)).type, 'ok');
+		const failing = createReservationsService({
+			repo: state.repo,
+			calendar: {} as CalendarRepository,
+			meetings: null,
+			hostOf: async () => ({ name: 'Izi', email: 'me@example.test' }),
+			notify: async () => undefined,
+			remind: async () => {
+				throw new Error('provider down');
+			},
+			now: () => new Date('2026-09-27T02:00:30.000Z')
+		});
+		assert.deepEqual(await failing.sendDueReminders(), { sent: 0, skipped: 1 });
+		assert.equal(state.bookings[0].nextReminderAt, null);
+	});
+
+	test('the guest can download their booking as a plain calendar file', async () => {
+		const { service, token } = await booked('day');
+		const file = await service.bookingIcsFor(token);
+		assert.ok(file);
+		assert.match(file.ics, /METHOD:PUBLISH/);
+		assert.match(file.ics, /DTSTART:20260928T020000Z/);
+		assert.doesNotMatch(file.ics, /ATTENDEE/);
+		assert.equal(await service.bookingIcsFor('not-a-real-token'), null);
 	});
 });

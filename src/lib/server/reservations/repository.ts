@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ReservationPage, ReservationPageSettings } from '../../calendar/reservations';
 import { parseRoomSettings, type RoomSettings } from '../../meet/room-settings';
+import { DEFAULT_REMINDERS, parseReminderSetting, type ReminderSetting } from '../../calendar/reminders';
 
 type PageRow = {
 	id: string;
@@ -24,6 +25,7 @@ type PageRow = {
 	collaborators: string | null;
 	room_settings: string | null;
 	max_per_day: number | null;
+	reminders: string | null;
 };
 
 function parseStoredRoom(value: string | null): RoomSettings | null {
@@ -72,13 +74,14 @@ function toPage(row: PageRow): StoredPage {
 		rescheduleCutoffHours: row.reschedule_cutoff_hours,
 		collaborators: parseCollaborators(row.collaborators),
 		roomSettings: parseStoredRoom(row.room_settings),
-		maxPerDay: row.max_per_day ?? null
+		maxPerDay: row.max_per_day ?? null,
+		reminders: parseReminderSetting(row.reminders) ?? DEFAULT_REMINDERS
 	};
 }
 
 const COLUMNS = `id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
 	day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours, collaborators,
-	room_settings, max_per_day`;
+	room_settings, max_per_day, reminders`;
 
 export type NewBooking = {
 	id: string;
@@ -103,6 +106,8 @@ export type NewBooking = {
 	manageTokenHash: string;
 	/** Invited with the guest, as the event's other guests. */
 	collaborators: string[];
+	/** When the guest's first reminder is due; `null` for none. */
+	nextReminderAt: string | null;
 };
 
 /**
@@ -132,9 +137,33 @@ export type ReservationsRepository = {
 	 * Moves a booking and bumps its invitation revision; `false` if there was no
 	 * such booking. `byGuest` also counts it against the guest's reschedule limit.
 	 */
-	moveBooking(userId: string, eventId: string, start: string, end: string, byGuest?: boolean): Promise<boolean>;
+	moveBooking(
+		userId: string,
+		eventId: string,
+		start: string,
+		end: string,
+		byGuest?: boolean,
+		nextReminderAt?: string | null
+	): Promise<boolean>;
+	/** Bookings whose next reminder is due by `now`, oldest first. Read through the partial index. */
+	dueReminders(now: string, limit: number): Promise<DueReminder[]>;
+	/**
+	 * Moves a booking's reminder on from `from` to `to` (`null` when none is
+	 * left). `false` when another sweep already did: whoever moves it sends it.
+	 */
+	claimReminder(id: string, from: string, to: string | null): Promise<boolean>;
 	/** The booking a guest's link points at, by the link's hash. */
 	getBookingByToken(tokenHash: string): Promise<ManagedBooking | null>;
+};
+
+export type DueReminder = {
+	id: string;
+	userId: string;
+	eventId: string;
+	start: string;
+	dueAt: string;
+	/** The page's setting now, which may have changed since the booking was made. */
+	reminders: ReminderSetting;
 };
 
 /** A booking as its guest manages it: what the email says, plus what the rules need. */
@@ -162,6 +191,8 @@ export type StoredBooking = {
 	sequence: number;
 	/** Who else this booking was sent to: the event's guests besides the booker. */
 	collaborators: string[];
+	/** The page's reminder setting, for a booking that moves. */
+	reminders: ReminderSetting;
 };
 
 function settingsValues(page: ReservationPageSettings): unknown[] {
@@ -184,7 +215,8 @@ function settingsValues(page: ReservationPageSettings): unknown[] {
 		page.rescheduleCutoffHours,
 		page.collaborators.length > 0 ? JSON.stringify(page.collaborators) : null,
 		page.roomSettings ? JSON.stringify(page.roomSettings) : null,
-		page.maxPerDay
+		page.maxPerDay,
+		page.reminders
 	];
 }
 
@@ -228,8 +260,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					`INSERT INTO reservation_pages
 					 (id, user_id, slug, title, description, location, time_zone, start_date, end_date, weekdays,
 					  day_start, day_end, slot_minutes, buffer_minutes, notice_minutes, active, with_meeting, reschedule_cutoff_hours,
-					  collaborators, room_settings, max_per_day)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					  collaborators, room_settings, max_per_day, reminders)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 				)
 				.bind(page.id, page.userId, ...settingsValues(page))
 				.run();
@@ -242,7 +274,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					 SET slug = ?, title = ?, description = ?, location = ?, time_zone = ?, start_date = ?, end_date = ?, weekdays = ?,
 					     day_start = ?, day_end = ?, slot_minutes = ?, buffer_minutes = ?, notice_minutes = ?, active = ?,
 					     with_meeting = ?, reschedule_cutoff_hours = ?, collaborators = ?, room_settings = ?,
-					     max_per_day = ?
+					     max_per_day = ?, reminders = ?
 					 WHERE id = ? AND user_id = ?`
 				)
 				.bind(...settingsValues(page), id, userId)
@@ -308,7 +340,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 			const row = await db
 				.prepare(
 					`SELECT r.guest_name, r.guest_email, r.note, r.starts_at, r.ends_at, r.meeting_code, r.meeting_url,
-					        p.title, p.time_zone, p.location AS page_location, e.location, COALESCE(e.sequence, 0) AS sequence
+					        p.title, p.time_zone, p.location AS page_location, p.reminders, e.location, COALESCE(e.sequence, 0) AS sequence
 					 FROM reservations r JOIN reservation_pages p ON p.id = r.page_id
 					 LEFT JOIN calendar_events e ON e.id = r.event_id
 					 WHERE r.event_id = ? AND r.user_id = ?`
@@ -325,6 +357,7 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					title: string;
 					time_zone: string;
 					page_location: string | null;
+					reminders: string | null;
 					location: string | null;
 					sequence: number;
 				}>();
@@ -346,7 +379,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 				meetingUrl: row.meeting_code ? (row.meeting_url ?? row.location) : null,
 				location: row.page_location,
 				sequence: row.sequence,
-				collaborators: guests.map((guest) => guest.email)
+				collaborators: guests.map((guest) => guest.email),
+				reminders: parseReminderSetting(row.reminders) ?? DEFAULT_REMINDERS
 			};
 		},
 
@@ -356,8 +390,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					.prepare(
 						`INSERT INTO reservations
 						 (id, page_id, user_id, event_id, guest_name, guest_email, note, starts_at, ends_at, created_at, meeting_code, meeting_url,
-						  manage_token_hash)
-						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+						  manage_token_hash, next_reminder_at)
+						 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 					)
 					.bind(
 						booking.id,
@@ -372,7 +406,8 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 						booking.createdAt,
 						booking.meetingCode,
 						booking.meetingUrl,
-						booking.manageTokenHash
+						booking.manageTokenHash,
+						booking.nextReminderAt
 					),
 				db
 					.prepare(
@@ -400,14 +435,14 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 			]);
 		},
 
-		async moveBooking(userId, eventId, start, end, byGuest = false) {
+		async moveBooking(userId, eventId, start, end, byGuest = false, nextReminderAt = null) {
 			const [, moved] = await db.batch([
 				db
 					.prepare(
-						`UPDATE reservations SET starts_at = ?, ends_at = ?, reschedule_count = reschedule_count + ?
+						`UPDATE reservations SET starts_at = ?, ends_at = ?, reschedule_count = reschedule_count + ?, next_reminder_at = ?
 						 WHERE event_id = ? AND user_id = ?`
 					)
-					.bind(start, end, byGuest ? 1 : 0, eventId, userId),
+					.bind(start, end, byGuest ? 1 : 0, nextReminderAt, eventId, userId),
 				db
 					.prepare(
 						`UPDATE calendar_events
@@ -417,6 +452,35 @@ export function createD1ReservationsRepository(db: D1Database): ReservationsRepo
 					.bind(start, end, eventId, userId)
 			]);
 			return (moved.meta.changes ?? 0) > 0;
+		},
+
+		async dueReminders(now, limit) {
+			const { results } = await db
+				.prepare(
+					`SELECT r.id, r.user_id, r.event_id, r.starts_at, r.next_reminder_at, p.reminders
+					 FROM reservations r JOIN reservation_pages p ON p.id = r.page_id
+					 WHERE r.next_reminder_at IS NOT NULL AND r.next_reminder_at <= ?
+					 ORDER BY r.next_reminder_at
+					 LIMIT ?`
+				)
+				.bind(now, limit)
+				.all<{ id: string; user_id: string; event_id: string; starts_at: string; next_reminder_at: string; reminders: string }>();
+			return results.map((row) => ({
+				id: row.id,
+				userId: row.user_id,
+				eventId: row.event_id,
+				start: row.starts_at,
+				dueAt: row.next_reminder_at,
+				reminders: parseReminderSetting(row.reminders) ?? DEFAULT_REMINDERS
+			}));
+		},
+
+		async claimReminder(id, from, to) {
+			const result = await db
+				.prepare('UPDATE reservations SET next_reminder_at = ? WHERE id = ? AND next_reminder_at = ?')
+				.bind(to, id, from)
+				.run();
+			return (result.meta.changes ?? 0) > 0;
 		}
 	};
 }

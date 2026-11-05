@@ -8,6 +8,7 @@ import { getEmailProvider } from './lib/server/context';
 import { ensureSchema } from './lib/server/migrations/migrate';
 import { runDueScheduledSends } from './lib/server/scheduled-send';
 import { runDueFeedSyncs } from './lib/server/calendar-feeds';
+import { runDueBookingReminders } from './lib/server/reservations';
 // Renamed from `_worker.js` by `scripts/wrap-cloudflare-worker.mjs` after `vite build`.
 // Whether this resolves depends on whether a build exists, so the suppression has
 // to be @ts-ignore: @ts-expect-error itself becomes an error once one does.
@@ -83,6 +84,13 @@ export default {
 					}
 				} catch (error) {
 					console.error('scheduled send sweep failed', error);
+				}
+				// One indexed read a minute, nearly always empty; its own step so a failure can't hold up mail.
+				try {
+					const { sent, skipped } = await runDueBookingReminders({ env, ctx } as App.Platform);
+					if (sent || skipped) console.log(`booking reminders: ${sent} sent, ${skipped} skipped`);
+				} catch (error) {
+					console.error('booking reminder sweep failed', error);
 				}
 				// Separate from the send sweep so a slow calendar server never delays mail.
 				try {

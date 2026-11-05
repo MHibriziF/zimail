@@ -5,7 +5,16 @@ import { getMeetingsService } from '../meet/meetings';
 import { emailLogoAttachment, renderEmailHtml, renderEmailText } from '../outbound/email-template';
 import { calendarAttachment, defaultSender } from '../outbound/calendar-mail';
 import { sendOutboundEmail } from '../outbound/send-mail';
-import { bookingEmailContent, bookingIcs, bookingMethod, bookingRecipients, type BookingDetails, type InviteKind } from './email';
+import {
+	bookingEmailContent,
+	bookingIcs,
+	bookingMethod,
+	bookingRecipients,
+	bookingReminderContent,
+	type BookingDetails,
+	type InviteKind
+} from './email';
+import type { ReminderKind } from '../../calendar/reminders';
 import { createD1ReservationsRepository } from './repository';
 import { createReservationsService, type MeetingRooms, type ReservationsService } from './service';
 
@@ -89,6 +98,26 @@ export function getReservationsService(platform: App.Platform | undefined | null
 				html: renderEmailHtml(content),
 				attachments: [calendarAttachment(bookingIcs(booking, kind), bookingMethod(kind)), emailLogoAttachment()]
 			});
+		},
+		// Same sender and recipients as the invitation, without a second copy to the host.
+		async remind(hostUserId: string, booking: BookingDetails, kind: ReminderKind) {
+			const found = await defaultSender(db, hostUserId);
+			if (!found) return;
+			const content = bookingReminderContent(booking, kind);
+			await sendOutboundEmail(getEmailProvider(platform), {
+				from: found.address,
+				senderName: found.name,
+				to: bookingRecipients(booking),
+				subject: content.title,
+				text: renderEmailText(content),
+				html: renderEmailHtml(content),
+				attachments: [emailLogoAttachment()]
+			});
 		}
 	});
+}
+
+/** For the cron trigger: sends the booking reminders that are due. */
+export function runDueBookingReminders(platform: App.Platform): Promise<{ sent: number; skipped: number }> {
+	return getReservationsService(platform).sendDueReminders();
 }

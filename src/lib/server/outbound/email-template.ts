@@ -44,6 +44,8 @@ export type EmailContent = {
 	lead: string;
 	details?: EmailDetail[];
 	action?: EmailAction;
+	/** A labelled row of small text links under the button, e.g. "Add to calendar: Google · Outlook". */
+	links?: { label: string; items: EmailAction[] };
 	/** Small print under the divider. Plain text; links are not parsed. */
 	footer?: string;
 };
@@ -58,6 +60,14 @@ function detailRows(details: EmailDetail[]): string {
               </tr>`
 		)
 		.join('');
+}
+
+function linkRow({ label, items }: NonNullable<EmailContent['links']>): string {
+	const anchors = items
+		.map(({ label: text, href }) => `<a href="${escapeHtml(href)}" style="color:${INK};font-weight:600;text-decoration:underline;">${escapeHtml(text)}</a>`)
+		.join(` <span style="color:${MUTED};">·</span> `);
+	return `
+          <p style="margin:18px 0 0 0;font:400 13px/1.6 ${FONT};color:${INK_2};">${escapeHtml(label)}: ${anchors}</p>`;
 }
 
 /**
@@ -79,7 +89,7 @@ function actionButton({ label, href }: EmailAction): string {
 }
 
 export function renderEmailHtml(content: EmailContent): string {
-	const { title, lead, details, action, footer } = content;
+	const { title, lead, details, action, links, footer } = content;
 
 	return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${PAGE};margin:0;padding:32px 12px;">
   <tr>
@@ -124,6 +134,13 @@ export function renderEmailHtml(content: EmailContent): string {
         </tr>`
 						: ''
 				}
+        ${
+					links?.items.length
+						? `<tr>
+          <td style="padding:0 28px;">${linkRow(links)}</td>
+        </tr>`
+						: ''
+				}
         <tr>
           <td style="padding:24px 28px 28px 28px;">
             <div style="height:1px;background:${LINE};font-size:0;line-height:0;">&nbsp;</div>
@@ -152,6 +169,10 @@ export function renderEmailText(content: EmailContent): string {
 
 	if (content.action) {
 		lines.push('', content.action.label + ':', content.action.href);
+	}
+
+	if (content.links?.items.length) {
+		lines.push('', `${content.links.label}:`, ...content.links.items.map(({ label, href }) => `${label}: ${href}`));
 	}
 
 	lines.push(
