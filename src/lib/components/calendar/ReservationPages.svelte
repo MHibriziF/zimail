@@ -11,6 +11,7 @@
 	import { dateKeyIn } from '$lib/calendar/grid';
 	import {
 		MAX_COLLABORATORS,
+		MAX_PER_DAY_LIMIT,
 		MAX_PAGE_DESCRIPTION_LENGTH,
 		MAX_PAGE_LOCATION_LENGTH,
 		DEFAULT_RESCHEDULE_CUTOFF_HOURS,
@@ -93,7 +94,8 @@
 			withMeeting: meetingsAvailable,
 			rescheduleCutoffHours: DEFAULT_RESCHEDULE_CUTOFF_HOURS,
 			collaborators: '',
-			roomSettings: DEFAULT_ROOM_SETTINGS
+			roomSettings: DEFAULT_ROOM_SETTINGS,
+			maxPerDay: null
 		};
 	}
 
@@ -138,7 +140,9 @@
 				...draft,
 				dayStart: timeToMinutes(draft.dayStart) ?? -1,
 				dayEnd: timeToMinutes(draft.dayEnd) ?? -1,
-				collaborators: draft.collaborators.split(/[\s,;]+/).filter(Boolean)
+				collaborators: draft.collaborators.split(/[\s,;]+/).filter(Boolean),
+				// An emptied number field binds as null (or NaN mid-edit); either means no limit.
+				maxPerDay: Number.isFinite(draft.maxPerDay) ? draft.maxPerDay : null
 			};
 			upsert(await saveReservationPage(settings, editingId ?? undefined));
 			draft = null;
@@ -276,6 +280,20 @@
 						<option value={hours}>{hours >= 24 ? t('calendar.reservations.noticeDays', { count: hours / 24 }) : t('calendar.reservations.noticeHours', { count: hours })}</option>
 					{/each}
 				</select>
+			</label>
+			<label class="resv-field">
+				<span>{t('calendar.reservations.maxPerDay')}</span>
+				<input
+					class="resv-input"
+					type="number"
+					min="1"
+					max={MAX_PER_DAY_LIMIT}
+					step="1"
+					inputmode="numeric"
+					bind:value={draft.maxPerDay}
+					placeholder={t('calendar.reservations.maxPerDayPlaceholder')}
+				/>
+				<small class="resv-hint">{t('calendar.reservations.maxPerDayHint')}</small>
 			</label>
 			<label class="resv-field">
 				<span>{t('calendar.reservations.collaborators')}</span>

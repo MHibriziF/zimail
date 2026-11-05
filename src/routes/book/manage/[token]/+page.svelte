@@ -54,8 +54,8 @@
 				done = action === 'cancel' ? { kind: 'cancelled' } : { kind: 'moved', start: body.start ?? chosen };
 				return;
 			}
-			const message = body.error ?? t('common.networkError');
-			if (body.code === 'slot_taken') {
+			const message = body.code === 'day_full' ? t('book.dayFull') : (body.error ?? t('common.networkError'));
+			if (body.code === 'slot_taken' || body.code === 'day_full') {
 				takenError = message;
 				picker?.drop(chosen);
 				picker?.reload();

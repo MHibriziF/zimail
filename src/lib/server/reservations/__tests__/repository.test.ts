@@ -140,9 +140,12 @@ describe('ReservationsRepository', () => {
 			withMeeting: false,
 			rescheduleCutoffHours: 24,
 			collaborators: ['me@other.test'],
-			roomSettings: { requireApproval: false, waitForHost: true, screenSharePolicy: 'open', screenShareMode: 'multiple' }
+			roomSettings: { requireApproval: false, waitForHost: true, screenSharePolicy: 'open', screenShareMode: 'multiple' },
+			maxPerDay: 4
 		});
 		assert.ok(queries[0].args.includes('["me@other.test"]'));
+		assert.match(queries[0].sql, /max_per_day = \?/);
+		assert.equal(queries[0].args.at(-3), 4);
 		assert.ok(queries[0].args.some((arg) => typeof arg === 'string' && arg.includes('"waitForHost":true')));
 		const read = (collaborators: string | null) =>
 			setup(() => [{ id: 'p', user_id: 'u', slug: 's', weekdays: '1', collaborators }]).repo.getBySlug('s');
