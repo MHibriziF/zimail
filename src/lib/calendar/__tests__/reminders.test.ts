@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { nextReminderAt, parseReminderSetting, reminderKind } from '../reminders';
+import { firstReminderAt, nextReminderAt, parseReminderSetting, reminderKind } from '../reminders';
 import { googleCalendarLink, outlookCalendarLink } from '../add-to-calendar';
 
 const start = new Date('2026-11-10T02:00:00.000Z');
@@ -25,6 +25,27 @@ describe('nextReminderAt', () => {
 		const tenHoursBefore = new Date(start.getTime() - 10 * 3_600_000);
 		assert.equal(nextReminderAt(start, 'day', tenHoursBefore), null);
 		assert.equal(nextReminderAt(start, 'both', tenHoursBefore)?.toISOString(), '2026-11-10T01:00:00.000Z');
+	});
+});
+
+describe('firstReminderAt', () => {
+	const hoursBefore = (hours: number) => new Date(start.getTime() - hours * 3_600_000);
+
+	test('a day-before reminder only for bookings made two or more days ahead', () => {
+		assert.equal(firstReminderAt(start, 'day', hoursBefore(48))?.toISOString(), '2026-11-09T02:00:00.000Z');
+		assert.equal(firstReminderAt(start, 'day', hoursBefore(47.9)), null);
+		assert.equal(firstReminderAt(start, 'day', hoursBefore(25)), null, 'booked the day before: the confirmation is the reminder');
+	});
+
+	test('with both, a booking made a day ahead still gets the hour-before one', () => {
+		assert.equal(firstReminderAt(start, 'both', hoursBefore(30))?.toISOString(), '2026-11-10T01:00:00.000Z');
+		assert.equal(firstReminderAt(start, 'both', hoursBefore(72))?.toISOString(), '2026-11-09T02:00:00.000Z');
+	});
+
+	test('an hour-before reminder only for bookings made two or more hours ahead', () => {
+		assert.equal(firstReminderAt(start, 'hour', hoursBefore(2))?.toISOString(), '2026-11-10T01:00:00.000Z');
+		assert.equal(firstReminderAt(start, 'hour', hoursBefore(1.5)), null);
+		assert.equal(firstReminderAt(start, 'none', hoursBefore(200)), null);
 	});
 });
 

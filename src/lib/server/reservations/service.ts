@@ -23,7 +23,7 @@ import type { CalendarRepository } from '../calendar/repository';
 import { bookingIcs, type BookingDetails, type InviteKind } from './email';
 import {
 	nextReminderAt,
-	REMINDER_QUIET_MS,
+	firstReminderAt,
 	reminderKind,
 	type ReminderKind,
 	type ReminderSetting
@@ -164,10 +164,9 @@ function randomSuffix(): string {
 	return crypto.randomUUID().replaceAll('-', '').slice(0, 5);
 }
 
-/** What every email about an existing booking says, at its next revision; `changes` overrides. */
-/** A booking's first reminder; none due right after the confirmation it was just sent. */
+/** A booking's first reminder, from when it was made or moved. */
 function firstReminder(start: Date, setting: ReminderSetting, at: Date): string | null {
-	return nextReminderAt(start, setting, new Date(at.getTime() + REMINDER_QUIET_MS))?.toISOString() ?? null;
+	return firstReminderAt(start, setting, at)?.toISOString() ?? null;
 }
 
 /** How many due reminders one sweep handles; the rest wait a minute for the next. */
@@ -175,6 +174,7 @@ export const REMINDER_BATCH = 20;
 /** After a reminder goes out, the next one has to be at least this far off, or it's skipped. */
 const REMINDER_GAP_MS = 30 * 60_000;
 
+/** What every email about an existing booking says, at its next revision; `changes` overrides. */
 function detailsFor(eventId: string, booking: StoredBooking, changes: Partial<BookingDetails> = {}) {
 	return {
 		uid: inviteUid(eventId),
