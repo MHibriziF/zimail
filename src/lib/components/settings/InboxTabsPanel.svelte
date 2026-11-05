@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { mailWrite } from '$lib/mail/client';
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { t } from '$lib/i18n';
@@ -21,7 +22,7 @@
 	};
 
 	async function post(body: unknown): Promise<Record<string, unknown>> {
-		const response = await fetch('/api/settings/inbox-tabs', {
+		const response = await mailWrite('/api/settings/inbox-tabs', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)
@@ -66,7 +67,7 @@
 		resorted = null;
 		error = '';
 		try {
-			const response = await fetch('/api/settings/inbox-tabs', {
+			const response = await mailWrite('/api/settings/inbox-tabs', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ resort: true })

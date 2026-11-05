@@ -1,5 +1,6 @@
 import type { OutboundAttachmentInput } from '$lib/types';
 import type { Label, LabelColor } from '$lib/mail/labels';
+import { forgetMailboxSnapshots } from '$lib/mail/mailbox-cache';
 
 /**
  * Every write a shell makes to the mailbox, in one place.
@@ -31,8 +32,13 @@ export function describeMailError(error: unknown, fallback: string): string {
 	return error instanceof MailRequestError ? error.message : fallback;
 }
 
+/** Any write can change any mailbox list, so cached lists go once it has landed. */
+export function mailWrite(url: string, init: RequestInit): Promise<Response> {
+	return fetch(url, init).finally(forgetMailboxSnapshots);
+}
+
 async function post<T = unknown>(url: string, body: unknown, fallback: string): Promise<T> {
-	const response = await fetch(url, {
+	const response = await mailWrite(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(body)
@@ -60,7 +66,7 @@ export async function runMailAction(
 
 /** Flags are booleans; `category` moves the conversation to another inbox tab. */
 export async function patchThread(id: string, flags: Record<string, boolean | string>): Promise<void> {
-	const response = await fetch(`/api/mail/${id}`, {
+	const response = await mailWrite(`/api/mail/${id}`, {
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(flags)
@@ -76,7 +82,7 @@ export async function patchThread(id: string, flags: Record<string, boolean | st
 
 /** Permanently removes a message. Only reachable from the trash. */
 export async function deleteMessage(messageId: string): Promise<void> {
-	const response = await fetch(`/api/mail/${encodeURIComponent(messageId)}`, {
+	const response = await mailWrite(`/api/mail/${encodeURIComponent(messageId)}`, {
 		method: 'DELETE'
 	});
 	if (!response.ok) {
@@ -201,7 +207,7 @@ export async function cancelScheduledSend(messageId: string): Promise<string | u
 
 /** Replaces the labels on the conversation `emailId` belongs to; resolves to what's applied now. */
 export async function setConversationLabels(emailId: string, labelIds: string[]): Promise<Label[]> {
-	const response = await fetch(`/api/mail/${encodeURIComponent(emailId)}/labels`, {
+	const response = await mailWrite(`/api/mail/${encodeURIComponent(emailId)}/labels`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ labelIds })
@@ -214,7 +220,7 @@ export async function setConversationLabels(emailId: string, labelIds: string[])
 }
 
 async function labelRequest(url: string, method: string, payload?: unknown): Promise<Label | null> {
-	const response = await fetch(url, {
+	const response = await mailWrite(url, {
 		method,
 		headers: payload ? { 'Content-Type': 'application/json' } : undefined,
 		body: payload ? JSON.stringify(payload) : undefined

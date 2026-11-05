@@ -7,6 +7,7 @@ import {
 	shouldRefreshMailbox,
 	waitForAbortable
 } from './sync';
+import { setMailboxCursor } from './mailbox-cache';
 
 type CursorFetch =
 	| { kind: 'ok'; cursor: string }
@@ -111,6 +112,7 @@ export function startMailboxLiveSync(invalidate: () => Promise<void>): () => voi
 			case 'ok': {
 				const changed = shouldRefreshMailbox(cursor, result.cursor);
 				cursor = result.cursor;
+				setMailboxCursor(cursor);
 				if (changed) {
 					await invalidate();
 					window.dispatchEvent(new Event(MAIL_CHANGED_MESSAGE));

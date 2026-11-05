@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { mailWrite } from '$lib/mail/client';
 	import { untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import Icon from '../Icon.svelte';
@@ -73,7 +74,7 @@
 		error = '';
 		notice = '';
 		try {
-			const res = await fetch('/api/settings/cleanup', {
+			const res = await mailWrite('/api/settings/cleanup', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(payload)

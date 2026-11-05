@@ -2,6 +2,7 @@
 	import { goto, invalidate, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { holdSend, restored, takeRestored } from '$lib/mail/undo-send';
+	import { markThreadReadInSnapshots } from '$lib/mail/mailbox-cache';
 	import { isBodyEmpty, replyAddress, signatureFor } from '$lib/mail/signature';
 	import { composerBody } from '$lib/email-signature';
 	import { t } from '$lib/i18n';
@@ -49,7 +50,9 @@
 	// comes from the root layout load, which SvelteKit has no reason to re-run on
 	// this navigation. Refresh just the counts, and only when something changed.
 	$effect(() => {
-		if (data.markedRead) void invalidate('app:counts');
+		if (!data.markedRead) return;
+		markThreadReadInSnapshots(data.threadId);
+		void invalidate('app:counts');
 	});
 
 	// A message the provider is still holding. Recalling it turns it back into a

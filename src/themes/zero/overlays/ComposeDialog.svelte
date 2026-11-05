@@ -9,7 +9,7 @@
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { composerBody, hasSignatureBlock } from '$lib/email-signature';
 	import { isBodyEmpty, signatureFor, swapSignature } from '$lib/mail/signature';
-	import { describeMailError, sendMessage, type SendMessageInput } from '$lib/mail/client';
+	import { describeMailError, sendMessage, type SendMessageInput, mailWrite } from '$lib/mail/client';
 	import { holdSend, peekRestored, settleRestored } from '$lib/mail/undo-send';
 	import { meetingLinkHtml, startMeeting } from '$lib/mail/meetings';
 	import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
@@ -138,7 +138,7 @@
 		savingDraft = true;
 		error = '';
 		try {
-			const response = await fetch('/api/drafts', {
+			const response = await mailWrite('/api/drafts', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
