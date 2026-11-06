@@ -250,6 +250,8 @@ describe('screen-share permissions', () => {
 		await createLiveKitClient('k', 's', 'wss://example.livekit.cloud', fetchImpl).deleteRoom('room-1');
 		assert.match(calls[0].url, /DeleteRoom$/);
 		assert.deepEqual(calls[0].body, { room: 'room-1' });
+		const token = calls[0].auth.replace(/^Bearer /, '');
+		assert.deepEqual(decodeJson(token.split('.')[1]).video, { roomCreate: true, room: 'room-1' });
 
 		const missing = recordingFetch(() => Response.json({ code: 'not_found', msg: 'room not found' }, { status: 404 }));
 		await createLiveKitClient('k', 's', 'wss://example.livekit.cloud', missing.fetchImpl).deleteRoom('room-1');
