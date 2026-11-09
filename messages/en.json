@@ -364,7 +364,20 @@
 		"linkUrl": "Link",
 		"linkApply": "Apply",
 		"linkRemove": "Remove link",
-		"linkInvalid": "Enter a web address or email"
+		"linkInvalid": "Enter a web address or email",
+		"emoji": "Emoji",
+		"emojiSearch": "Search emoji",
+		"emojiNone": "No emoji found",
+		"emojiRecent": "Recent",
+		"emojiSmileys": "Smileys",
+		"emojiPeople": "People",
+		"emojiNature": "Animals & nature",
+		"emojiFood": "Food & drink",
+		"emojiActivities": "Activities",
+		"emojiTravel": "Travel & places",
+		"emojiObjects": "Objects",
+		"emojiSymbols": "Symbols",
+		"emojiFlags": "Flags"
 	},
 	"thread": {
 		"close": "Close",

@@ -364,7 +364,20 @@
 		"linkUrl": "Tautan",
 		"linkApply": "Terapkan",
 		"linkRemove": "Hapus tautan",
-		"linkInvalid": "Masukkan alamat web atau email"
+		"linkInvalid": "Masukkan alamat web atau email",
+		"emoji": "Emoji",
+		"emojiSearch": "Cari emoji",
+		"emojiNone": "Emoji tidak ditemukan",
+		"emojiRecent": "Terbaru",
+		"emojiSmileys": "Wajah",
+		"emojiPeople": "Orang",
+		"emojiNature": "Hewan & alam",
+		"emojiFood": "Makanan & minuman",
+		"emojiActivities": "Aktivitas",
+		"emojiTravel": "Perjalanan & tempat",
+		"emojiObjects": "Benda",
+		"emojiSymbols": "Simbol",
+		"emojiFlags": "Bendera"
 	},
 	"thread": {
 		"close": "Tutup",

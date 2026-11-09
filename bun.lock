@@ -9,6 +9,7 @@
         "@fontsource-variable/geist-mono": "^5.3.0",
         "@livekit/track-processors": "^0.8.1",
         "@modelcontextprotocol/sdk": "^1.32.1",
+        "emojibase-data": "^18.0.0",
         "livekit-client": "^2.22.4",
         "postal-mime": "^4.2.0",
         "qrcode-generator": "^2.0.4",
@@ -354,6 +355,10 @@
     "ecdsa-sig-formatter": ["ecdsa-sig-formatter@1.0.11", "", { "dependencies": { "safe-buffer": "^5.0.1" } }, "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ=="],
 
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
+
+    "emojibase": ["emojibase@18.0.0", "", {}, "sha512-5PG+EEt5zQ9qvqdHZw61+T9iz96g+r621QS/w8jEzPg+3mjzAdjl8LPLc+e9ABv/yboNfMwEair7aK9qKnwAbQ=="],
+
+    "emojibase-data": ["emojibase-data@18.0.0", "", { "peerDependencies": { "emojibase": "*" } }, "sha512-TPPRRYv2zPd0jKI+pTpMquwWNZXYAsC3IVsCMeg2X8y8fEzKwOks4/5bz0YavF5r6d71aGPpb6oDnUEwSLLMoA=="],
 
     "encodeurl": ["encodeurl@2.0.0", "", {}, "sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg=="],
 

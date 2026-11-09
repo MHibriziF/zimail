@@ -364,7 +364,20 @@
 		"linkUrl": "Enlace",
 		"linkApply": "Aplicar",
 		"linkRemove": "Quitar enlace",
-		"linkInvalid": "Introduce una dirección web o un correo"
+		"linkInvalid": "Introduce una dirección web o un correo",
+		"emoji": "Emoji",
+		"emojiSearch": "Buscar emoji",
+		"emojiNone": "No se encontraron emojis",
+		"emojiRecent": "Recientes",
+		"emojiSmileys": "Caritas",
+		"emojiPeople": "Personas",
+		"emojiNature": "Animales y naturaleza",
+		"emojiFood": "Comida y bebida",
+		"emojiActivities": "Actividades",
+		"emojiTravel": "Viajes y lugares",
+		"emojiObjects": "Objetos",
+		"emojiSymbols": "Símbolos",
+		"emojiFlags": "Banderas"
 	},
 	"thread": {
 		"close": "Cerrar",
