@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { AdmissionsRepository, AdmissionStatus, PendingAdmission } from '../../admissions/repository';
+import { canMoveAdmission } from '../../admissions/status';
 import type { LiveKitClient, RoomParticipant, TrackSourceName } from '../../livekit';
 import type { Meeting, MeetingFieldPatch, MeetingsRepository, NewMeeting } from '../repository';
 import { createMeetingsService } from '../service';
@@ -139,7 +140,7 @@ function fakeAdmissionsRepo(): AdmissionsRepository & { seedStatus(id: string, s
 		},
 		async setStatus(meetingId, admissionId, status) {
 			const row = rows.get(admissionId);
-			if (!row || row.meetingId !== meetingId) return false;
+			if (!row || row.meetingId !== meetingId || !canMoveAdmission(row.status, status)) return false;
 			row.status = status;
 			return true;
 		},
@@ -557,6 +558,50 @@ describe('checkAdmission', () => {
 		const outcome = await service.checkAdmission('aaa-aaaa-aaa', id, 'Ada');
 		assert.equal(outcome.type, 'admitted');
 	});
+
+	test('an admission hands out one token, then stops working', async () => {
+		const admissionsRepo = fakeAdmissionsRepo();
+		const { repo } = fakeMeetingsRepo([meeting({ require_approval: true })]);
+		const { id } = await admissionsRepo.create('meeting-1', 'Ada');
+		await admissionsRepo.setStatus('meeting-1', id, 'admitted');
+		const service = createMeetingsService({ repo, admissionsRepo, getLiveKit: fakeLiveKit });
+
+		assert.equal((await service.checkAdmission('aaa-aaaa-aaa', id, 'Ada')).type, 'admitted');
+		assert.deepEqual(await service.checkAdmission('aaa-aaaa-aaa', id, 'Ada'), { type: 'admission_not_found' });
+		assert.equal((await admissionsRepo.get('meeting-1', id))?.status, 'joined');
+	});
+
+	test('two polls racing for one admission get one token between them', async () => {
+		const admissionsRepo = fakeAdmissionsRepo();
+		const { repo } = fakeMeetingsRepo([meeting({ require_approval: true })]);
+		const { id } = await admissionsRepo.create('meeting-1', 'Ada');
+		await admissionsRepo.setStatus('meeting-1', id, 'admitted');
+		const service = createMeetingsService({ repo, admissionsRepo, getLiveKit: fakeLiveKit });
+
+		const outcomes = await Promise.all([
+			service.checkAdmission('aaa-aaaa-aaa', id, 'Ada'),
+			service.checkAdmission('aaa-aaaa-aaa', id, 'Ada')
+		]);
+		assert.deepEqual(outcomes.map((outcome) => outcome.type).sort(), ['admission_not_found', 'admitted']);
+	});
+
+	test('a LiveKit failure leaves the admission usable', async () => {
+		const admissionsRepo = fakeAdmissionsRepo();
+		const { repo } = fakeMeetingsRepo([meeting({ require_approval: true })]);
+		const { id } = await admissionsRepo.create('meeting-1', 'Ada');
+		await admissionsRepo.setStatus('meeting-1', id, 'admitted');
+		let down = true;
+		const getLiveKit = () => {
+			const client = fakeLiveKit();
+			if (down) client.createAccessToken = async () => { throw new Error('LiveKit down'); };
+			return client;
+		};
+		const service = createMeetingsService({ repo, admissionsRepo, getLiveKit });
+
+		await assert.rejects(service.checkAdmission('aaa-aaaa-aaa', id, 'Ada'));
+		down = false;
+		assert.equal((await service.checkAdmission('aaa-aaaa-aaa', id, 'Ada')).type, 'admitted');
+	});
 });
 
 describe('captions', () => {
@@ -608,6 +653,17 @@ describe('decideAdmission', () => {
 		assert.equal(await service.decideAdmission('user-1', 'meeting-1', 'no-such-admission', 'denied'), 'admission_not_found');
 		assert.equal(await service.decideAdmission('user-1', 'meeting-1', id, 'admitted'), 'ok');
 		assert.equal((await admissionsRepo.get('meeting-1', id))?.status, 'admitted');
+	});
+
+	test('already_decided when the host answers the same request twice', async () => {
+		const { repo } = fakeMeetingsRepo([meeting()]);
+		const admissionsRepo = fakeAdmissionsRepo();
+		const { id } = await admissionsRepo.create('meeting-1', 'Ada');
+		const service = createMeetingsService({ repo, admissionsRepo, getLiveKit: fakeLiveKit });
+
+		assert.equal(await service.decideAdmission('user-1', 'meeting-1', id, 'denied'), 'ok');
+		assert.equal(await service.decideAdmission('user-1', 'meeting-1', id, 'admitted'), 'already_decided');
+		assert.equal((await admissionsRepo.get('meeting-1', id))?.status, 'denied');
 	});
 });
 

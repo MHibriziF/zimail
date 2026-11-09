@@ -835,6 +835,7 @@
 		"scheduledFor": "Dijadwalkan pada {time}",
 		"scheduleNow": "Sedang berlangsung",
 		"admissionDenied": "Tuan rumah tidak mengizinkan Anda masuk ke rapat ini.",
+		"admissionExpired": "Permintaan bergabung Anda sudah kedaluwarsa. Minta bergabung lagi.",
 		"connectionError": "Tidak dapat terhubung ke rapat.",
 		"raiseHand": "Angkat tangan",
 		"lowerHand": "Turunkan tangan",

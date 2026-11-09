@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { admissionStatusesBefore, type AdmissionStatus } from './status';
 
-export type AdmissionStatus = 'pending' | 'admitted' | 'denied';
+export type { AdmissionStatus };
 
 export type PendingAdmission = {
 	id: string;
@@ -17,6 +18,7 @@ export type AdmissionsRepository = {
 	create(meetingId: string, name: string): Promise<{ id: string }>;
 	get(meetingId: string, admissionId: string): Promise<{ status: AdmissionStatus } | null>;
 	listPending(meetingId: string): Promise<PendingAdmission[]>;
+	/** Only legal moves (see `./status`); false when the row is missing or can't make this one. */
 	setStatus(
 		meetingId: string,
 		admissionId: string,
@@ -59,9 +61,13 @@ export function createD1AdmissionsRepository(db: D1Database): AdmissionsReposito
 		},
 
 		async setStatus(meetingId, admissionId, status) {
+			const from = admissionStatusesBefore(status);
 			const result = await db
-				.prepare(`UPDATE meeting_admissions SET status = ? WHERE id = ? AND meeting_id = ?`)
-				.bind(status, admissionId, meetingId)
+				.prepare(
+					`UPDATE meeting_admissions SET status = ?
+					 WHERE id = ? AND meeting_id = ? AND status IN (${from.map(() => '?').join(', ')})`
+				)
+				.bind(status, admissionId, meetingId, ...from)
 				.run();
 
 			return (result.meta.changes ?? 0) > 0;

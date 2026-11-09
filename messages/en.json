@@ -835,6 +835,7 @@
 		"scheduledFor": "Scheduled for {time}",
 		"scheduleNow": "Happening now",
 		"admissionDenied": "The host didn't let you into this meeting.",
+		"admissionExpired": "Your request to join has expired. Ask to join again.",
 		"connectionError": "Could not connect to the meeting.",
 		"raiseHand": "Raise hand",
 		"lowerHand": "Lower hand",

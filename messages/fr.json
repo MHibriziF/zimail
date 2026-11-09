@@ -835,6 +835,7 @@
 		"scheduledFor": "Prévue le {time}",
 		"scheduleNow": "En cours",
 		"admissionDenied": "L'hôte ne vous a pas laissé entrer dans cette réunion.",
+		"admissionExpired": "Votre demande pour rejoindre a expiré. Redemandez à rejoindre.",
 		"connectionError": "Impossible de se connecter à la réunion.",
 		"raiseHand": "Lever la main",
 		"lowerHand": "Baisser la main",
