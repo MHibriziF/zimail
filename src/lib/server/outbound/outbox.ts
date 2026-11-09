@@ -1,6 +1,7 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { MailAddress, OutboundAttachmentInput, User } from '$lib/types';
-import { appendEmailSignature, pickEmailSignature } from '$lib/email-signature';
+import { pickEmailSignature } from '$lib/email-signature';
+import { appendEmailSignature } from './append-signature';
 import { base64ByteLength, insertAttachments } from '../attachments';
 import {
 	MAX_ATTACHMENT_BYTES,

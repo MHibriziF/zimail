@@ -4,6 +4,7 @@ import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-
 import { getApiTokenService, readBearerToken } from '$lib/server/api-tokens';
 import { getAuthService, readSessionToken } from '$lib/server/auth';
 import { PUBLISHED_FEED_PREFIX } from '$lib/server/calendar-publish/paths';
+import { SIGNATURE_IMAGE_PATH } from '$lib/server/signature-images';
 import { DOMAIN_COOKIE, UI_THEME_COOKIE, UI_THEME_COOKIE_MAX_AGE } from '$lib/server/constants';
 import { getDomainsService } from '$lib/server/domains';
 import { ensureSchema } from '$lib/server/migrations/migrate';
@@ -180,6 +181,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// d1_migrations. A feed only exists once its migration has run, and its
 	// token is its only credential, so it needs neither.
 	if (pathname.startsWith(PUBLISHED_FEED_PREFIX)) return render(event, resolve);
+	// Signature images are fetched by recipients' mail apps, signed out, and only read R2.
+	if (pathname.startsWith(SIGNATURE_IMAGE_PATH)) return render(event, resolve);
 
 	if (db) {
 		await migrate(db);

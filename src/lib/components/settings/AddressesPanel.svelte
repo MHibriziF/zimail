@@ -3,7 +3,7 @@
 	import AddressField from '../AddressField.svelte';
 	import { t } from '$lib/i18n';
 	import { addressErrorMessage } from '$lib/address-error';
-	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
+	import SignatureEditor from './SignatureEditor.svelte';
 	import type { Domain, MailAddress } from '$lib/types';
 
 	let {
@@ -95,6 +95,11 @@
 		if (res.ok) edited = body.addresses;
 	}
 
+	/** Edited signatures not saved yet, by address id. */
+	let signatureDrafts = $state<Record<string, string>>({});
+	const signatureDraft = (address: MailAddress) => signatureDrafts[address.id] ?? address.signature ?? '';
+	const signatureChanged = (address: MailAddress) => signatureDraft(address).trim() !== (address.signature ?? '');
+
 	async function saveMailboxSignature(id: string, value: string) {
 		const current = addresses.find((address) => address.id === id);
 		if (!current || (current.signature ?? '') === value.trim()) return;
@@ -113,6 +118,7 @@
 				return;
 			}
 			edited = body.addresses;
+			delete signatureDrafts[id];
 		} catch {
 			error = t('common.networkError');
 		} finally {
@@ -174,16 +180,25 @@
 						</button>
 					{/if}
 				</div>
-				<textarea
-					class="mailbox-signature"
-					rows="2"
-					maxlength={MAX_EMAIL_SIGNATURE_LENGTH}
-					value={address.signature ?? ''}
-					placeholder={t('settings.signaturePlaceholder')}
-					aria-label={t('settings.mailboxSignature')}
-					disabled={savingId === address.id}
-					onchange={(event) => saveMailboxSignature(address.id, event.currentTarget.value)}
-				></textarea>
+				<div class="mailbox-signature">
+					<SignatureEditor
+						bind:html={() => signatureDraft(address), (value) => (signatureDrafts[address.id] = value)}
+						label={t('settings.mailboxSignature')}
+						placeholder={t('settings.signaturePlaceholder')}
+					/>
+					{#if signatureChanged(address)}
+						<div class="mailbox-signature-actions">
+							<button
+								type="button"
+								class="btn-primary"
+								disabled={savingId === address.id}
+								onclick={() => saveMailboxSignature(address.id, signatureDraft(address))}
+							>
+								{savingId === address.id ? t('common.saving') : t('common.save')}
+							</button>
+						</div>
+					{/if}
+				</div>
 			</li>
 		{/each}
 	</ul>
@@ -281,22 +296,13 @@
 
 	.mailbox-signature {
 		width: 100%;
-		padding: 0.5rem 0.75rem;
-		resize: vertical;
-		border-radius: 0.625rem;
 		font-size: 0.8125rem;
-		line-height: 1.5;
-		background: var(--color-surface-muted);
-		box-shadow: inset 0 0 0 1px var(--color-line);
-		outline: none;
 	}
 
-	.mailbox-signature:focus {
-		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
-	}
-
-	.mailbox-signature::placeholder {
-		color: var(--color-muted);
+	.mailbox-signature-actions {
+		display: flex;
+		justify-content: flex-end;
+		margin-top: 0.5rem;
 	}
 
 	.address-domain {

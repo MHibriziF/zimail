@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import Icon from '../Icon.svelte';
+	import SignatureEditor from './SignatureEditor.svelte';
 	import { t } from '$lib/i18n';
-	import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
 
 	let { signature: initialSignature }: { signature: string } = $props();
 
@@ -44,17 +44,9 @@
 	<p class="card-hint">{t('settings.signatureHint')}</p>
 
 	<form class="signature-form" onsubmit={saveSignature}>
-		<textarea
-			id="email-signature"
-			bind:value={signature}
-			maxlength={MAX_EMAIL_SIGNATURE_LENGTH}
-			rows="3"
-			placeholder={'Best,\nEmmanuel'}
-			class="signature-input"
-		></textarea>
+		<SignatureEditor bind:html={signature} label={t('settings.signature')} placeholder={t('settings.signaturePasteHint')} />
 
 		<div class="signature-actions">
-			<span class="character-count">{signature.length}/{MAX_EMAIL_SIGNATURE_LENGTH}</span>
 			<button type="submit" class="btn-primary" disabled={signatureBusy}>
 				{signatureBusy ? t('common.saving') : t('common.save')}
 			</button>
@@ -90,33 +82,12 @@
 		margin-top: 1rem;
 	}
 
-	.signature-input {
-		width: 100%;
-		padding: 0.75rem 0.875rem;
-		resize: vertical;
-		border-radius: 0.75rem;
-		font-size: 0.875rem;
-		line-height: 1.55;
-		background: var(--color-surface-muted);
-		box-shadow: inset 0 0 0 1px var(--color-line);
-		outline: none;
-	}
-
-	.signature-input:focus {
-		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
-	}
-
 	.signature-actions {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-end;
 		gap: 0.75rem;
 		margin-top: 0.75rem;
-	}
-
-	.character-count {
-		font-size: 0.75rem;
-		color: var(--color-muted);
 	}
 
 	.saved {

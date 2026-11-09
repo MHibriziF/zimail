@@ -1,5 +1,5 @@
 import type { Domain, MailAddress } from '$lib/types';
-import { parseMailboxSignature } from '$lib/email-signature';
+import { cleanSignature } from '../util/signature-html';
 import type { EmailProvider } from '../email-provider';
 import type { DomainsRepository, NewUnroutedEmail, UnroutedEmail } from './repository';
 
@@ -218,9 +218,10 @@ export function createDomainsService(deps: DomainsServiceDeps): DomainsService {
 			}
 
 			const label = patch.label !== undefined ? patch.label?.trim() || null : current.label;
+			// Blank means "use the account signature", stored as null.
 			const signature =
 				patch.signature !== undefined
-					? parseMailboxSignature(patch.signature ?? '')
+					? (await cleanSignature(patch.signature ?? '')) || null
 					: current.signature;
 
 			await repo.updateAddressRow(userId, addressId, { label, signature });

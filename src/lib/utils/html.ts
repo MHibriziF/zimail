@@ -1,8 +1,19 @@
 import { stripTags } from './text';
 
+/** Elements that end a line, which `textContent` alone would run into the next one. */
+const LINE_ENDS = 'p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote, pre, table, ul, ol';
+
 export function htmlToPlainText(html: string): string {
 	const doc = new DOMParser().parseFromString(html, 'text/html');
-	return (doc.body.textContent ?? '').replace(/\n{3,}/g, '\n\n').trim();
+	for (const br of doc.body.querySelectorAll('br')) br.replaceWith('\n');
+	for (const block of doc.body.querySelectorAll(LINE_ENDS)) block.append('\n');
+	for (const cell of doc.body.querySelectorAll('td, th')) cell.append(' ');
+	return (doc.body.textContent ?? '')
+		.split('\n')
+		.map((line) => line.trimEnd())
+		.join('\n')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
 }
 
 /** Decode tags and whitespace entities when DOMParser is unavailable (SSR). */

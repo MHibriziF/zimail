@@ -1,6 +1,9 @@
-export const MAX_EMAIL_SIGNATURE_LENGTH = 1000;
+import { isHtmlTagName } from './signature-html';
 
-/** Keep intentional line breaks while removing transport and trailing whitespace noise. */
+/** Signatures are HTML: a logo, links and a table add up quickly, so this is generous. */
+export const MAX_EMAIL_SIGNATURE_LENGTH = 10_000;
+
+/** Remove transport line endings and the whitespace around the signature. */
 export function normalizeEmailSignature(value: string): string {
 	return value
 		.replace(/\r\n?/g, '\n')
@@ -19,6 +22,37 @@ function escapeHtml(value: string): string {
 		.replaceAll("'", '&#39;');
 }
 
+function isNameChar(char: string): boolean {
+	const lower = char.toLowerCase();
+	return (lower >= 'a' && lower <= 'z') || (char >= '0' && char <= '9') || char === ':';
+}
+
+/** The tag name after the `<` at `open`, skipping the `/` of a closing tag. */
+function tagNameAt(value: string, open: number): string {
+	let index = open + 1;
+	if (value[index] === '/') index += 1;
+	let name = '';
+	while (index < value.length && isNameChar(value[index])) name += value[index++];
+	return name;
+}
+
+/** True when `value` contains real markup, rather than text such as `<3` or `Ana <ana@x.co>`. */
+function looksLikeHtml(value: string): boolean {
+	for (let open = value.indexOf('<'); open !== -1; open = value.indexOf('<', open + 1)) {
+		if (value.startsWith('<!--', open) || isHtmlTagName(tagNameAt(value, open))) return true;
+	}
+	return false;
+}
+
+/**
+ * A signature as HTML. The settings editor sends HTML; an API client may still send plain text,
+ * as every signature was before, so text keeps its line breaks instead of running together.
+ */
+export function signatureAsHtml(value: string): string {
+	const normalized = normalizeEmailSignature(value);
+	return looksLikeHtml(normalized) ? normalized : escapeHtml(normalized).replaceAll('\n', '<br>');
+}
+
 /** Mailbox sign-off wins when set; otherwise the account signature. */
 export function pickEmailSignature(
 	mailbox: string | null | undefined,
@@ -27,23 +61,23 @@ export function pickEmailSignature(
 	return normalizeEmailSignature(mailbox ?? '') || normalizeEmailSignature(account ?? '');
 }
 
-/** Empty input becomes null so the mailbox falls back to the account signature. */
-export function parseMailboxSignature(value: string): string | null {
-	const signature = normalizeEmailSignature(value);
-	if (signature.length > MAX_EMAIL_SIGNATURE_LENGTH) {
+export function assertSignatureLength(value: string): void {
+	if (value.length > MAX_EMAIL_SIGNATURE_LENGTH) {
 		throw new Error(`Signature must be ${MAX_EMAIL_SIGNATURE_LENGTH} characters or fewer`);
 	}
-	return signature || null;
 }
 
 /** Marks the signature in a body, so the composer can find it again to swap or skip it. */
 export const SIGNATURE_ATTRIBUTE = 'data-email-signature';
 
-/** The signature as the composer shows it and sent mail carries it; empty when there is none. */
+/**
+ * The signature as the composer shows it and sent mail carries it; empty when there is none.
+ * Stored signatures are already sanitized, so they go in as they are.
+ */
 export function signatureBlockHtml(signature: string): string {
 	const normalized = normalizeEmailSignature(signature);
 	if (!normalized) return '';
-	return `<div ${SIGNATURE_ATTRIBUTE}="true">${escapeHtml(normalized).replaceAll('\n', '<br>\n')}</div>`;
+	return `<div ${SIGNATURE_ATTRIBUTE}="true">${normalized}</div>`;
 }
 
 export function hasSignatureBlock(html: string): boolean {
@@ -55,21 +89,4 @@ export function composerBody(signature: string, body = ''): string {
 	const block = signatureBlockHtml(signature);
 	if (!block) return body;
 	return `${body || '<div><br></div>'}<div><br></div>${block}`;
-}
-
-/** Append the configured sign-off to both MIME alternatives exactly once at send time. */
-export function appendEmailSignature(input: {
-	text: string;
-	html: string | null;
-	signature: string;
-}): { text: string; html: string | null } {
-	const signature = normalizeEmailSignature(input.signature);
-	if (!signature) return { text: input.text, html: input.html };
-
-	const text = `${input.text.trimEnd()}\n\n${signature}`;
-	const html = input.html
-		? `${input.html.trimEnd()}\n<div><br></div>\n${signatureBlockHtml(signature)}`
-		: null;
-
-	return { text, html };
 }
