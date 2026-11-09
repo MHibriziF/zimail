@@ -20,7 +20,9 @@ function cleanElement(element: Element) {
 		element.removeAndKeepContent();
 		return;
 	}
-	for (const [name, value] of [...element.attributes]) {
+	// A copy, because removing attributes while iterating the live list could skip some.
+	const attributes = Array.from(element.attributes);
+	for (const [name, value] of attributes) {
 		const kept = signatureAttribute(name, value);
 		if (kept === null) element.removeAttribute(name);
 		else if (kept !== value) element.setAttribute(name, kept);

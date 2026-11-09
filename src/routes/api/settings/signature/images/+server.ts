@@ -3,8 +3,9 @@ import { MAX_SIGNATURE_IMAGE_BYTES, saveSignatureImage, SIGNATURE_IMAGE_PATH } f
 
 /** Takes the image file as the request body and answers with the public URL to put in the signature. */
 export const POST: RequestHandler = async ({ request, locals, platform, url }) => {
+	if (!locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 	const bucket = platform?.env.ATTACHMENTS;
-	if (!bucket || !locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
+	if (!bucket) return json({ error: 'Storage is not available' }, { status: 503 });
 
 	const declared = Number(request.headers.get('content-length') ?? 0);
 	if (declared > MAX_SIGNATURE_IMAGE_BYTES) return json({ error: 'too_large' }, { status: 413 });

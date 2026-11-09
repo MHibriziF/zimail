@@ -1,16 +1,28 @@
 import { signatureAttribute, signatureTagRule } from '$lib/signature-html';
 
 function cleanAttributes(element: Element) {
-	for (const { name, value } of [...element.attributes]) {
+	// A copy, because removing from the live list while walking it would skip the next attribute.
+	const attributes = Array.from(element.attributes);
+	for (const { name, value } of attributes) {
 		const kept = signatureAttribute(name, value);
 		if (kept === null) element.removeAttribute(name);
 		else if (kept !== value) element.setAttribute(name, kept);
 	}
 }
 
-function cleanNode(node: Node) {
+/** Cleans each child, taking the next sibling first since cleaning may remove or unwrap the current one. */
+function cleanChildren(parent: Node) {
+	let child = parent.firstChild;
+	while (child) {
+		const next = child.nextSibling;
+		cleanNode(child);
+		child = next;
+	}
+}
+
+function cleanNode(node: ChildNode) {
 	if (node.nodeType === Node.COMMENT_NODE) {
-		node.parentNode?.removeChild(node);
+		node.remove();
 		return;
 	}
 	if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -20,7 +32,7 @@ function cleanNode(node: Node) {
 		element.remove();
 		return;
 	}
-	for (const child of [...element.childNodes]) cleanNode(child);
+	cleanChildren(element);
 	if (rule === 'unwrap') {
 		element.replaceWith(...element.childNodes);
 		return;
@@ -39,6 +51,6 @@ function cleanNode(node: Node) {
  */
 export function cleanPastedHtml(html: string): string {
 	const doc = new DOMParser().parseFromString(html, 'text/html');
-	for (const child of [...doc.body.childNodes]) cleanNode(child);
+	cleanChildren(doc.body);
 	return doc.body.innerHTML;
 }
