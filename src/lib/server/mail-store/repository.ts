@@ -2,6 +2,7 @@ import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { MAILBOX_PAGE_SIZE } from '$lib/constants';
 import type { Label } from '$lib/mail/labels';
 import { MAIL_CATEGORIES, type MailCategory } from '$lib/mail/categories';
+import { deliveryStatusesBefore } from '$lib/mail/delivery-status';
 import { createD1LabelsRepository } from '../labels/repository';
 import type {
 	DeliveryStatus,
@@ -282,11 +283,12 @@ export type MailStoreRepository = {
 	/** Sending a reply from an archived conversation should not silently move it back. */
 	carryArchiveToReply(userId: string, replyId: string, parentId: string): Promise<void>;
 	existsByProviderId(providerId: string): Promise<boolean>;
+	/** Moves the status forward only; false when the message is already past it. */
 	updateStatusByProviderId(
 		providerId: string,
 		status: DeliveryStatus,
 		detail: string | null
-	): Promise<void>;
+	): Promise<boolean>;
 	getForUser(userId: string, emailId: string): Promise<EmailRow | null>;
 
 	listMailboxRows(userId: string, query: MailboxQuery): Promise<MailboxRowsPage>;
@@ -456,13 +458,16 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 		},
 
 		async updateStatusByProviderId(providerId, status, detail) {
-			await db
+			const from = deliveryStatusesBefore(status);
+			if (from.length === 0) return false;
+			const result = await db
 				.prepare(
 					`UPDATE emails SET status = ?, status_at = datetime('now'), status_detail = ?
-					 WHERE provider_id = ?`
+					 WHERE provider_id = ? AND status IN (${from.map(() => '?').join(', ')})`
 				)
-				.bind(status, detail, providerId)
+				.bind(status, detail, providerId, ...from)
 				.run();
+			return (result.meta?.changes ?? 0) > 0;
 		},
 
 		async getForUser(userId, emailId) {

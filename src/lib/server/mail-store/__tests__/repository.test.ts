@@ -190,9 +190,10 @@ function setup(seedRows: Partial<Row>[] = [], seedAttachments: Attachment[] = []
 			return rows.filter((r) => r.provider_id === args[0]).map((r) => ({ id: r.id }));
 		}
 		if (sql.startsWith('UPDATE emails SET status = ?')) {
-			const [status, detail, providerId] = args as [string, string | null, string];
-			for (const r of rows) if (r.provider_id === providerId) Object.assign(r, { status, status_detail: detail });
-			return [];
+			const [status, detail, providerId, ...from] = args as [string, string | null, string, ...string[]];
+			const matched = rows.filter((r) => r.provider_id === providerId && from.includes(String(r.status)));
+			for (const r of matched) Object.assign(r, { status, status_detail: detail });
+			return matched;
 		}
 		if (sql === 'SELECT * FROM emails WHERE id = ? AND user_id = ?') {
 			return rows.filter((r) => r.id === args[0] && r.user_id === args[1]);
@@ -470,9 +471,34 @@ describe('MailStoreRepository — core row ops', () => {
 		assert.equal(await repo.existsByProviderId('prov-1'), true);
 		assert.equal(await repo.existsByProviderId('missing'), false);
 
-		await repo.updateStatusByProviderId('prov-1', 'delivered', 'ok');
+		assert.equal(await repo.updateStatusByProviderId('prov-1', 'delivered', 'ok'), true);
 		assert.equal(rows[0].status, 'delivered');
 		assert.equal(rows[0].status_detail, 'ok');
+	});
+
+	test('updateStatusByProviderId ignores a webhook that arrives after a later one', async () => {
+		const { repo, rows } = setup([
+			{ id: 'a', provider_id: 'prov-1', status: 'delivered' },
+			{ id: 'b', provider_id: 'prov-2', status: 'bounced', status_detail: 'mailbox full' }
+		]);
+
+		assert.equal(await repo.updateStatusByProviderId('prov-1', 'sent', null), false);
+		assert.equal(await repo.updateStatusByProviderId('prov-1', 'delayed', null), false);
+		assert.equal(rows[0].status, 'delivered');
+
+		assert.equal(await repo.updateStatusByProviderId('prov-2', 'delivered', null), false);
+		assert.equal(rows[1].status, 'bounced');
+		assert.equal(rows[1].status_detail, 'mailbox full');
+	});
+
+	test('updateStatusByProviderId never touches drafts or scheduled mail', async () => {
+		const { repo, rows } = setup([
+			{ id: 'a', provider_id: 'prov-1', status: 'draft' },
+			{ id: 'b', provider_id: 'prov-2', status: 'scheduled' }
+		]);
+		assert.equal(await repo.updateStatusByProviderId('prov-1', 'failed', null), false);
+		assert.equal(await repo.updateStatusByProviderId('prov-2', 'delivered', null), false);
+		assert.deepEqual(rows.map((r) => r.status), ['draft', 'scheduled']);
 	});
 
 	test('getForUser is ownership-scoped', async () => {
