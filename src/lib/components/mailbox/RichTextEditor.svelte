@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '../Icon.svelte';
+	import EmojiPicker from './EmojiPicker.svelte';
 	import { t } from '$lib/i18n';
 	import { linkHtml, normalizeLinkUrl } from '$lib/utils/links';
 
@@ -207,6 +208,26 @@
 		editor?.focus();
 	}
 
+	let emojiPicker = $state<EmojiPicker | null>(null);
+
+	function openEmoji(event: MouseEvent) {
+		const range = selectionInEditor();
+		savedRange = range?.cloneRange() ?? null;
+		emojiPicker?.show((event.currentTarget as HTMLElement).getBoundingClientRect());
+	}
+
+	/** Lands where the cursor was, or at the end when the message was never clicked into. */
+	function insertEmoji(char: string) {
+		if (savedRange) restoreSelection();
+		else {
+			editor?.focus();
+			window.getSelection()?.selectAllChildren(editor as Node);
+			window.getSelection()?.collapseToEnd();
+		}
+		document.execCommand('insertText', false, char);
+		html = editor?.innerHTML ?? '';
+	}
+
 	function handleEditorClick(event: MouseEvent) {
 		const anchor = anchorAround(event.target as Node);
 		if (!anchor) return;
@@ -236,6 +257,18 @@
 				<Icon name={tool.icon} size={16} />
 			</button>
 		{/each}
+		<button
+			type="button"
+			class="icon-btn"
+			title={t('compose.emoji')}
+			aria-label={t('compose.emoji')}
+			onmousedown={(event) => event.preventDefault()}
+			onpointerenter={() => emojiPicker?.preload()}
+			onfocus={() => emojiPicker?.preload()}
+			onclick={openEmoji}
+		>
+			<Icon name="emotion-happy-line" size={16} />
+		</button>
 		{#if toolbarEnd}
 			<div class="toolbar-end">
 				{@render toolbarEnd()}
@@ -257,6 +290,8 @@
 		onclick={handleEditorClick}
 		onkeydown={handleEditorKey}
 	></div>
+
+	<EmojiPicker bind:this={emojiPicker} onpick={insertEmoji} onclose={restoreSelection} />
 
 	<!-- Not a <form>: the composer around the editor already is one, and forms cannot nest. -->
 	<div

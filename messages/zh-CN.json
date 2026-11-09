@@ -364,7 +364,20 @@
 		"linkUrl": "链接",
 		"linkApply": "应用",
 		"linkRemove": "移除链接",
-		"linkInvalid": "请输入网址或邮箱地址"
+		"linkInvalid": "请输入网址或邮箱地址",
+		"emoji": "表情",
+		"emojiSearch": "搜索表情",
+		"emojiNone": "未找到表情",
+		"emojiRecent": "最近使用",
+		"emojiSmileys": "笑脸",
+		"emojiPeople": "人物",
+		"emojiNature": "动物与自然",
+		"emojiFood": "食物与饮料",
+		"emojiActivities": "活动",
+		"emojiTravel": "旅行与地点",
+		"emojiObjects": "物品",
+		"emojiSymbols": "符号",
+		"emojiFlags": "旗帜"
 	},
 	"thread": {
 		"close": "关闭",
