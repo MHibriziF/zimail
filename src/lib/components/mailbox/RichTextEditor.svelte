@@ -10,7 +10,10 @@
 		minHeight = 240,
 		embedded = false,
 		fill = false,
-		toolbarEnd
+		toolbarEnd,
+		toolbarExtra,
+		cleanPaste,
+		onpastefiles
 	}: {
 		html?: string;
 		placeholder?: string;
@@ -19,6 +22,12 @@
 		/** On phones, grow to fill the composer and drop the card chrome. */
 		fill?: boolean;
 		toolbarEnd?: import('svelte').Snippet;
+		/** More tools after the built-in ones. */
+		toolbarExtra?: import('svelte').Snippet;
+		/** Keep pasted formatting, cleaned by this. Without it a paste is plain text. */
+		cleanPaste?: (html: string) => string;
+		/** Files pasted in, such as a copied image; they are not inserted by the editor itself. */
+		onpastefiles?: (files: File[]) => void;
 	} = $props();
 
 	let editor = $state<HTMLDivElement | null>(null);
@@ -87,9 +96,42 @@
 
 	function handlePaste(event: ClipboardEvent) {
 		event.preventDefault();
-		const text = event.clipboardData?.getData('text/plain') ?? '';
-		document.execCommand('insertText', false, text);
+		const data = event.clipboardData;
+		const files = [...(data?.files ?? [])];
+		const pastedHtml = cleanPaste ? (data?.getData('text/html') ?? '') : '';
+		if (files.length && onpastefiles && !pastedHtml) {
+			onpastefiles(files);
+			return;
+		}
+		if (pastedHtml && cleanPaste) document.execCommand('insertHTML', false, cleanPaste(pastedHtml));
+		else document.execCommand('insertText', false, data?.getData('text/plain') ?? '');
 		html = editor?.innerHTML ?? '';
+	}
+
+	/** Keeps html in step after the content was changed from outside, such as resizing an image. */
+	export function sync() {
+		html = editor?.innerHTML ?? '';
+	}
+
+	/** Remembers the cursor before focus leaves the editor, such as for a file picker. */
+	export function rememberSelection() {
+		savedRange = selectionInEditor()?.cloneRange() ?? null;
+	}
+
+	/** Back to the remembered cursor, or the end when the editor was never clicked into. */
+	function placeAtSavedSelection() {
+		if (savedRange) restoreSelection();
+		else {
+			editor?.focus();
+			window.getSelection()?.selectAllChildren(editor as Node);
+			window.getSelection()?.collapseToEnd();
+		}
+	}
+
+	export function insertHtml(markup: string) {
+		placeAtSavedSelection();
+		document.execCommand('insertHTML', false, markup);
+		sync();
 	}
 
 	const tools = [
@@ -211,21 +253,14 @@
 	let emojiPicker = $state<EmojiPicker | null>(null);
 
 	function openEmoji(event: MouseEvent) {
-		const range = selectionInEditor();
-		savedRange = range?.cloneRange() ?? null;
+		rememberSelection();
 		emojiPicker?.show((event.currentTarget as HTMLElement).getBoundingClientRect());
 	}
 
-	/** Lands where the cursor was, or at the end when the message was never clicked into. */
 	function insertEmoji(char: string) {
-		if (savedRange) restoreSelection();
-		else {
-			editor?.focus();
-			window.getSelection()?.selectAllChildren(editor as Node);
-			window.getSelection()?.collapseToEnd();
-		}
+		placeAtSavedSelection();
 		document.execCommand('insertText', false, char);
-		html = editor?.innerHTML ?? '';
+		sync();
 	}
 
 	function handleEditorClick(event: MouseEvent) {
@@ -269,6 +304,7 @@
 		>
 			<Icon name="emotion-happy-line" size={16} />
 		</button>
+		{@render toolbarExtra?.()}
 		{#if toolbarEnd}
 			<div class="toolbar-end">
 				{@render toolbarEnd()}
@@ -441,6 +477,12 @@
 
 	.editor :global(li) {
 		margin: 0.15em 0;
+	}
+
+	/* Tailwind's reset makes images blocks; mail apps show them inline, so a row of icons in a
+	   signature stays a row. */
+	.editor :global(img) {
+		display: inline;
 	}
 
 	.editor :global(a) {
