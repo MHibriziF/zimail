@@ -315,7 +315,7 @@
 	{/if}
 
 	<div class="compose-editor">
-		<RichTextEditor bind:html fill minHeight={320}>
+		<RichTextEditor bind:html fill minHeight={160}>
 			{#snippet toolbarEnd()}
 				<AiAssist bind:html bind:subject />
 				<AttachmentPicker bind:attachments mode="button" />
