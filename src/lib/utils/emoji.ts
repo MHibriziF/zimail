@@ -1,3 +1,5 @@
+import type { Locale } from '../i18n/locales';
+
 export const EMOJI_CATEGORIES = [
 	'smileys',
 	'people',
@@ -126,7 +128,10 @@ export function rememberEmoji(recent: readonly string[], char: string): string[]
 	return [char, ...recent.filter((item) => item !== char)].slice(0, RECENT_EMOJI_LIMIT);
 }
 
-/** Emojibase has no Indonesian; those users search in English. */
-export const EMOJI_LOCALES = { en: 'en', id: 'en', fr: 'fr', es: 'es', 'zh-CN': 'zh' } as const;
+/** Emojibase has no Indonesian; those users search in English. A new UI language must be added here. */
+export const EMOJI_LOCALES = { en: 'en', id: 'en', fr: 'fr', es: 'es', 'zh-CN': 'zh' } as const satisfies Record<
+	Locale,
+	string
+>;
 
 export type EmojiDataLocale = (typeof EMOJI_LOCALES)[keyof typeof EMOJI_LOCALES];
