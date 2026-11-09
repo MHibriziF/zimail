@@ -13,7 +13,8 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 		const outcome = await getMeetingsService(platform).end(locals.user.id, params.id, { remove: body.delete === true });
 		if (outcome === 'meeting_not_found') return json({ error: 'Meeting not found' }, { status: 404 });
 		return json({ ok: true });
-	} catch {
+	} catch (error) {
+		console.error('ending meeting failed', error);
 		return json({ error: 'Could not end the meeting' }, { status: 502 });
 	}
 };

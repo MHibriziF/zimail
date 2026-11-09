@@ -133,13 +133,17 @@ export function createLiveKitClient(
     return `${header}.${payload}.${signature}`;
   }
 
-  /** One RoomService call. A room-scoped admin token, minted per call and valid for a minute. */
+  /**
+   * One RoomService call, with a room-scoped token minted per call and valid for a minute.
+   * Participant calls need `roomAdmin`; DeleteRoom checks `roomCreate` and rejects anything else.
+   */
   async function roomService<T>(
     method: string,
     room: string,
     body: Record<string, unknown>,
+    grant: "roomAdmin" | "roomCreate" = "roomAdmin",
   ): Promise<T> {
-    const token = await signClaims({ video: { roomAdmin: true, room } }, 60);
+    const token = await signClaims({ video: { [grant]: true, room } }, 60);
     const response = await fetchImpl(
       `${httpBaseUrl(url)}/twirp/livekit.RoomService/${method}`,
       {
@@ -251,7 +255,7 @@ export function createLiveKitClient(
 
     async deleteRoom(room) {
       try {
-        await roomService("DeleteRoom", room, {});
+        await roomService("DeleteRoom", room, {}, "roomCreate");
       } catch (error) {
         if (error instanceof LiveKitError && /not_found/.test(error.message))
           return;
