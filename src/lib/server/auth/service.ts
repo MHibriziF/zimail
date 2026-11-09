@@ -1,7 +1,7 @@
 import type { R2Bucket } from '@cloudflare/workers-types';
 import type { User } from '$lib/types';
 import { MAX_USER_NAME_LENGTH, MIN_PASSWORD_LENGTH } from '$lib/constants';
-import { normalizeEmailSignature } from '$lib/email-signature';
+import { cleanSignature } from '../util/signature-html';
 import { DEFAULT_UI_THEME, isThemeId } from '$lib/ui-theme/ids';
 import { DEFAULT_LOCALE, parseLocale, type Locale } from '$lib/i18n/locales';
 import { SESSION_COOKIE, SESSION_DAYS } from '../constants';
@@ -552,7 +552,7 @@ export function createAuthService(repo: AuthRepository, { now = Date.now }: Auth
 			return repo.getEmailSignature(userId);
 		},
 		async updateEmailSignature(userId, value) {
-			const signature = normalizeEmailSignature(value);
+			const signature = await cleanSignature(value);
 			await repo.setEmailSignature(userId, signature);
 			return signature;
 		},
