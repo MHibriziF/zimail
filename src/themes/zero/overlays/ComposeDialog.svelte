@@ -306,7 +306,7 @@
 			</div>
 
 			<div class="z-composer-body">
-				<RichTextEditor bind:html embedded minHeight={200} placeholder={t('compose.writeMessagePlaceholder')} />
+				<RichTextEditor bind:html embedded minHeight={120} placeholder={t('compose.writeMessagePlaceholder')} />
 			</div>
 
 			<ComposerActions
