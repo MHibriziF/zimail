@@ -342,6 +342,7 @@
 
 		<div class="z-sidebar-foot">
 			{#if !settings}
+				{#if $page.data.aiAvailable !== false}
 				<Tooltip text={t('ai.askOpen')} side="right" enabled={collapsed && !mobileOpen} stretch>
 					<button
 						type="button"
@@ -357,6 +358,7 @@
 						{#if !collapsed || mobileOpen}<span>{t('ai.askOpen')}</span>{/if}
 					</button>
 				</Tooltip>
+				{/if}
 				<Tooltip text={t('nav.calendar')} side="right" enabled={collapsed && !mobileOpen} stretch>
 					<a
 						href="/calendar"
@@ -448,7 +450,7 @@
 {#if paletteOpen}
 	<CommandPalette onClose={() => (paletteOpen = false)} />
 {/if}
-<AskPanel bind:open={askOpen} shell="zero" />
+{#if $page.data.aiAvailable !== false}<AskPanel bind:open={askOpen} shell="zero" />{/if}
 
 {#if shortcutsOpen}
 	<ShortcutsSheet onClose={() => (shortcutsOpen = false)} />

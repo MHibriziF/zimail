@@ -7,12 +7,14 @@ import { calendarServiceFor } from '../calendar';
 import { getMailStoreService } from '../mail-store';
 import type { ThreadMessageRow } from '../mail-store/repository';
 import type { FoundEvent, FoundMessage } from './find';
+import { aiFromEnv } from './provider';
 import { createAiService, type AiService } from './service';
 
 export { COMPOSE_ACTIONS, type ComposeAction } from './prompt';
 export { MAX_QUESTION_CHARS, type FoundEvent, type FoundMessage, type HistoryTurn } from './find';
 export { createAiService, type AiBinding, type AiService, type ComposeOutcome, type FindOutcome } from './service';
 export { sortTabs, type TabMessage, type TabsOutcome } from './tabs';
+export { aiFromEnv, type AiEnv } from './provider';
 export type { EventDraft } from './draft';
 
 type PlatformLike = App.Platform | undefined | null;
@@ -60,7 +62,7 @@ function toFoundEvent(event: CalendarEvent, timeZone: string): FoundEvent {
 export function getAiService(platform: PlatformLike): AiService {
 	const mailStore = getMailStoreService(platform);
 	return createAiService({
-		ai: platform?.env.AI ?? null,
+		ai: aiFromEnv(platform?.env),
 		async searchMail(userId, args, limit) {
 			const rows = await mailStore.searchMessages(
 				userId,

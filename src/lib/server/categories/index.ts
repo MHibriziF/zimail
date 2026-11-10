@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { sortTabs, type AiBinding } from '../ai';
+import { aiFromEnv, sortTabs, type AiBinding } from '../ai';
 import { listAddressesForUser } from '../domains';
 import { mailStoreServiceForDb } from '../mail-store';
 import { createD1CategoriesRepository } from './repository';
@@ -27,5 +27,5 @@ export function categoriesServiceForDb(db: D1Database, ai?: AiBinding | null): C
 export function getCategoriesService(platform: PlatformLike): CategoriesService {
 	const db = platform?.env.DB;
 	if (!db) throw new Error('Database unavailable');
-	return categoriesServiceForDb(db, platform?.env.AI);
+	return categoriesServiceForDb(db, aiFromEnv(platform?.env) ?? undefined);
 }
