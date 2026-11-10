@@ -21,8 +21,24 @@ type Result<T> = { success: true; meta: Meta; results: T[] };
 const READER = /^\s*(SELECT|WITH|PRAGMA|VALUES|EXPLAIN)\b/i;
 const RETURNING = /\bRETURNING\b/i;
 
+/** A statement may open with `-- notes` or `/* notes */`; what it does starts after them. */
+function withoutLeadingComments(sql: string): string {
+	let rest = sql.trimStart();
+	for (;;) {
+		if (rest.startsWith('--')) {
+			const end = rest.indexOf('\n');
+			rest = end < 0 ? '' : rest.slice(end + 1).trimStart();
+		} else if (rest.startsWith('/*')) {
+			const end = rest.indexOf('*/');
+			rest = end < 0 ? '' : rest.slice(end + 2).trimStart();
+		} else {
+			return rest;
+		}
+	}
+}
+
 function returnsRows(sql: string): boolean {
-	return READER.test(sql) || RETURNING.test(sql);
+	return READER.test(withoutLeadingComments(sql)) || RETURNING.test(sql);
 }
 
 /** D1 stores booleans as 0/1 and rejects `undefined`, so the wrapper does too. */
@@ -62,7 +78,7 @@ export function createSqliteD1(sqlite: DatabaseSync): D1Database {
 
 	function prepared(sql: string, args: SQLInputValue[]) {
 		return {
-			bind: (...values: unknown[]) => prepared(sql, values.map(toSqlValue)),
+			bind: (...values: unknown[]) => prepared(sql, values.map((value, index) => toSqlValue(value, index))),
 			async first<T = Row>(column?: string): Promise<T | null> {
 				const row = execute(sql, args).results[0];
 				if (!row) return null;

@@ -47,6 +47,13 @@ describe('createSqliteD1', () => {
 		assert.deepEqual(results.map((row) => row.body), ['a', 'b']);
 	});
 
+	test('a query that opens with comments still returns its rows', async () => {
+		const { db } = setup();
+		await db.prepare('INSERT INTO notes (body) VALUES (?)').bind('a').run();
+		const { results } = await db.prepare('-- the newest note\n/* just one */ SELECT body FROM notes').all();
+		assert.deepEqual(results, [{ body: 'a' }]);
+	});
+
 	test('raw returns arrays, optionally led by the column names', async () => {
 		const { db } = setup();
 		await db.prepare('INSERT INTO notes (body) VALUES (?)').bind('a').run();
