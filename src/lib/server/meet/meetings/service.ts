@@ -1,4 +1,4 @@
-import type { AdmissionsRepository, AdmissionStatus, PendingAdmission } from '../admissions/repository';
+import type { AdmissionsRepository, PendingAdmission } from '../admissions/repository';
 import { createHostIdentity, isHostIdentity } from '../../../meet/host-identity';
 import {
 	DEFAULT_SCREEN_SHARE,

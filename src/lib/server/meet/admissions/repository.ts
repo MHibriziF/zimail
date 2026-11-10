@@ -62,6 +62,7 @@ export function createD1AdmissionsRepository(db: D1Database): AdmissionsReposito
 
 		async setStatus(meetingId, admissionId, status) {
 			const from = admissionStatusesBefore(status);
+			if (from.length === 0) return false;
 			const result = await db
 				.prepare(
 					`UPDATE meeting_admissions SET status = ?
