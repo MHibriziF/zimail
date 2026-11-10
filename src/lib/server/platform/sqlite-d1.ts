@@ -21,7 +21,7 @@ type Result<T> = { success: true; meta: Meta; results: T[] };
 const READER = /^\s*(SELECT|WITH|PRAGMA|VALUES|EXPLAIN)\b/i;
 const RETURNING = /\bRETURNING\b/i;
 
-/** A statement may open with `-- notes` or `/* notes */`; what it does starts after them. */
+/** A statement may open with line or block comments; what it does starts after them. */
 function withoutLeadingComments(sql: string): string {
 	let rest = sql.trimStart();
 	for (;;) {
