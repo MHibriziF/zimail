@@ -135,6 +135,9 @@ export function encodeMailboxCursor(messageCount: number, latestRowid: number): 
 	return `${messageCount}:${latestRowid}`;
 }
 
+/** `stale`: the message is already further along, or isn't one we sent. */
+export type DeliveryStatusOutcome = 'updated' | 'stale';
+
 export type MailStoreService = {
 	getUserIdByEmail(email: string): Promise<string | null>;
 	insertEmail(input: InsertEmailInput): Promise<string>;
@@ -143,7 +146,7 @@ export type MailStoreService = {
 		providerId: string,
 		status: DeliveryStatus,
 		detail?: string | null
-	): Promise<void>;
+	): Promise<DeliveryStatusOutcome>;
 	getEmailForUser(userId: string, emailId: string): Promise<EmailRow | null>;
 
 	listMailbox(userId: string, query: MailboxQuery): Promise<MailboxPage>;
@@ -291,8 +294,8 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 		getUserIdByEmail: (email) => repo.getUserIdByEmail(email),
 		insertEmail,
 		emailExistsByProviderId: (providerId) => repo.existsByProviderId(providerId),
-		updateEmailStatusByProviderId: (providerId, status, detail) =>
-			repo.updateStatusByProviderId(providerId, status, detail ?? null),
+		updateEmailStatusByProviderId: async (providerId, status, detail) =>
+			(await repo.updateStatusByProviderId(providerId, status, detail ?? null)) ? 'updated' : 'stale',
 		getEmailForUser: (userId, emailId) => repo.getForUser(userId, emailId),
 
 		async listMailbox(userId, query) {

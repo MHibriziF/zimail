@@ -80,7 +80,10 @@ async function handleDeliveryStatus(
 		readString(event.data?.reason) ??
 		null;
 
-	await updateEmailStatusByProviderId(db, providerId, status, detail);
+	const outcome = await updateEmailStatusByProviderId(db, providerId, status, detail);
+	if (outcome === 'stale') {
+		return { handled: true, note: `Ignored ${status} for ${providerId}: unknown, or already further along` };
+	}
 	return { handled: true, note: `Marked ${providerId} as ${status}` };
 }
 

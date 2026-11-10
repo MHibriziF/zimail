@@ -103,7 +103,7 @@ function fakeRepo(overrides: Partial<MailStoreRepository> = {}) {
 			record('carryArchiveToReply', [userId, replyId, parentId]);
 		},
 		existsByProviderId: async () => false,
-		updateStatusByProviderId: async () => {},
+		updateStatusByProviderId: async () => true,
 		getForUser: async () => null,
 		async listMailboxRows(userId: string, query: MailboxQuery): Promise<MailboxRowsPage> {
 			record('listMailboxRows', [userId, query]);
@@ -180,6 +180,7 @@ describe('thin pass-throughs', () => {
 			existsByProviderId: async (id) => id === 'prov-1',
 			async updateStatusByProviderId(providerId, status, detail) {
 				record('updateStatusByProviderId', [providerId, status, detail]);
+				return providerId === 'prov-1';
 			},
 			getForUser: async (userId, emailId) => (userId === 'user-1' && emailId === 'e1' ? emailRow({ id: 'e1' }) : null),
 			expandToThreads: async (_userId, ids) => [...ids, 'extra'],
@@ -199,7 +200,8 @@ describe('thin pass-throughs', () => {
 
 		assert.equal(await service.getUserIdByEmail('jane@example.com'), 'user-1');
 		assert.equal(await service.emailExistsByProviderId('prov-1'), true);
-		await service.updateEmailStatusByProviderId('prov-1', 'delivered', 'ok');
+		assert.equal(await service.updateEmailStatusByProviderId('prov-1', 'delivered', 'ok'), 'updated');
+		assert.equal(await service.updateEmailStatusByProviderId('prov-2', 'sent'), 'stale');
 		assert.deepEqual(calls.updateStatusByProviderId?.[0], ['prov-1', 'delivered', 'ok']);
 		assert.equal((await service.getEmailForUser('user-1', 'e1'))?.id, 'e1');
 		assert.deepEqual(await service.expandToThreads('user-1', ['a']), ['a', 'extra']);
