@@ -4,6 +4,7 @@ import type { Label } from '$lib/mail/labels';
 import { MAIL_CATEGORIES, type MailCategory } from '$lib/mail/categories';
 import { deliveryStatusesBefore } from '$lib/mail/delivery-status';
 import { createD1LabelsRepository } from '../labels/repository';
+import { TRASH_CANCELS_SCHEDULE, withLocationRules } from './location';
 import type {
 	DeliveryStatus,
 	EmailAttachmentMeta,
@@ -197,14 +198,18 @@ const FLAG_COLUMNS = [
 	['isStarred', 'is_starred']
 ] as const;
 
-/** State flags stored as the time they were set, NULL when cleared. */
+/**
+ * State flags stored as the time they were set, NULL when cleared. Which of
+ * them combine is decided in `./location`, and `flagAssignments` applies it.
+ */
 const TIMESTAMP_COLUMNS = [
 	['trashed', 'deleted_at'],
 	['archived', 'archived_at'],
 	['spam', 'spam_at']
 ] as const;
 
-function flagAssignments(update: MailFlagUpdate): { assignments: string[]; bindings: unknown[] } {
+export function flagAssignments(requested: MailFlagUpdate): { assignments: string[]; bindings: unknown[] } {
+	const update = withLocationRules(requested);
 	const assignments: string[] = [];
 	const bindings: unknown[] = [];
 	for (const [key, column] of FLAG_COLUMNS) {
@@ -216,6 +221,7 @@ function flagAssignments(update: MailFlagUpdate): { assignments: string[]; bindi
 		if (update[key] === undefined) continue;
 		assignments.push(update[key] ? `${column} = datetime('now')` : `${column} = NULL`);
 	}
+	if (update.trashed) assignments.push(...TRASH_CANCELS_SCHEDULE);
 	return { assignments, bindings };
 }
 
