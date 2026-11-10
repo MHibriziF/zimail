@@ -1,4 +1,4 @@
-import type { AdmissionsRepository, AdmissionStatus, PendingAdmission } from '../admissions/repository';
+import type { AdmissionsRepository, PendingAdmission } from '../admissions/repository';
 import { createHostIdentity, isHostIdentity } from '../../../meet/host-identity';
 import {
 	DEFAULT_SCREEN_SHARE,
@@ -45,10 +45,10 @@ export type CaptionsAccess = 'meeting_not_found' | 'unauthorized' | 'disabled' |
 export type AdmissionCheckOutcome =
 	| { type: 'meeting_not_found' }
 	| { type: 'admission_not_found' }
-	| { type: 'waiting'; status: Exclude<AdmissionStatus, 'admitted'> }
+	| { type: 'waiting'; status: 'pending' | 'denied' }
 	| AdmittedOutcome;
 
-export type DecideAdmissionOutcome = 'meeting_not_found' | 'admission_not_found' | 'ok';
+export type DecideAdmissionOutcome = 'meeting_not_found' | 'admission_not_found' | 'already_decided' | 'ok';
 
 export type MeetingChanges = {
 	title?: string;
@@ -158,7 +158,7 @@ export type MeetingsService = {
 		userId: string,
 		meetingId: string,
 		admissionId: string,
-		status: Exclude<AdmissionStatus, 'pending'>
+		status: 'admitted' | 'denied'
 	): Promise<DecideAdmissionOutcome>;
 	/** Whether a caption token's holder may have speech transcribed in the meeting behind `code` right now. */
 	checkCaptionsAccess(code: string, captionToken: string): Promise<CaptionsAccess>;
@@ -400,11 +400,16 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			const admission = await admissionsRepo.get(meeting.id, admissionId);
 			if (!admission) return { type: 'admission_not_found' };
 
-			if (admission.status !== 'admitted') {
+			if (admission.status === 'pending' || admission.status === 'denied') {
 				return { type: 'waiting', status: admission.status };
 			}
+			if (admission.status === 'joined') return { type: 'admission_not_found' };
 
-			return admitted(getLiveKit(), meeting, { identity: crypto.randomUUID(), name, isOwner: false });
+			// Minted before the claim so a LiveKit failure leaves the admission
+			// usable; only the poll that wins the claim gets the token.
+			const outcome = await admitted(getLiveKit(), meeting, { identity: crypto.randomUUID(), name, isOwner: false });
+			const claimed = await admissionsRepo.setStatus(meeting.id, admissionId, 'joined');
+			return claimed ? outcome : { type: 'admission_not_found' };
 		},
 
 		/** Admit or deny one pending join request — owner-only. */
@@ -412,8 +417,8 @@ export function createMeetingsService(deps: MeetingsServiceDeps): MeetingsServic
 			const meeting = await repo.getForUser(userId, meetingId);
 			if (!meeting) return 'meeting_not_found';
 
-			const updated = await admissionsRepo.setStatus(meetingId, admissionId, status);
-			return updated ? 'ok' : 'admission_not_found';
+			if (await admissionsRepo.setStatus(meetingId, admissionId, status)) return 'ok';
+			return (await admissionsRepo.get(meetingId, admissionId)) ? 'already_decided' : 'admission_not_found';
 		},
 
 		async checkCaptionsAccess(code, captionToken) {

@@ -27,6 +27,7 @@ export const POST: RequestHandler = async ({ params, request, locals, platform }
 
 	if (outcome === 'meeting_not_found') return json({ error: 'Meeting not found' }, { status: 404 });
 	if (outcome === 'admission_not_found') return json({ error: 'Request not found' }, { status: 404 });
+	if (outcome === 'already_decided') return json({ error: 'Request already answered' }, { status: 409 });
 
 	return json({ ok: true });
 };

@@ -17,8 +17,8 @@ function setup(seed: Row[] = []) {
 			return [];
 		}
 		if (sql.startsWith('UPDATE meeting_admissions SET status')) {
-			const [status, id, meetingId] = args as [string, string, string];
-			const row = rows.find((entry) => entry.id === id && entry.meeting_id === meetingId);
+			const [status, id, meetingId, ...from] = args as [string, string, string, ...string[]];
+			const row = rows.find((entry) => entry.id === id && entry.meeting_id === meetingId && from.includes(entry.status));
 			if (row) row.status = status;
 			return row ? [row] : [];
 		}
@@ -82,5 +82,25 @@ describe('AdmissionsRepository', () => {
 
 		assert.equal(await repo.setStatus('meeting-1', admission.id, 'denied'), true);
 		assert.equal((await repo.get('meeting-1', admission.id))?.status, 'denied');
+	});
+
+	test('a decision is final', async () => {
+		const { repo } = setup();
+		const admission = await repo.create('meeting-1', 'Ada');
+		await repo.setStatus('meeting-1', admission.id, 'denied');
+
+		assert.equal(await repo.setStatus('meeting-1', admission.id, 'admitted'), false);
+		assert.equal(await repo.setStatus('meeting-1', admission.id, 'joined'), false);
+		assert.equal((await repo.get('meeting-1', admission.id))?.status, 'denied');
+	});
+
+	test('an admission is joined once', async () => {
+		const { repo } = setup();
+		const admission = await repo.create('meeting-1', 'Ada');
+		assert.equal(await repo.setStatus('meeting-1', admission.id, 'joined'), false);
+
+		await repo.setStatus('meeting-1', admission.id, 'admitted');
+		assert.equal(await repo.setStatus('meeting-1', admission.id, 'joined'), true);
+		assert.equal(await repo.setStatus('meeting-1', admission.id, 'joined'), false);
 	});
 });

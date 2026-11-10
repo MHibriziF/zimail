@@ -328,8 +328,13 @@
 					captions?: boolean;
 					captionToken?: string;
 				};
-				if (destroyed || epoch !== waitEpoch) return;
-				if (body.status === 'admitted' && body.url && body.token && body.roomName) {
+				if (destroyed || epoch !== waitEpoch || session) return;
+				// An admission is spent by the token it hands out, so a lost response
+				// means asking again rather than waiting forever.
+				if (response.status === 404) {
+					stopWaiting();
+					error = t('meet.admissionExpired');
+				} else if (body.status === 'admitted' && body.url && body.token && body.roomName) {
 					stopWaiting();
 					stopPreview();
 					session = {

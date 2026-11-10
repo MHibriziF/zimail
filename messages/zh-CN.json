@@ -835,6 +835,7 @@
 		"scheduledFor": "预定时间：{time}",
 		"scheduleNow": "正在进行",
 		"admissionDenied": "主持人未允许你加入此会议。",
+		"admissionExpired": "你的加入请求已过期。请重新请求加入。",
 		"connectionError": "无法连接到会议。",
 		"raiseHand": "举手",
 		"lowerHand": "放下手",

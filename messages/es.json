@@ -835,6 +835,7 @@
 		"scheduledFor": "Programada para el {time}",
 		"scheduleNow": "En curso",
 		"admissionDenied": "El anfitrión no te dejó entrar a esta reunión.",
+		"admissionExpired": "Tu solicitud para unirte ha caducado. Vuelve a pedir unirte.",
 		"connectionError": "No se pudo conectar a la reunión.",
 		"raiseHand": "Levantar la mano",
 		"lowerHand": "Bajar la mano",
