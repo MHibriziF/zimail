@@ -34,6 +34,32 @@ jobs:
           name: coverage
           path: coverage/lcov.info
 
+  # Both deploy targets have to build: the Worker, and the self-hosted server and its image.
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [cloudflare, node]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - run: bun install --frozen-lockfile
+
+      - if: matrix.target == 'cloudflare'
+        run: bun run build
+
+      - if: matrix.target == 'node'
+        run: bun run build:node
+
+      - if: matrix.target == 'node'
+        run: docker build --tag zimail:ci .
+
   sonarqube:
     name: SonarQube scan
     runs-on: ubuntu-latest
