@@ -24,6 +24,7 @@
 	import { downloadBlob, formatElapsed } from '$lib/meet/recorder';
 	import { CallRecording } from '$lib/meet/call-recording.svelte';
 	import { colorFor, initialsFor } from '$lib/meet/avatar';
+	import { CallPictureInPicture } from '$lib/meet/call-pip.svelte';
 	import { layoutCallTiles, type TileRect } from '$lib/meet/tile-layout';
 	import { parseRecordingAttribute, type RecordingKind } from '$lib/meet/recording-kind';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
@@ -119,13 +120,6 @@
 	const speakerSelectionSupported =
 		typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
 
-	// Document Picture-in-Picture is Chromium-only as of 2026 (no Firefox/Safari
-	// support) — hide the control rather than fail on tap. Where it's missing,
-	// Chromium-based browsers still fall back to their own bare auto-PiP video
-	// when the tab is hidden; this just gives Chromium users a real one with
-	// working controls instead of that raw, control-less video.
-	const pipSupported = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
-
 	// Background blur/replacement needs WebAssembly + (ideally) Insertable
 	// Streams; the library itself knows exactly what that requires per browser.
 	const backgroundSupported = typeof navigator !== 'undefined' && supportsBackgroundProcessors();
@@ -173,11 +167,16 @@
 	let remoteCount = $state(0);
 	let localScreenMediaEl = $state<HTMLDivElement>();
 
-	let pipWindow: Window | null = null;
-	let pipActive = $state(false);
-	let pipVideoEl: HTMLDivElement | null = null;
-	let pipMicBtn: HTMLButtonElement | null = null;
-	let pipCameraBtn: HTMLButtonElement | null = null;
+	const pip = new CallPictureInPicture({
+		room: () => room,
+		localName: () => localName,
+		micEnabled: () => micEnabled,
+		cameraEnabled: () => cameraEnabled,
+		guestLabel: () => t('meet.guest'),
+		onToggleMic: () => void toggleMic(),
+		onToggleCamera: () => void toggleCamera(),
+		onLeave: () => void leave()
+	});
 
 	let isHost = $state(false);
 	let requireApproval = $state(false);
@@ -664,7 +663,7 @@
 		if (track.kind === Track.Kind.Audio && deafened) el.muted = true;
 		tile.media.appendChild(el);
 		if (track.kind === Track.Kind.Audio) recorder.remoteAudioAdded(track.mediaStreamTrack);
-		if (pipActive && track.kind === Track.Kind.Video) refreshPipVideo();
+		if (pip.active && track.kind === Track.Kind.Video) pip.refreshVideo();
 	}
 
 	function detachRemoteTrack(
@@ -678,7 +677,7 @@
 		if (track.kind === Track.Kind.Audio) recorder.remoteAudioRemoved(track.mediaStreamTrack);
 		// The screen tile has no avatar fallback, so it only makes sense while sharing.
 		if (track.source === Track.Source.ScreenShare) removeScreenTile(participant.identity);
-		if (pipActive && track.kind === Track.Kind.Video) refreshPipVideo();
+		if (pip.active && track.kind === Track.Kind.Video) pip.refreshVideo();
 	}
 
 	function handleParticipantConnected(participant: RemoteParticipant) {
@@ -729,7 +728,7 @@
 			},
 			...remote
 		];
-		refreshPipVideo();
+		pip.refreshVideo();
 	}
 
 	/** An empty source list is LiveKit's "no restriction". */
@@ -816,140 +815,6 @@
 		}
 	}
 
-	/**
-	 * The PiP window shows whoever you're talking to, not yourself — falling
-	 * back to your own camera only while waiting for someone else to join.
-	 * Called on every roster/track change so it never goes stale while open.
-	 */
-	function refreshPipVideo() {
-		if (!pipVideoEl || !room) return;
-		pipVideoEl.innerHTML = '';
-		const doc = pipVideoEl.ownerDocument;
-
-		function showAvatar(name: string) {
-			if (!pipVideoEl) return;
-			const avatar = doc.createElement('div');
-			avatar.className = 'pip-avatar';
-			avatar.textContent = initialsFor(name);
-			pipVideoEl.appendChild(avatar);
-		}
-
-		const remote = Array.from(room!.remoteParticipants.values())[0];
-		if (remote) {
-			const publication = Array.from(remote.videoTrackPublications.values()).find(
-				(pub) => pub.track && pub.source !== Track.Source.ScreenShare
-			);
-			const track = publication?.track;
-			if (track) {
-				const el = track.attach();
-				el.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-				pipVideoEl.appendChild(el);
-			} else {
-				showAvatar(remote.name || t('meet.guest'));
-			}
-			return;
-		}
-
-		if (cameraEnabled) {
-			const publication = Array.from(room!.localParticipant.videoTrackPublications.values())[0];
-			const track = publication?.track;
-			if (track) {
-				const el = track.attach();
-				el.style.cssText = 'width:100%;height:100%;object-fit:cover;transform:scaleX(-1);';
-				pipVideoEl.appendChild(el);
-				return;
-			}
-		}
-		showAvatar(localName);
-	}
-
-	function updatePipButtons() {
-		if (pipMicBtn) {
-			pipMicBtn.textContent = micEnabled ? '🎤' : '🔇';
-			pipMicBtn.classList.toggle('off', !micEnabled);
-		}
-		if (pipCameraBtn) {
-			pipCameraBtn.textContent = cameraEnabled ? '🎥' : '🚫';
-			pipCameraBtn.classList.toggle('off', !cameraEnabled);
-		}
-	}
-
-	async function togglePip() {
-		if (pipWindow) {
-			pipWindow.close();
-			return;
-		}
-		try {
-			const win = await window.documentPictureInPicture!.requestWindow({ width: 300, height: 220 });
-			pipWindow = win;
-			pipActive = true;
-
-			const style = win.document.createElement('style');
-			style.textContent = `
-				:root { color-scheme: dark; }
-				body { margin: 0; background: #0b0b0d; overflow: hidden; font-family: system-ui, sans-serif; }
-				.pip-stage { display: flex; flex-direction: column; width: 100%; height: 100vh; }
-				.pip-video { flex: 1; min-height: 0; background: #1c1c1f; display: flex; align-items: center; justify-content: center; }
-				.pip-video video { width: 100%; height: 100%; object-fit: cover; }
-				.pip-avatar { font-size: 1.5rem; font-weight: 600; color: rgba(255,255,255,0.85); }
-				.pip-controls { flex-shrink: 0; height: 44px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #0b0b0d; }
-				.pip-btn { width: 32px; height: 32px; border: none; border-radius: 999px; background: #3f3f46; color: #fff; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; padding: 0; }
-				.pip-btn.off { background: #dc2626; }
-				.pip-btn.leave { background: #dc2626; }
-			`;
-			win.document.head.appendChild(style);
-
-			const stage = win.document.createElement('div');
-			stage.className = 'pip-stage';
-
-			const videoWrap = win.document.createElement('div');
-			videoWrap.className = 'pip-video';
-			stage.appendChild(videoWrap);
-			pipVideoEl = videoWrap;
-
-			const controls = win.document.createElement('div');
-			controls.className = 'pip-controls';
-
-			const micBtn = win.document.createElement('button');
-			micBtn.type = 'button';
-			micBtn.className = 'pip-btn';
-			micBtn.onclick = () => void toggleMic();
-			controls.appendChild(micBtn);
-			pipMicBtn = micBtn;
-
-			const cameraBtn = win.document.createElement('button');
-			cameraBtn.type = 'button';
-			cameraBtn.className = 'pip-btn';
-			cameraBtn.onclick = () => void toggleCamera();
-			controls.appendChild(cameraBtn);
-			pipCameraBtn = cameraBtn;
-
-			const leaveBtn = win.document.createElement('button');
-			leaveBtn.type = 'button';
-			leaveBtn.className = 'pip-btn leave';
-			leaveBtn.textContent = '✕';
-			leaveBtn.onclick = () => leave();
-			controls.appendChild(leaveBtn);
-
-			stage.appendChild(controls);
-			win.document.body.appendChild(stage);
-
-			updatePipButtons();
-			refreshPipVideo();
-
-			win.addEventListener('pagehide', () => {
-				pipWindow = null;
-				pipActive = false;
-				pipVideoEl = null;
-				pipMicBtn = null;
-				pipCameraBtn = null;
-			});
-		} catch {
-			// Requires a user gesture and a secure context; if it's ever missing
-			// despite the feature check, just leave the browser's own auto-PiP.
-		}
-	}
-
 	function receiveChatMessage(text: string, identity: string) {
 		const from = roster.find((p) => p.identity === identity)?.name || t('meet.guest');
 		messages = [
@@ -1032,9 +897,9 @@
 	$effect(() => {
 		micEnabled;
 		cameraEnabled;
-		if (pipActive) {
-			updatePipButtons();
-			refreshPipVideo();
+		if (pip.active) {
+			pip.updateButtons();
+			pip.refreshVideo();
 		}
 	});
 
@@ -1172,7 +1037,7 @@
 		// However the call ends — Leave, a dropped connection, closing the page — keep what was recorded.
 		void recorder.finish();
 		room?.disconnect();
-		pipWindow?.close();
+		pip.close();
 		stopAdmissionsPolling();
 		releasePendingScreenShare();
 		stopShareCooldown();
@@ -2067,8 +1932,8 @@
 		{canShareScreen}
 		{screenShareRequested}
 		{shareCooldownSeconds}
-		{pipSupported}
-		{pipActive}
+		pipSupported={pip.supported}
+		pipActive={pip.active}
 		{recordChoices}
 		recording={recorder.active}
 		recordingSaving={recorder.saving}
@@ -2090,7 +1955,7 @@
 		onToggleCamera={toggleCamera}
 		onShowBackgroundPicker={() => (showBackgroundPicker = true)}
 		onToggleScreenShare={toggleScreenShare}
-		onTogglePip={togglePip}
+		onTogglePip={() => void pip.toggle()}
 		onRecord={(kind) => void recorder.begin(kind)}
 		onStopRecording={() => void recorder.finish()}
 		onTogglePanel={togglePanel}
