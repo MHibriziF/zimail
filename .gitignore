@@ -27,3 +27,7 @@ vite.config.ts.timestamp-*
 
 # Local secrets for wrangler dev
 .dev.vars
+
+# Self-hosted settings and data (docker compose, bun run start:node)
+zimail.env
+/data

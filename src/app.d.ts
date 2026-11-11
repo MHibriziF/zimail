@@ -86,6 +86,9 @@ declare global {
 			locale: string;
 		}
 	}
+
+	/** `node` in `bun run build:node`, otherwise `cloudflare`. Set by Vite's `define`. */
+	const __ZIMAIL_TARGET__: 'node' | 'cloudflare';
 }
 
 export {};

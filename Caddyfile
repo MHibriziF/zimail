@@ -1,0 +1,5 @@
+# HTTPS in front of Zimail, with a certificate from Let's Encrypt.
+# Set ZIMAIL_DOMAIN (e.g. mail.example.com) and point its DNS at this machine.
+{$ZIMAIL_DOMAIN} {
+	reverse_proxy zimail:3000
+}

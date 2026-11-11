@@ -26,4 +26,8 @@ function emojiData(): Plugin {
 	};
 }
 
-export default defineConfig({ plugins: [tailwindcss(), sveltekit(), emojiData()] });
+export default defineConfig({
+	plugins: [tailwindcss(), sveltekit(), emojiData()],
+	// A constant, so the Worker build drops the self-hosted runtime (and its node:sqlite) entirely.
+	define: { __ZIMAIL_TARGET__: JSON.stringify(process.env.ZIMAIL_TARGET === 'node' ? 'node' : 'cloudflare') }
+});
