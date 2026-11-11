@@ -155,7 +155,8 @@ function authMechanisms(caps: Set<string>): string[] {
 async function authenticate(session: Session, caps: Set<string>, user: string, password: string): Promise<void> {
 	const mechanisms = authMechanisms(caps);
 	if (mechanisms.includes('PLAIN')) {
-		await session.command(`AUTH PLAIN ${base64(`\u0000${user}\u0000${password}`)}`, 'AUTH', 235);
+		const credentials = base64(['', user, password].join('\u0000'));
+		await session.command(`AUTH PLAIN ${credentials}`, 'AUTH', 235);
 		return;
 	}
 	if (mechanisms.includes('LOGIN')) {

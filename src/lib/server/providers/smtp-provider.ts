@@ -21,7 +21,7 @@ export type SmtpSettings = {
 	SMTP_MAIL_DOMAINS?: string;
 };
 
-const SECURITIES: SmtpSecurity[] = ['tls', 'starttls', 'none'];
+const SECURITIES = new Set<string>(['tls', 'starttls', 'none']);
 
 export function smtpConfigured(settings: SmtpSettings): boolean {
 	return Boolean(settings.SMTP_HOST?.trim()) && parseMailDomains(settings.SMTP_MAIL_DOMAINS).length > 0;
@@ -37,7 +37,7 @@ function readPort(raw: string | undefined): number {
 function readSecurity(raw: string | undefined, port: number): SmtpSecurity {
 	const value = raw?.trim().toLowerCase();
 	if (!value) return port === 465 ? 'tls' : 'starttls';
-	if (!SECURITIES.includes(value as SmtpSecurity)) {
+	if (!SECURITIES.has(value)) {
 		throw new ConfigError(`SMTP_SECURITY "${raw}" is not one of tls, starttls or none.`);
 	}
 	return value as SmtpSecurity;

@@ -94,7 +94,8 @@ export function formatAddress(address: string, name?: string): string {
 	const display = name ? oneLine(name) : '';
 	if (!display) return `<${addr}>`;
 	if (!isPrintableAscii(display)) return `${encodeWords(display)} <${addr}>`;
-	return `"${display.replaceAll('\\', '\\\\').replaceAll('"', String.raw`\"`)}" <${addr}>`;
+	const quoted = display.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+	return `"${quoted}" <${addr}>`;
 }
 
 /** Folds a long ASCII header at spaces, keeping lines near the recommended 78. */
