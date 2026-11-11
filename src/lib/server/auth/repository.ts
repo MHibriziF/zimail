@@ -147,13 +147,6 @@ export type AuthRepository = {
 	clearLoginFailures(userId: string): Promise<void>;
 	/** Stores `step` only if it is newer than the last accepted one. False means a replay. */
 	claimTotpStep(userId: string, step: number): Promise<boolean>;
-
-	getEmailSignature(userId: string): Promise<string>;
-	setEmailSignature(userId: string, value: string): Promise<void>;
-	getUiTheme(userId: string): Promise<string | null>;
-	setUiTheme(userId: string, theme: string): Promise<void>;
-	getLocale(userId: string): Promise<string | null>;
-	setLocale(userId: string, locale: string): Promise<void>;
 };
 
 const CLEAR_LOGIN_FAILURES_SQL = 'UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?';
@@ -605,42 +598,6 @@ export function createD1AuthRepository(db: D1Database): AuthRepository {
 				.bind(userId, step)
 				.run();
 			return (result.meta.changes ?? 0) === 1;
-		},
-
-		async getEmailSignature(userId) {
-			const row = await db
-				.prepare('SELECT email_signature FROM users WHERE id = ?')
-				.bind(userId)
-				.first<{ email_signature: string }>();
-			return row?.email_signature ?? '';
-		},
-
-		async setEmailSignature(userId, value) {
-			await db.prepare('UPDATE users SET email_signature = ? WHERE id = ?').bind(value, userId).run();
-		},
-
-		async getUiTheme(userId) {
-			const row = await db
-				.prepare('SELECT ui_theme FROM users WHERE id = ?')
-				.bind(userId)
-				.first<{ ui_theme: string | null }>();
-			return row?.ui_theme ?? null;
-		},
-
-		async setUiTheme(userId, theme) {
-			await db.prepare('UPDATE users SET ui_theme = ? WHERE id = ?').bind(theme, userId).run();
-		},
-
-		async getLocale(userId) {
-			const row = await db
-				.prepare('SELECT locale FROM users WHERE id = ?')
-				.bind(userId)
-				.first<{ locale: string | null }>();
-			return row?.locale ?? null;
-		},
-
-		async setLocale(userId, locale) {
-			await db.prepare('UPDATE users SET locale = ? WHERE id = ?').bind(locale, userId).run();
 		}
 	};
 }

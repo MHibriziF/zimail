@@ -1,9 +1,6 @@
 import type { R2Bucket } from '@cloudflare/workers-types';
 import type { User } from '$lib/types';
 import { MAX_USER_NAME_LENGTH, MIN_PASSWORD_LENGTH } from '$lib/constants';
-import { cleanSignature } from '../util/signature-html';
-import { DEFAULT_UI_THEME, isThemeId } from '$lib/ui-theme/ids';
-import { DEFAULT_LOCALE, parseLocale, type Locale } from '$lib/i18n/locales';
 import { SESSION_COOKIE, SESSION_DAYS } from '../constants';
 import { createSessionToken, hashPassword, hashToken, verifyPassword } from '../util/crypto';
 import { generateTotpSecret, matchTotpStep, otpauthUri, verifyTotp } from '../util/totp';
@@ -163,13 +160,6 @@ export type AuthService = {
 	confirmEnrollment(userId: string, code: string): Promise<string[]>;
 	disableTwoFactor(userId: string): Promise<void>;
 	verifyChallenge(userId: string, code: string): Promise<boolean>;
-
-	getEmailSignature(userId: string): Promise<string>;
-	updateEmailSignature(userId: string, value: string): Promise<string>;
-	getUserUiTheme(userId: string): Promise<string>;
-	setUserUiTheme(userId: string, theme: string): Promise<string>;
-	getUserLocale(userId: string): Promise<Locale>;
-	setUserLocale(userId: string, locale: string): Promise<Locale>;
 };
 
 function lockedFor(lockedUntil: number | null, nowMs: number): LoginResult | null {
@@ -546,37 +536,6 @@ export function createAuthService(repo: AuthRepository, { now = Date.now }: Auth
 			const gate = await repo.readLoginGate(userId);
 			if (!gate?.totpEnabled || !gate.totpSecret) return false;
 			return passSecondFactor(repo, userId, gate, code, now());
-		},
-
-		async getEmailSignature(userId) {
-			return repo.getEmailSignature(userId);
-		},
-		async updateEmailSignature(userId, value) {
-			const signature = await cleanSignature(value);
-			await repo.setEmailSignature(userId, signature);
-			return signature;
-		},
-
-		async getUserUiTheme(userId) {
-			const theme = await repo.getUiTheme(userId);
-			return isThemeId(theme) ? theme : DEFAULT_UI_THEME;
-		},
-		async setUserUiTheme(userId, theme) {
-			if (!isThemeId(theme)) {
-				throw new Error('Unknown theme');
-			}
-			await repo.setUiTheme(userId, theme);
-			return theme;
-		},
-
-		async getUserLocale(userId) {
-			const locale = await repo.getLocale(userId);
-			return parseLocale(locale ?? DEFAULT_LOCALE);
-		},
-		async setUserLocale(userId, locale) {
-			const resolved = parseLocale(locale);
-			await repo.setLocale(userId, resolved);
-			return resolved;
 		}
 	};
 }
