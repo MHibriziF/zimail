@@ -34,6 +34,8 @@ declare global {
 				RESEND_API_KEY: string;
 				/** Signing secret from the Resend webhook (whsec_…). */
 				RESEND_WEBHOOK_SECRET: string;
+				/** Turns on `/api/webhooks/inbound` (raw MIME from any MX); sent as Bearer, or as the Basic password. */
+				INBOUND_WEBHOOK_SECRET?: string;
 				/** Web Push application server public key. */
 				VAPID_PUBLIC_KEY?: string;
 				/** Web Push application server private key. */
