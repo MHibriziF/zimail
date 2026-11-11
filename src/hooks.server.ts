@@ -3,6 +3,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-access';
 import { getApiTokenService, readBearerToken } from '$lib/server/api-tokens';
 import { getAuthService, readSessionToken } from '$lib/server/auth';
+import { getPreferencesService } from '$lib/server/preferences';
 import { PUBLISHED_FEED_PREFIX } from '$lib/server/calendar-publish/paths';
 import { SIGNATURE_IMAGE_PATH } from '$lib/server/signature-images';
 import { DOMAIN_COOKIE, UI_THEME_COOKIE, UI_THEME_COOKIE_MAX_AGE } from '$lib/server/constants';
@@ -173,11 +174,8 @@ function mirrorCookie(event: RequestEvent, name: string, value: string, maxAge: 
 }
 
 async function loadPreferences(event: RequestEvent, userId: string) {
-	const authService = getAuthService(event.platform);
-	const [storedTheme, storedLocale] = await Promise.all([
-		authService.getUserUiTheme(userId),
-		authService.getUserLocale(userId)
-	]);
+	const preferences = getPreferencesService(event.platform);
+	const [storedTheme, storedLocale] = await Promise.all([preferences.getUiTheme(userId), preferences.getLocale(userId)]);
 	event.locals.uiTheme = storedTheme;
 	event.locals.locale = storedLocale;
 	mirrorCookie(event, UI_THEME_COOKIE, storedTheme, UI_THEME_COOKIE_MAX_AGE);
