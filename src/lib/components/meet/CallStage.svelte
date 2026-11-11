@@ -50,6 +50,7 @@
 	import CallTranscriptPanel from '$lib/components/meet/CallTranscriptPanel.svelte';
 	import { CAPTIONS_ALLOWED_ATTRIBUTE, CAPTIONS_WANTED_ATTRIBUTE, CAPTION_TOPIC, type CaptionLine } from '$lib/meet/captions';
 	import { CallCaptions } from '$lib/meet/call-captions.svelte';
+	import { CallDevices } from '$lib/meet/call-devices.svelte';
 
 	let {
 		url,
@@ -102,11 +103,6 @@
 	const screenShareSupported =
 		typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 
-	// setSinkId (routing audio to a chosen output device) is unsupported in
-	// Safari as of 2026 — hide the speaker picker there rather than fail on tap.
-	const speakerSelectionSupported =
-		typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
-
 	// Background blur/replacement needs WebAssembly + (ideally) Insertable
 	// Streams; the library itself knows exactly what that requires per browser.
 	const backgroundSupported = typeof navigator !== 'undefined' && supportsBackgroundProcessors();
@@ -140,12 +136,10 @@
 	let awaitingConnect = false;
 	let micEnabled = $state(untrack(() => initialMicEnabled));
 	let cameraEnabled = $state(untrack(() => initialCameraEnabled));
-	let micDeviceId = $state(untrack(() => initialMicDeviceId));
-	let cameraDeviceId = $state(untrack(() => initialCameraDeviceId));
-	let speakerDeviceId = $state('');
-	// Listed at this level (rather than by DeviceSelect itself) because the speaker picker is
-	// now bundled into the mic pill's popup as a plain option list, not its own DeviceSelect.
-	let speakerDevices = $state<MediaDeviceInfo[]>([]);
+	const devices = new CallDevices(
+		{ room: () => room, onMicChanged: () => captions.micTrackChanged() },
+		{ micId: untrack(() => initialMicDeviceId), cameraId: untrack(() => initialCameraDeviceId) }
+	);
 	let backgroundOption = $state(untrack(() => initialBackgroundOption));
 	let showBackgroundPicker = $state(false);
 	let deafened = $state(untrack(() => initialDeafened));
@@ -599,13 +593,6 @@
 	}
 
 	/** Routes one attached remote element to the chosen output device, if a non-default one is picked. */
-	function applySinkId(el: HTMLMediaElement) {
-		if (!speakerSelectionSupported || !speakerDeviceId) return;
-		void (el as HTMLMediaElement & { setSinkId(id: string): Promise<void> }).setSinkId(speakerDeviceId).catch(() => {
-			// Device may have disappeared since selection — the default output still plays.
-		});
-	}
-
 	function attachRemoteTrack(
 		track: RemoteTrack,
 		_publication: RemoteTrackPublication,
@@ -615,7 +602,7 @@
 		if (track.source === Track.Source.ScreenShare || track.source === Track.Source.ScreenShareAudio) {
 			const tile = ensureScreenTile(participant);
 			const el = track.attach();
-			applySinkId(el);
+			devices.applySinkId(el);
 			if (track.kind === Track.Kind.Audio && deafened) el.muted = true;
 			tile.media.appendChild(el);
 			if (track.source === Track.Source.ScreenShare) addShare(participant.identity);
@@ -623,7 +610,7 @@
 		}
 		const tile = ensureRemoteTile(participant);
 		const el = track.attach();
-		applySinkId(el);
+		devices.applySinkId(el);
 		if (track.kind === Track.Kind.Audio && deafened) el.muted = true;
 		tile.media.appendChild(el);
 		if (track.kind === Track.Kind.Audio) recorder.remoteAudioAdded(track.mediaStreamTrack);
@@ -867,22 +854,6 @@
 		}
 	});
 
-	async function loadSpeakerDevices() {
-		try {
-			const all = await navigator.mediaDevices.enumerateDevices();
-			speakerDevices = all.filter((device) => device.kind === 'audiooutput');
-		} catch {
-			speakerDevices = [];
-		}
-	}
-
-	$effect(() => {
-		if (!speakerSelectionSupported || !navigator.mediaDevices?.enumerateDevices) return;
-		void loadSpeakerDevices();
-		navigator.mediaDevices.addEventListener('devicechange', loadSpeakerDevices);
-		return () => navigator.mediaDevices.removeEventListener('devicechange', loadSpeakerDevices);
-	});
-
 	async function connectToRoom(instance: Room) {
 		connecting = true;
 		connectionError = '';
@@ -1034,7 +1005,7 @@
 	async function enableMic() {
 		if (!room) return;
 		try {
-			await room.localParticipant.setMicrophoneEnabled(true, micDeviceId ? { deviceId: micDeviceId } : undefined);
+			await room.localParticipant.setMicrophoneEnabled(true, devices.micConstraint());
 		} catch (error) {
 			micEnabled = false;
 			showNotice(t(deviceErrorKey(error)));
@@ -1047,7 +1018,7 @@
 		try {
 			const publication = await room.localParticipant.setCameraEnabled(
 				true,
-				cameraDeviceId ? { deviceId: cameraDeviceId } : undefined
+				devices.cameraConstraint()
 			);
 			const track = publication?.track;
 			if (track && localMediaEl) {
@@ -1154,27 +1125,6 @@
 		} else {
 			await room.localParticipant.setCameraEnabled(false);
 			if (localMediaEl) localMediaEl.innerHTML = '';
-		}
-	}
-
-	async function selectMic(id: string) {
-		micDeviceId = id;
-		if (room) await room.switchActiveDevice('audioinput', id);
-		captions.micTrackChanged();
-	}
-
-	async function selectCamera(id: string) {
-		cameraDeviceId = id;
-		if (room) await room.switchActiveDevice('videoinput', id);
-	}
-
-	function selectSpeaker(id: string) {
-		speakerDeviceId = id;
-		if (!room) return;
-		for (const participant of room.remoteParticipants.values()) {
-			for (const publication of [...participant.audioTrackPublications.values(), ...participant.videoTrackPublications.values()]) {
-				for (const el of publication.track?.attachedElements ?? []) applySinkId(el);
-			}
 		}
 	}
 
@@ -1771,12 +1721,12 @@
 	<CallControls
 		{deafened}
 		{micEnabled}
-		{micDeviceId}
+		micDeviceId={devices.micId}
 		{cameraEnabled}
-		{cameraDeviceId}
-		{speakerDeviceId}
-		{speakerDevices}
-		{speakerSelectionSupported}
+		cameraDeviceId={devices.cameraId}
+		speakerDeviceId={devices.speakerId}
+		speakerDevices={devices.speakers}
+		speakerSelectionSupported={devices.speakerSelectionSupported}
 		{backgroundSupported}
 		{backgroundOption}
 		{screenShareSupported}
@@ -1800,10 +1750,10 @@
 		captionsOn={captions.on}
 		onToggleCaptions={() => captions.toggle()}
 		onToggleDeafen={toggleDeafen}
-		onSelectMic={selectMic}
+		onSelectMic={(id) => void devices.selectMic(id)}
 		onToggleMic={toggleMic}
-		onSelectSpeaker={selectSpeaker}
-		onSelectCamera={selectCamera}
+		onSelectSpeaker={(id) => devices.selectSpeaker(id)}
+		onSelectCamera={(id) => void devices.selectCamera(id)}
 		onToggleCamera={toggleCamera}
 		onShowBackgroundPicker={() => (showBackgroundPicker = true)}
 		onToggleScreenShare={toggleScreenShare}
@@ -1820,7 +1770,7 @@
 
 {#if showBackgroundPicker}
 	<BackgroundPickerModal
-		{cameraDeviceId}
+		cameraDeviceId={devices.cameraId}
 		initialOption={backgroundOption}
 		{isLoggedIn}
 		onapply={(option) => void applyBackground(option)}
