@@ -169,33 +169,41 @@
 	"provider": {
 		"resend": "Resend",
 		"cloudflare": "Cloudflare Email",
+		"smtp": "SMTP",
 		"missingTitle": {
 			"resend": "缺少 Resend API 密钥",
-			"cloudflare": "未配置 Cloudflare Email"
+			"cloudflare": "未配置 Cloudflare Email",
+			"smtp": "SMTP 尚未配置"
 		},
 		"missingHint": {
 			"resend": "wrangler secret put RESEND_API_KEY",
-			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com"
+			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com",
+			"smtp": "EMAIL_PROVIDER=smtp\nSMTP_HOST=smtp.example.com\nSMTP_USER=…\nSMTP_PASSWORD=…\nSMTP_MAIL_DOMAINS=yourdomain.com"
 		},
 		"noDomainsTitle": {
 			"resend": "此 Resend 账户中没有域名",
-			"cloudflare": "CLOUDFLARE_MAIL_DOMAINS 中没有域名"
+			"cloudflare": "CLOUDFLARE_MAIL_DOMAINS 中没有域名",
+			"smtp": "SMTP_MAIL_DOMAINS 中没有域名"
 		},
 		"noDomainsBody": {
 			"resend": "请在 resend.com/domains 添加并验证域名，然后刷新此页面。",
-			"cloudflare": "在 Cloudflare Email Service 中接入域名，然后设置 CLOUDFLARE_MAIL_DOMAINS 并刷新。"
+			"cloudflare": "在 Cloudflare Email Service 中接入域名，然后设置 CLOUDFLARE_MAIL_DOMAINS 并刷新。",
+			"smtp": "在 SMTP_MAIL_DOMAINS 中列出你的 SMTP 中继可以代发的域名，然后重新加载。"
 		},
 		"domainPickerSubtitle": {
 			"resend": "这些是你的 Resend 账户可以收发的域名。选择你要使用的那个 — 之后还可以再添加。",
-			"cloudflare": "这些是 CLOUDFLARE_MAIL_DOMAINS 中列出的域名。选择你要使用的那个 — 之后还可以再添加。"
+			"cloudflare": "这些是 CLOUDFLARE_MAIL_DOMAINS 中列出的域名。选择你要使用的那个 — 之后还可以再添加。",
+			"smtp": "这些是 SMTP_MAIL_DOMAINS 中列出的域名。选择你要使用的一个——之后可以再添加更多。"
 		},
 		"onboardingSubtitle": {
 			"resend": "从你的 Resend 账户中选择要加入此控制台的域名。",
-			"cloudflare": "从 CLOUDFLARE_MAIL_DOMAINS 中选择要加入此控制台的域名。"
+			"cloudflare": "从 CLOUDFLARE_MAIL_DOMAINS 中选择要加入此控制台的域名。",
+			"smtp": "从 SMTP_MAIL_DOMAINS 中选择要显示在此面板中的域名。"
 		},
 		"receivingHint": {
 			"resend": "{domain} 尚未启用接收 — 你可以发信，但在 Resend 中添加 MX 记录之前收不到来信。",
-			"cloudflare": "{domain} 尚未启用接收 — 请将 Email Routing 的 catch-all 指向此 Worker。"
+			"cloudflare": "{domain} 尚未启用接收 — 请将 Email Routing 的 catch-all 指向此 Worker。",
+			"smtp": "{domain} 尚未设置收信——在你的 MX 将邮件转发到本实例的入站 webhook 之前，发往该域名的邮件不会到达。"
 		}
 	},
 	"mailbox": {

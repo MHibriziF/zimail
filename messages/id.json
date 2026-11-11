@@ -169,33 +169,41 @@
 	"provider": {
 		"resend": "Resend",
 		"cloudflare": "Cloudflare Email",
+		"smtp": "SMTP",
 		"missingTitle": {
 			"resend": "Kunci API Resend belum ada",
-			"cloudflare": "Cloudflare Email belum dikonfigurasi"
+			"cloudflare": "Cloudflare Email belum dikonfigurasi",
+			"smtp": "SMTP belum dikonfigurasi"
 		},
 		"missingHint": {
 			"resend": "wrangler secret put RESEND_API_KEY",
-			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com"
+			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com",
+			"smtp": "EMAIL_PROVIDER=smtp\nSMTP_HOST=smtp.example.com\nSMTP_USER=…\nSMTP_PASSWORD=…\nSMTP_MAIL_DOMAINS=yourdomain.com"
 		},
 		"noDomainsTitle": {
 			"resend": "Tidak ada domain di akun Resend ini",
-			"cloudflare": "Tidak ada domain di CLOUDFLARE_MAIL_DOMAINS"
+			"cloudflare": "Tidak ada domain di CLOUDFLARE_MAIL_DOMAINS",
+			"smtp": "Tidak ada domain di SMTP_MAIL_DOMAINS"
 		},
 		"noDomainsBody": {
 			"resend": "Tambahkan dan verifikasi domain di resend.com/domains, lalu muat ulang halaman ini.",
-			"cloudflare": "Daftarkan domain di Cloudflare Email Service, lalu isi CLOUDFLARE_MAIL_DOMAINS dan muat ulang."
+			"cloudflare": "Daftarkan domain di Cloudflare Email Service, lalu isi CLOUDFLARE_MAIL_DOMAINS dan muat ulang.",
+			"smtp": "Cantumkan domain yang boleh dikirim lewat relay SMTP Anda di SMTP_MAIL_DOMAINS, lalu muat ulang."
 		},
 		"domainPickerSubtitle": {
 			"resend": "Ini domain yang bisa dipakai akun Resend Anda untuk mengirim dan menerima. Pilih satu — Anda bisa menambah lagi nanti.",
-			"cloudflare": "Ini domain yang tercantum di CLOUDFLARE_MAIL_DOMAINS. Pilih satu — Anda bisa menambah lagi nanti."
+			"cloudflare": "Ini domain yang tercantum di CLOUDFLARE_MAIL_DOMAINS. Pilih satu — Anda bisa menambah lagi nanti.",
+			"smtp": "Ini domain yang tercantum di SMTP_MAIL_DOMAINS. Pilih yang ingin Anda gunakan — Anda bisa menambah lagi nanti."
 		},
 		"onboardingSubtitle": {
 			"resend": "Pilih domain dari akun Resend Anda yang ingin ditampilkan di dasbor ini.",
-			"cloudflare": "Pilih domain dari CLOUDFLARE_MAIL_DOMAINS yang ingin ditampilkan di dasbor ini."
+			"cloudflare": "Pilih domain dari CLOUDFLARE_MAIL_DOMAINS yang ingin ditampilkan di dasbor ini.",
+			"smtp": "Pilih domain dari SMTP_MAIL_DOMAINS yang ingin Anda tampilkan di dasbor ini."
 		},
 		"receivingHint": {
 			"resend": "Penerimaan belum aktif di {domain} — Anda bisa mengirim, tetapi surel masuk baru akan sampai setelah Anda menambahkan data MX di Resend.",
-			"cloudflare": "Penerimaan belum aktif di {domain} — arahkan catch-all Email Routing ke Worker ini."
+			"cloudflare": "Penerimaan belum aktif di {domain} — arahkan catch-all Email Routing ke Worker ini.",
+			"smtp": "Penerimaan belum disiapkan di {domain} — surat ke domain ini tidak akan masuk sampai MX Anda meneruskannya ke webhook masuk instalasi ini."
 		}
 	},
 	"mailbox": {

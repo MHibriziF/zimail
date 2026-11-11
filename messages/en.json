@@ -169,33 +169,41 @@
 	"provider": {
 		"resend": "Resend",
 		"cloudflare": "Cloudflare Email",
+		"smtp": "SMTP",
 		"missingTitle": {
 			"resend": "Resend API key missing",
-			"cloudflare": "Cloudflare Email is not configured"
+			"cloudflare": "Cloudflare Email is not configured",
+			"smtp": "SMTP is not configured"
 		},
 		"missingHint": {
 			"resend": "wrangler secret put RESEND_API_KEY",
-			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com"
+			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com",
+			"smtp": "EMAIL_PROVIDER=smtp\nSMTP_HOST=smtp.example.com\nSMTP_USER=…\nSMTP_PASSWORD=…\nSMTP_MAIL_DOMAINS=yourdomain.com"
 		},
 		"noDomainsTitle": {
 			"resend": "No domains in this Resend account",
-			"cloudflare": "No domains in CLOUDFLARE_MAIL_DOMAINS"
+			"cloudflare": "No domains in CLOUDFLARE_MAIL_DOMAINS",
+			"smtp": "No domains in SMTP_MAIL_DOMAINS"
 		},
 		"noDomainsBody": {
 			"resend": "Add and verify a domain at resend.com/domains, then reload this page.",
-			"cloudflare": "Onboard the domain in Cloudflare Email Service, then set CLOUDFLARE_MAIL_DOMAINS and reload."
+			"cloudflare": "Onboard the domain in Cloudflare Email Service, then set CLOUDFLARE_MAIL_DOMAINS and reload.",
+			"smtp": "List the domains your SMTP relay may send for in SMTP_MAIL_DOMAINS, then reload."
 		},
 		"domainPickerSubtitle": {
 			"resend": "These are the domains your Resend account can send and receive on. Pick the one you want to use — you can add more later.",
-			"cloudflare": "These are the domains listed in CLOUDFLARE_MAIL_DOMAINS. Pick the one you want to use — you can add more later."
+			"cloudflare": "These are the domains listed in CLOUDFLARE_MAIL_DOMAINS. Pick the one you want to use — you can add more later.",
+			"smtp": "These are the domains listed in SMTP_MAIL_DOMAINS. Pick the one you want to use — you can add more later."
 		},
 		"onboardingSubtitle": {
 			"resend": "Pick the domains from your Resend account that you want in this dashboard.",
-			"cloudflare": "Pick the domains from CLOUDFLARE_MAIL_DOMAINS that you want in this dashboard."
+			"cloudflare": "Pick the domains from CLOUDFLARE_MAIL_DOMAINS that you want in this dashboard.",
+			"smtp": "Pick the domains from SMTP_MAIL_DOMAINS that you want in this dashboard."
 		},
 		"receivingHint": {
 			"resend": "Receiving isn't enabled on {domain} yet — you can send, but inbound mail won't arrive until you add the MX record in Resend.",
-			"cloudflare": "Receiving isn't enabled on {domain} yet — point Email Routing's catch-all at this Worker."
+			"cloudflare": "Receiving isn't enabled on {domain} yet — point Email Routing's catch-all at this Worker.",
+			"smtp": "Receiving isn't set up on {domain} yet — mail to it won't arrive until your MX forwards it to this install's inbound webhook."
 		}
 	},
 	"mailbox": {

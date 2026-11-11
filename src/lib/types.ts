@@ -52,7 +52,7 @@ export type Domain = {
 };
 
 /** Which mail backend this deploy is configured to use. */
-export type EmailProviderKind = 'resend' | 'cloudflare';
+export type EmailProviderKind = 'resend' | 'cloudflare' | 'smtp';
 
 /** A domain as reported by the active provider, flagged with local connection state. */
 export type AvailableDomain = {

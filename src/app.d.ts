@@ -26,10 +26,19 @@ declare global {
 				AI_API_KEY?: string;
 				/** For `openai`, optional: a model served at `/audio/transcriptions`, for meeting captions. */
 				AI_TRANSCRIPTION_MODEL?: string;
-				/** `resend` (default) or `cloudflare`. */
+				/** `resend` (default), `cloudflare` or `smtp`. */
 				EMAIL_PROVIDER?: string;
 				/** Comma-separated domains when EMAIL_PROVIDER=cloudflare. */
 				CLOUDFLARE_MAIL_DOMAINS?: string;
+				/** For EMAIL_PROVIDER=smtp: the relay, e.g. `smtp.postmarkapp.com`, and its port (default 587). */
+				SMTP_HOST?: string;
+				SMTP_PORT?: string;
+				/** `tls` (465), `starttls` (the default elsewhere) or `none` (a local relay with no password). */
+				SMTP_SECURITY?: string;
+				SMTP_USER?: string;
+				SMTP_PASSWORD?: string;
+				/** Comma-separated domains the relay may send for. */
+				SMTP_MAIL_DOMAINS?: string;
 				/** Resend API key — `wrangler secret put RESEND_API_KEY`. */
 				RESEND_API_KEY: string;
 				/** Signing secret from the Resend webhook (whsec_…). */

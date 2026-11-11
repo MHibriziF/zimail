@@ -5,6 +5,7 @@
 	import AddressField from '$lib/components/AddressField.svelte';
 	import Check from '$lib/components/Check.svelte';
 	import { APP_NAME } from '$lib/constants';
+	import { providerName } from '$lib/provider-copy';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -278,7 +279,7 @@
 				<p class="connect-title">
 					{t('admin.availableIn', {
 						provider:
-							data.providerKind === 'cloudflare' ? t('provider.cloudflare') : t('provider.resend')
+							providerName(data.providerKind)
 					})}
 				</p>
 				<ul class="connect-list">

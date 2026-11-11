@@ -169,33 +169,41 @@
 	"provider": {
 		"resend": "Resend",
 		"cloudflare": "Cloudflare Email",
+		"smtp": "SMTP",
 		"missingTitle": {
 			"resend": "Falta la clave API de Resend",
-			"cloudflare": "Cloudflare Email no está configurado"
+			"cloudflare": "Cloudflare Email no está configurado",
+			"smtp": "SMTP no está configurado"
 		},
 		"missingHint": {
 			"resend": "wrangler secret put RESEND_API_KEY",
-			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com"
+			"cloudflare": "EMAIL_PROVIDER=cloudflare\nCLOUDFLARE_MAIL_DOMAINS=yourdomain.com",
+			"smtp": "EMAIL_PROVIDER=smtp\nSMTP_HOST=smtp.example.com\nSMTP_USER=…\nSMTP_PASSWORD=…\nSMTP_MAIL_DOMAINS=yourdomain.com"
 		},
 		"noDomainsTitle": {
 			"resend": "No hay dominios en esta cuenta de Resend",
-			"cloudflare": "No hay dominios en CLOUDFLARE_MAIL_DOMAINS"
+			"cloudflare": "No hay dominios en CLOUDFLARE_MAIL_DOMAINS",
+			"smtp": "No hay dominios en SMTP_MAIL_DOMAINS"
 		},
 		"noDomainsBody": {
 			"resend": "Añade y verifica un dominio en resend.com/domains y recarga esta página.",
-			"cloudflare": "Incorpora el dominio en Cloudflare Email Service, configura CLOUDFLARE_MAIL_DOMAINS y recarga."
+			"cloudflare": "Incorpora el dominio en Cloudflare Email Service, configura CLOUDFLARE_MAIL_DOMAINS y recarga.",
+			"smtp": "Indica en SMTP_MAIL_DOMAINS los dominios para los que tu relay SMTP puede enviar y vuelve a cargar."
 		},
 		"domainPickerSubtitle": {
 			"resend": "Estos son los dominios con los que tu cuenta de Resend puede enviar y recibir. Elige el que quieras usar; podrás añadir más después.",
-			"cloudflare": "Estos son los dominios listados en CLOUDFLARE_MAIL_DOMAINS. Elige el que quieras usar; podrás añadir más después."
+			"cloudflare": "Estos son los dominios listados en CLOUDFLARE_MAIL_DOMAINS. Elige el que quieras usar; podrás añadir más después.",
+			"smtp": "Estos son los dominios de SMTP_MAIL_DOMAINS. Elige el que quieras usar; podrás añadir más después."
 		},
 		"onboardingSubtitle": {
 			"resend": "Elige los dominios de tu cuenta de Resend que quieres en este panel.",
-			"cloudflare": "Elige los dominios de CLOUDFLARE_MAIL_DOMAINS que quieres en este panel."
+			"cloudflare": "Elige los dominios de CLOUDFLARE_MAIL_DOMAINS que quieres en este panel.",
+			"smtp": "Elige los dominios de SMTP_MAIL_DOMAINS que quieres en este panel."
 		},
 		"receivingHint": {
 			"resend": "La recepción aún no está activada en {domain}: puedes enviar, pero el correo entrante no llegará hasta que añadas el registro MX en Resend.",
-			"cloudflare": "La recepción aún no está activada en {domain}: apunta el catch-all de Email Routing a este Worker."
+			"cloudflare": "La recepción aún no está activada en {domain}: apunta el catch-all de Email Routing a este Worker.",
+			"smtp": "La recepción aún no está configurada en {domain}: el correo no llegará hasta que tu MX lo reenvíe al webhook de entrada de esta instalación."
 		}
 	},
 	"mailbox": {
