@@ -9,6 +9,7 @@ import {
 import { ConfigError } from './errors';
 import { createCloudflareProvider } from './providers/cloudflare-provider';
 import { createResendProvider, getResendReceivingClient } from './providers/resend-provider';
+import { createSmtpProvider, smtpConfigured } from './providers/smtp-provider';
 import type { ResendClient } from './providers/resend-client';
 import { createLiveKitClient, type LiveKitClient } from './meet/livekit';
 
@@ -21,7 +22,8 @@ export function getEmailProviderKind(platform: PlatformLike): EmailProviderKind 
 	const raw = platform?.env.EMAIL_PROVIDER?.trim().toLowerCase();
 	if (!raw || raw === 'resend') return 'resend';
 	if (raw === 'cloudflare') return 'cloudflare';
-	throw new ConfigError(`Unknown EMAIL_PROVIDER "${platform?.env.EMAIL_PROVIDER}". Use "resend" or "cloudflare".`);
+	if (raw === 'smtp') return 'smtp';
+	throw new ConfigError(`Unknown EMAIL_PROVIDER "${platform?.env.EMAIL_PROVIDER}". Use "resend", "cloudflare" or "smtp".`);
 }
 
 export function safeEmailProviderKind(platform: PlatformLike): EmailProviderKind {
@@ -54,6 +56,8 @@ export function getEmailProvider(platform: PlatformLike): EmailProvider {
 			}
 			return createCloudflareProvider(email, platform?.env.CLOUDFLARE_MAIL_DOMAINS ?? '');
 		}
+		case 'smtp':
+			return createSmtpProvider(platform?.env ?? {});
 		default: {
 			const _never: never = kind;
 			return _never;
@@ -69,6 +73,8 @@ export function hasProviderConfigured(platform: PlatformLike): boolean {
 				return Boolean(platform?.env.RESEND_API_KEY);
 			case 'cloudflare':
 				return Boolean(platform?.env.EMAIL) && parseMailDomains(platform?.env.CLOUDFLARE_MAIL_DOMAINS).length > 0;
+			case 'smtp':
+				return smtpConfigured(platform?.env ?? {});
 			default: {
 				const _never: never = kind;
 				return _never;
@@ -122,6 +128,8 @@ export function providerLoadError(kind: EmailProviderKind, error: unknown): stri
 			return 'Could not reach Resend. Check the API key and try again.';
 		case 'cloudflare':
 			return 'Could not load Cloudflare Email domains. Check EMAIL_PROVIDER and CLOUDFLARE_MAIL_DOMAINS.';
+		case 'smtp':
+			return 'Could not read the SMTP settings. Check SMTP_HOST and SMTP_MAIL_DOMAINS.';
 		default: {
 			const _never: never = kind;
 			return _never;

@@ -43,12 +43,13 @@ export function toAvailableDomain(domain: ProviderDomain, connected: boolean): A
 	};
 }
 
-/** Outbound rows stay queued until Resend webhooks land; Cloudflare send() is already accepted. */
+/** Outbound rows stay queued until Resend webhooks land; Cloudflare and SMTP report acceptance on send. */
 export function initialOutboundStatus(kind: EmailProviderKind): MailStatus {
 	switch (kind) {
 		case 'resend':
 			return 'queued';
 		case 'cloudflare':
+		case 'smtp':
 			return 'sent';
 		default: {
 			const _never: never = kind;
@@ -63,6 +64,8 @@ export function providerLabel(kind: EmailProviderKind): string {
 			return 'Resend';
 		case 'cloudflare':
 			return 'Cloudflare Email';
+		case 'smtp':
+			return 'SMTP';
 		default: {
 			const _never: never = kind;
 			return _never;
