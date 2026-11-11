@@ -9,6 +9,14 @@ const host = process.env.HOST ?? '0.0.0.0';
 const port = Number(process.env.PORT ?? 3000);
 const origin = process.env.ORIGIN?.replace(/\/+$/, '');
 
+/** Without ORIGIN, the origin adapter-node itself derives: PROTOCOL_HEADER and HOST_HEADER when set (behind a proxy). */
+function requestOrigin(req) {
+	const header = (name) => (name ? String(req.headers[name.toLowerCase()] ?? '').split(',')[0].trim() : '');
+	const protocol = header(process.env.PROTOCOL_HEADER) || 'http';
+	const host = header(process.env.HOST_HEADER) || req.headers.host;
+	return `${protocol}://${host}`;
+}
+
 /**
  * The same exemption the Worker makes in src/lib/server/inbound/webhook-request.ts:
  * SvelteKit refuses cross-site form posts before any hook runs, and SendGrid
@@ -17,7 +25,7 @@ const origin = process.env.ORIGIN?.replace(/\/+$/, '');
  */
 function asWebhookRequest(req) {
 	if (req.method !== 'POST' || (req.url ?? '').split('?')[0] !== INBOUND_WEBHOOK) return;
-	req.headers.origin = origin ?? `http://${req.headers.host}`;
+	req.headers.origin = origin ?? requestOrigin(req);
 	delete req.headers.cookie;
 }
 
