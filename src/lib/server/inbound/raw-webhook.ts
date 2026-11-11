@@ -1,4 +1,4 @@
-import type { CloudflareInboundMessage } from './cloudflare-inbound';
+import type { RawInboundMessage } from './raw-mime';
 
 /**
  * Inbound mail as raw MIME over HTTP, for anything that isn't Resend or
@@ -20,7 +20,7 @@ import type { CloudflareInboundMessage } from './cloudflare-inbound';
 export const MAX_RAW_MESSAGE_BYTES = 40 * 1024 * 1024;
 
 export type RawInboundOutcome =
-	| { kind: 'message'; message: CloudflareInboundMessage }
+	| { kind: 'message'; message: RawInboundMessage }
 	| { kind: 'unauthorized' }
 	| { kind: 'too_large' }
 	| { kind: 'invalid'; reason: string };

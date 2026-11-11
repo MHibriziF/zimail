@@ -33,7 +33,7 @@ export function getMailStoreService(platform: PlatformLike): MailStoreService {
 
 /*
  * The functions below exist only for the peer server modules (outbox,
- * cloudflare-inbound, inbound, cleanup, mailbox) that receive a `db` handed
+ * inbound, cleanup, mailbox) that receive a `db` handed
  * down from their own callers rather than `platform`. They are a
  * deliberately thin, `db`-first facade over the service, matching each
  * function's exact prior signature — routes are the actual target of the
