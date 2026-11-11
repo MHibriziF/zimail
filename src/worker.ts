@@ -6,6 +6,7 @@ import {
 } from './lib/server/inbound/cloudflare-inbound';
 import { aiFromEnv } from './lib/server/ai/provider';
 import { getEmailProvider } from './lib/server/context';
+import { asWebhookRequest } from './lib/server/inbound/webhook-request';
 import { ensureSchema } from './lib/server/migrations/migrate';
 import { runDueScheduledSends } from './lib/server/scheduled-send';
 import { runDueFeedSyncs } from './lib/server/calendar-feeds';
@@ -33,7 +34,7 @@ export default {
 		if (typeof svelteApp.fetch !== 'function') {
 			throw new Error('SvelteKit worker export is missing fetch');
 		}
-		return svelteApp.fetch(request, env, ctx);
+		return svelteApp.fetch(asWebhookRequest(request), env, ctx);
 	},
 
 	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {
