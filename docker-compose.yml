@@ -1,0 +1,33 @@
+# Self-host Zimail: copy zimail.env.example to zimail.env, fill it in, then
+#   docker compose up -d                 # the app on port 3000
+#   docker compose --profile tls up -d   # plus Caddy, with HTTPS for ZIMAIL_DOMAIN
+# Everything is in the zimail-data volume. Upgrades: git pull, then
+# `docker compose up -d --build`; migrations run on start.
+services:
+  zimail:
+    build: .
+    image: zimail:latest
+    restart: unless-stopped
+    env_file: zimail.env
+    volumes:
+      - zimail-data:/data
+    ports:
+      - "${ZIMAIL_PORT:-3000}:3000"
+
+  caddy:
+    image: caddy:2
+    profiles: [tls]
+    restart: unless-stopped
+    depends_on: [zimail]
+    environment:
+      ZIMAIL_DOMAIN: ${ZIMAIL_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  zimail-data:
+  caddy-data:

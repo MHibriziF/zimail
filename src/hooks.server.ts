@@ -1,4 +1,4 @@
-import { redirect, type Handle, type RequestEvent } from '@sveltejs/kit';
+import { redirect, type Handle, type RequestEvent, type ServerInit } from '@sveltejs/kit';
 import type { D1Database } from '@cloudflare/workers-types';
 import { authorizeApiRequest, canAccessDuringFirstLogin } from '$lib/server/api-access';
 import { getApiTokenService, readBearerToken } from '$lib/server/api-tokens';
@@ -22,6 +22,19 @@ import {
 } from '$lib/i18n/locales';
 
 type Resolve = Parameters<Handle>[0]['resolve'];
+
+/**
+ * Off Cloudflare there are no bindings, so the self-hosted build starts its own
+ * platform (SQLite, a blobs folder, the minute timer) once, here. The check is a
+ * build-time constant, so the Worker bundle doesn't contain any of it.
+ */
+let selfHosted: App.Platform | null = null;
+
+export const init: ServerInit = async () => {
+	if (__ZIMAIL_TARGET__ !== 'node') return;
+	const { startNodeRuntime } = await import('$lib/server/platform/node-runtime');
+	selfHosted = (await startNodeRuntime()).platform;
+};
 
 function jsonError(error: string, status: number): Response {
 	return new Response(JSON.stringify({ error }), {
@@ -172,6 +185,7 @@ async function loadPreferences(event: RequestEvent, userId: string) {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	if (selfHosted) event.platform = selfHosted;
 	const db = event.platform?.env.DB;
 	const { pathname } = event.url;
 	resetLocals(event);

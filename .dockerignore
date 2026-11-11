@@ -1,0 +1,12 @@
+node_modules
+.svelte-kit
+build
+coverage
+.wrangler
+.git
+.github
+.env
+.env.*
+.dev.vars
+zimail.env
+data

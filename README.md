@@ -108,19 +108,37 @@ Updates take care of database changes by themselves.
 ## Choosing a mail provider
 
 One provider is active per deploy, selected by `EMAIL_PROVIDER` (`resend` is
-the default, `cloudflare` is the alternative). Do not point the same domain's
-apex MX at both.
+the default; `cloudflare` and `smtp` are the alternatives). Do not point the
+same domain's apex MX at two of them.
 
-|                 | [Resend](https://resend.com)             | [Cloudflare Email Service](https://developers.cloudflare.com/email-service/) |
-| --------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| Outbound        | Resend API                               | Workers `env.EMAIL.send()`                                                    |
-| Inbound         | Webhook → `/api/webhooks/resend`         | Worker `email()` handler                                                      |
-| DNS             | Any DNS host                             | **Cloudflare DNS required**                                                   |
-| Cost            | Resend free tier + Cloudflare            | Requires a **Workers paid** plan                                              |
-| Delivery events | `delivered`, `bounced`, `complained`, …  | Accepted send is stored as `sent`                                             |
+|                 | [Resend](https://resend.com)             | [Cloudflare Email Service](https://developers.cloudflare.com/email-service/) | SMTP                                              |
+| --------------- | ---------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------- |
+| Outbound        | Resend API                               | Workers `env.EMAIL.send()`                                                    | Any relay: Postmark, SES, Mailgun, Brevo, Postfix |
+| Inbound         | Webhook → `/api/webhooks/resend`         | Worker `email()` handler                                                      | Raw MIME → `/api/webhooks/inbound`                |
+| DNS             | Any DNS host                             | **Cloudflare DNS required**                                                   | Any DNS host                                      |
+| Cost            | Resend free tier + Cloudflare            | Requires a **Workers paid** plan                                              | Whatever your relay charges                       |
+| Delivery events | `delivered`, `bounced`, `complained`, …  | Accepted send is stored as `sent`                                             | Accepted send is stored as `sent`                 |
 
 Pick Resend if your DNS lives elsewhere or you already use it. Pick Cloudflare
 Email if the zone is already on Cloudflare and you want everything on one account.
+Pick SMTP if you already have a relay or a mail server, or you self-host (below).
+
+**The inbound webhook** takes raw MIME from anything that can POST it, whichever
+provider sends. It is off until `INBOUND_WEBHOOK_SECRET` is set, and wants that
+secret as `Authorization: Bearer …` (or as the Basic password, for forwarders
+that only take a URL). It accepts a raw `message/rfc822` body, SendGrid Inbound
+Parse in raw mode, and Mailgun routes that forward MIME. From your own MX, a
+Postfix pipe is enough:
+
+```bash
+# Postfix master.cf:
+#   zimail unix - n n - - pipe flags=R user=nobody argv=/usr/local/bin/zimail-inbound ${recipient}
+# /usr/local/bin/zimail-inbound:
+#!/bin/sh
+exec curl --fail -sS --data-binary @- \
+  -H "Authorization: Bearer $INBOUND_WEBHOOK_SECRET" -H "Content-Type: message/rfc822" \
+  -H "X-Envelope-To: $1" https://mail.example.com/api/webhooks/inbound
+```
 
 ## Manual setup
 
@@ -214,6 +232,38 @@ The zone must use **Cloudflare DNS**.
 
 Inbound mail only works on a **deployed** Worker (or `bun run preview`) —
 `vite dev` never runs the `email()` handler.
+
+## Self-host on a VPS
+
+The same code also builds as a plain server. It keeps everything in one folder:
+a SQLite database and the attachments. You need Docker, a domain, and an SMTP
+relay (or a local Postfix) to send with.
+
+```bash
+git clone https://github.com/MHibriziF/zimail && cd zimail
+cp zimail.env.example zimail.env   # set ORIGIN, the SMTP_* settings, INBOUND_WEBHOOK_SECRET
+docker compose --profile tls up -d # the app, plus Caddy with HTTPS for ZIMAIL_DOMAIN
+```
+
+Leave out `--profile tls` to run only the app on port 3000 behind your own proxy.
+Then open the site and create the first account, as on Cloudflare.
+
+- **Data** lives in the `zimail-data` volume (`/data/zimail.db` and
+  `/data/blobs/`). Back up that one volume.
+- **Upgrades:** `git pull && docker compose up -d --build`. Migrations run on
+  start, as the Worker runs them on Cloudflare.
+- **Scheduled send, booking reminders and calendar feeds** run in the server
+  every minute, as the cron trigger does on Workers.
+- **Receiving:** point your MX at a server that posts to the inbound webhook
+  (see [Choosing a mail provider](#choosing-a-mail-provider)).
+- **AI** is off unless you set `AI_PROVIDER`: `openai` with `AI_BASE_URL` and
+  `AI_MODEL` for a local Ollama or llama.cpp, or `workers-ai-rest` for the free
+  Workers AI allowance. Mail goes only to the endpoint you configure.
+
+Without Docker: `bun install && bun run build:node`, then
+`DATA_DIR=./data ORIGIN=https://… bun run start:node` with the same settings in
+the environment. It runs on Bun, which has `node:sqlite` and `HTMLRewriter`
+built in.
 
 ## First run
 

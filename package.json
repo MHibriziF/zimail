@@ -11,6 +11,8 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "bun scripts/generate-migrations.mjs && vite build && bun scripts/wrap-cloudflare-worker.mjs",
+		"build:node": "bun scripts/generate-migrations.mjs && ZIMAIL_TARGET=node vite build",
+		"start:node": "bun server/node.js",
 		"preview": "bun run build && wrangler dev",
 		"setup": "node scripts/setup.mjs",
 		"deploy": "bun run build && wrangler deploy",
@@ -30,6 +32,7 @@
 		"@cloudflare/workers-types": "^5.20261010.1",
 		"@sveltejs/adapter-auto": "^7.0.1",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
+		"@sveltejs/adapter-node": "^5",
 		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@tailwindcss/vite": "^4.3.3",
