@@ -4,6 +4,7 @@ import {
 	type CloudflareInboundEnv,
 	type CloudflareInboundMessage
 } from './lib/server/inbound/cloudflare-inbound';
+import { aiFromEnv } from './lib/server/ai/provider';
 import { getEmailProvider } from './lib/server/context';
 import { ensureSchema } from './lib/server/migrations/migrate';
 import { runDueScheduledSends } from './lib/server/scheduled-send';
@@ -47,7 +48,7 @@ export default {
 		const inboundEnv: CloudflareInboundEnv = {
 			DB: env.DB,
 			ATTACHMENTS: env.ATTACHMENTS,
-			AI: env.AI,
+			AI: aiFromEnv(env) ?? undefined,
 			VAPID_PUBLIC_KEY: env.VAPID_PUBLIC_KEY,
 			VAPID_PRIVATE_KEY: env.VAPID_PRIVATE_KEY,
 			VAPID_SUBJECT: env.VAPID_SUBJECT,

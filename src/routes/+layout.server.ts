@@ -4,6 +4,7 @@ import { getLabelsService } from '$lib/server/labels';
 import { getCalendarService } from '$lib/server/calendar';
 import { runDueCleanup } from '$lib/server/cleanup';
 import { getEmailProvider } from '$lib/server/context';
+import { aiFromEnv } from '$lib/server/ai/provider';
 import { runDueScheduledSends } from '$lib/server/scheduled-send';
 import { DEFAULT_UI_THEME } from '$lib/ui-theme/ids';
 import { DEFAULT_LOCALE } from '$lib/i18n/locales';
@@ -107,6 +108,8 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 		addresses: locals.addresses,
 		activeDomainId: locals.activeDomainId,
 		counts,
+		/** Hides Ask AI and the writing assistant on installs with no AI set up. */
+		aiAvailable: aiFromEnv(platform?.env) !== null,
 		uiTheme: locals.uiTheme ?? DEFAULT_UI_THEME,
 		locale: locals.locale ?? DEFAULT_LOCALE
 	};

@@ -79,11 +79,13 @@
 	</form>
 
 	<div class="topbar-actions">
-		<button type="button" class="ask-trigger" aria-expanded={askOpen} onclick={() => (askOpen = !askOpen)}>
-			<Icon name="sparkling-line" size={16} />
-			<span>{t('ai.askOpen')}</span>
-		</button>
-		<AskPanel bind:open={askOpen} />
+		{#if $page.data.aiAvailable !== false}
+			<button type="button" class="ask-trigger" aria-expanded={askOpen} onclick={() => (askOpen = !askOpen)}>
+				<Icon name="sparkling-line" size={16} />
+				<span>{t('ai.askOpen')}</span>
+			</button>
+			<AskPanel bind:open={askOpen} />
+		{/if}
 		<div class="locale-chip">
 			<LocaleSwitcher />
 		</div>

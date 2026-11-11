@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/stores';
 	import { t } from '$lib/i18n';
 	import Icon from '$lib/components/Icon.svelte';
 	import ZeroIcon from '$themes/zero/icons/Icon.svelte';
@@ -121,6 +122,7 @@
 
 <svelte:window onclick={onWindowClick} />
 
+{#if $page.data.aiAvailable !== false}
 <div class="ai" class:zero={shell === 'zero'} bind:this={rootEl}>
 	<button
 		type="button"
@@ -174,6 +176,7 @@
 		</div>
 	{/if}
 </div>
+{/if}
 
 <style>
 	.ai {

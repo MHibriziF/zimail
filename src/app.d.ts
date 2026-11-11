@@ -15,6 +15,17 @@ declare global {
 				EMAIL: CloudflareSendEmailBinding;
 				/** Workers AI — the mail assistant. Optional: without it the assistant says it's unavailable. */
 				AI?: AiBinding;
+				/** `workers-ai` (default: the binding), `workers-ai-rest`, `openai` or `none`. See `ai/provider.ts`. */
+				AI_PROVIDER?: string;
+				/** For `workers-ai-rest`: the account whose free allowance is used, and a token with Workers AI read. */
+				CLOUDFLARE_ACCOUNT_ID?: string;
+				CLOUDFLARE_AI_TOKEN?: string;
+				/** For `openai`: e.g. `http://localhost:11434/v1` (Ollama) and a tool-capable chat model. */
+				AI_BASE_URL?: string;
+				AI_MODEL?: string;
+				AI_API_KEY?: string;
+				/** For `openai`, optional: a model served at `/audio/transcriptions`, for meeting captions. */
+				AI_TRANSCRIPTION_MODEL?: string;
 				/** `resend` (default) or `cloudflare`. */
 				EMAIL_PROVIDER?: string;
 				/** Comma-separated domains when EMAIL_PROVIDER=cloudflare. */

@@ -1,12 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { aiFromEnv } from '$lib/server/ai/provider';
 import { getCategoriesService, type ResortOutcome } from '$lib/server/categories';
 
 /** Whether the inbox is split into tabs, and whether this deploy sorts them with Clef. */
 export const GET: RequestHandler = async ({ locals, platform }) => {
 	if (!platform?.env.DB || !locals.user) return json({ error: 'Unauthorized' }, { status: 401 });
 	const enabled = await getCategoriesService(platform).tabsEnabled(locals.user.id);
-	return json({ enabled, aiAvailable: Boolean(platform.env.AI) });
+	return json({ enabled, aiAvailable: aiFromEnv(platform.env) !== null });
 };
 
 const RESORT_STATUS: Record<Exclude<ResortOutcome['kind'], 'sorted'>, number> = {
