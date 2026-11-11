@@ -21,7 +21,7 @@
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { normalizeDisplayName } from '$lib/meet/display-name';
 	import { isHostIdentity } from '$lib/meet/host-identity';
-	import { downloadBlob, formatElapsed } from '$lib/meet/recorder';
+	import { formatElapsed } from '$lib/meet/recorder';
 	import { CallRecording } from '$lib/meet/call-recording.svelte';
 	import { colorFor, initialsFor } from '$lib/meet/avatar';
 	import { CallPictureInPicture } from '$lib/meet/call-pip.svelte';
@@ -48,21 +48,8 @@
 	import CallSettingsPanel from '$lib/components/meet/CallSettingsPanel.svelte';
 	import CallControls from '$lib/components/meet/CallControls.svelte';
 	import CallTranscriptPanel from '$lib/components/meet/CallTranscriptPanel.svelte';
-	import {
-		CAPTIONS_ALLOWED_ATTRIBUTE,
-		CAPTIONS_WANTED_ATTRIBUTE,
-		CAPTION_TOPIC,
-		createCaptionUploader,
-		parseCaptionMessage,
-		livePartials,
-		recentCaptions,
-		transcriptFile,
-		type CaptionLine,
-		type CaptionPartial,
-		type CaptionStopReason
-	} from '$lib/meet/captions';
-	import { captionCaptureSupported, startCaptionCapture } from '$lib/meet/caption-capture';
-	import { CAPTION_LANGUAGE_STORAGE_KEY, captionLanguage } from '$lib/meet/caption-language';
+	import { CAPTIONS_ALLOWED_ATTRIBUTE, CAPTIONS_WANTED_ATTRIBUTE, CAPTION_TOPIC, type CaptionLine } from '$lib/meet/captions';
+	import { CallCaptions } from '$lib/meet/call-captions.svelte';
 
 	let {
 		url,
@@ -248,47 +235,24 @@
 	let messages = $state<{ id: string; from: string; text: string; isLocal: boolean; isHost: boolean }[]>([]);
 	let unread = $state(0);
 
-	const canCaption = typeof window !== 'undefined' && captionCaptureSupported();
-	const MAX_CAPTION_LINES = 2_000;
-	let captionsAllowed = $state(untrack(() => initialCaptionsAllowed));
-	/** This viewer's own captions strip; turning it on affects nobody else's screen. */
-	let captionsOn = $state(false);
-	let captionLines = $state<CaptionLine[]>(untrack(() => initialTranscript));
-	/** Set once the Worker refuses: out of allowance, captions turned off, or a bad token. */
-	let captionsStopped = $state(false);
-	let captionClock = $state(Date.now());
-	/** Bumped whenever the mic's underlying track may have been replaced, so capture follows it. */
-	let micTrackVersion = $state(0);
-	const wantsCaptions = $derived(captionsAllowed && (captionsOn || panel === 'transcript'));
-	const someoneWantsCaptions = $derived(captionsAllowed && roster.some((entry) => entry.wantsCaptions));
-	const transcribing = $derived(
-		someoneWantsCaptions && micEnabled && !captionsStopped && canCaption && Boolean(captionToken && meetingCode)
+	const captions = new CallCaptions(
+		{
+			room: () => room,
+			ready: () => !connecting && !connectionError,
+			meetingCode: () => meetingCode,
+			captionToken: () => captionToken,
+			localName: () => localName,
+			isHost: () => isHost,
+			micEnabled: () => micEnabled,
+			transcriptOpen: () => panel === 'transcript',
+			someoneWants: () => roster.some((entry) => entry.wantsCaptions),
+			nameOf: (identity) => roster.find((entry) => entry.identity === identity)?.name,
+			guestLabel: () => t('meet.guest'),
+			notify: (key) => showNotice(t(key)),
+			onWantedChanged: () => refreshRoster()
+		},
+		{ allowed: untrack(() => initialCaptionsAllowed), transcript: untrack(() => initialTranscript) }
 	);
-	/** Words still being spoken, one per speaker, until their line replaces them. */
-	let captionPartials = $state<CaptionPartial[]>([]);
-	const shownPartials = $derived(livePartials(captionPartials, captionClock));
-	const shownCaptions = $derived(
-		captionsOn ? recentCaptions(captionLines, captionClock, undefined, Math.max(1, 3 - shownPartials.length)) : []
-	);
-	/** The language this participant speaks, for their own captions; `''` lets Whisper guess. */
-	let spokenLanguage = $state(loadSpokenLanguage());
-
-	function loadSpokenLanguage(): string {
-		try {
-			return captionLanguage(localStorage.getItem(CAPTION_LANGUAGE_STORAGE_KEY));
-		} catch {
-			return '';
-		}
-	}
-
-	function setSpokenLanguage(code: string) {
-		spokenLanguage = captionLanguage(code);
-		try {
-			localStorage.setItem(CAPTION_LANGUAGE_STORAGE_KEY, spokenLanguage);
-		} catch {
-			// Private mode: the choice lasts for this call only.
-		}
-	}
 
 	let localName = $state(untrack(() => displayName));
 	const localInitials = $derived(initialsFor(localName));
@@ -724,7 +688,7 @@
 				canShareScreen,
 				recording: recorder.attribute,
 				handRaisedAt,
-				wantsCaptions
+				wantsCaptions: captions.wants
 			},
 			...remote
 		];
@@ -799,8 +763,8 @@
 	 */
 	function readHostSettings(participant: Participant) {
 		if (!isHostIdentity(participant.identity)) return;
-		const captions = participant.attributes[CAPTIONS_ALLOWED_ATTRIBUTE];
-		if (captions === '1' || captions === '0') applyCaptionsAllowed(captions === '1');
+		const allowed = participant.attributes[CAPTIONS_ALLOWED_ATTRIBUTE];
+		if (allowed === '1' || allowed === '0') captions.applyAllowed(allowed === '1');
 		const policy = parseScreenSharePolicy(participant.attributes.screenSharePolicy);
 		const mode = parseScreenShareMode(participant.attributes.screenShareMode);
 		if (policy || mode) applyScreenShareSettings({ policy: policy ?? screenShareSettings.policy, mode: mode ?? screenShareSettings.mode });
@@ -832,7 +796,7 @@
 		}
 		if (publication.source === Track.Source.Microphone && publication.track) {
 			recorder.micPublished(publication.track.mediaStreamTrack);
-			micTrackVersion += 1;
+			captions.micTrackChanged();
 		}
 		if (publication.source !== Track.Source.ScreenShare || !publication.track) return;
 		screenShareEnabled = true;
@@ -956,7 +920,7 @@
 	/** A failed connect fires Disconnected too; that one stays on the stage as an error with Retry. */
 	function handleDisconnected(reason?: DisconnectReason) {
 		if (awaitingConnect || endingMeeting) return;
-		onleave(captionLines, reason === DisconnectReason.ROOM_DELETED ? 'ended' : 'left');
+		onleave(captions.lines, reason === DisconnectReason.ROOM_DELETED ? 'ended' : 'left');
 	}
 
 	function retryConnect() {
@@ -1001,7 +965,7 @@
 			receiveReaction(await reader.readAll(), participantInfo.identity);
 		});
 		instance.registerTextStreamHandler(CAPTION_TOPIC, async (reader, participantInfo) => {
-			receiveCaption(await reader.readAll(), participantInfo.identity);
+			captions.receive(await reader.readAll(), participantInfo.identity);
 		});
 		instance.registerTextStreamHandler(SCREEN_SHARE_CANCELLED_TOPIC, async (reader, participantInfo) => {
 			await reader.readAll();
@@ -1196,7 +1160,7 @@
 	async function selectMic(id: string) {
 		micDeviceId = id;
 		if (room) await room.switchActiveDevice('audioinput', id);
-		micTrackVersion += 1;
+		captions.micTrackChanged();
 	}
 
 	async function selectCamera(id: string) {
@@ -1424,19 +1388,6 @@
 		}
 	}
 
-	function applyCaptionsAllowed(next: boolean) {
-		if (next === captionsAllowed) return;
-		if (!next && !isHost && wantsCaptions) showNotice(t('meet.captionsHostDisabled'));
-		captionsAllowed = next;
-		if (next) captionsStopped = false;
-		else captionsOn = false;
-	}
-
-	function broadcastCaptionsSetting() {
-		if (!room || !isHost) return;
-		room.localParticipant.setAttributes({ [CAPTIONS_ALLOWED_ATTRIBUTE]: captionsAllowed ? '1' : '0' }).catch(() => {});
-	}
-
 	async function setCaptionsAllowed(next: boolean) {
 		if (!meetingId || settingsBusy) return;
 		settingsBusy = true;
@@ -1451,113 +1402,14 @@
 				settingsError = t('meetings.couldNotSave');
 				return;
 			}
-			applyCaptionsAllowed(next);
-			broadcastCaptionsSetting();
+			captions.applyAllowed(next);
+			captions.broadcastAllowed();
 		} catch {
 			settingsError = t('common.networkError');
 		} finally {
 			settingsBusy = false;
 		}
 	}
-
-	/** A speaker's partial is replaced by the next one, and taken down by their line or an empty one. */
-	function setCaptionPartial(identity: string, name: string, text: string) {
-		const at = Date.now();
-		const others = captionPartials.filter((partial) => partial.identity !== identity);
-		captionPartials = text ? [...others, { identity, name, text, at }] : others;
-		captionClock = at;
-	}
-
-	function addCaptionLine(identity: string, name: string, text: string) {
-		const at = Date.now();
-		captionLines = [...captionLines.slice(1 - MAX_CAPTION_LINES), { id: crypto.randomUUID(), identity, name, text, at }];
-		setCaptionPartial(identity, name, '');
-	}
-
-	function publishOwnCaption(text: string) {
-		if (!room) return;
-		addCaptionLine(room.localParticipant.identity, localName, text);
-		room.localParticipant.sendText(JSON.stringify({ type: 'line', text }), { topic: CAPTION_TOPIC }).catch(() => {});
-	}
-
-	function publishOwnPartial(text: string) {
-		if (!room) return;
-		setCaptionPartial(room.localParticipant.identity, localName, text);
-		room.localParticipant.sendText(JSON.stringify({ type: 'partial', text }), { topic: CAPTION_TOPIC }).catch(() => {});
-	}
-
-	function receiveCaption(raw: string, identity: string) {
-		const message = parseCaptionMessage(raw);
-		if (!message) return;
-		if (message.type === 'paused') {
-			if (wantsCaptions) showNotice(t('meet.captionsPaused'));
-			return;
-		}
-		const name = roster.find((entry) => entry.identity === identity)?.name || t('meet.guest');
-		if (message.type === 'partial') setCaptionPartial(identity, name, message.text);
-		else addCaptionLine(identity, name, message.text);
-	}
-
-	/** Out of allowance is everyone's business, since it stops every speaker; the rest only stop this one. */
-	function stopCaptions(reason: CaptionStopReason) {
-		captionsStopped = true;
-		if (reason !== 'limit' || !room) return;
-		showNotice(t('meet.captionsPaused'));
-		room.localParticipant.sendText(JSON.stringify({ type: 'paused' }), { topic: CAPTION_TOPIC }).catch(() => {});
-	}
-
-	function downloadTranscript(format: 'txt' | 'vtt') {
-		if (captionLines.length === 0) return;
-		const { blob, filename } = transcriptFile(captionLines, meetingCode, format);
-		downloadBlob(blob, filename);
-	}
-
-	// Speakers only transcribe while someone has captions or the transcript open.
-	$effect(() => {
-		const wanted = wantsCaptions;
-		if (connecting || connectionError || !room) return;
-		room.localParticipant.setAttributes({ [CAPTIONS_WANTED_ATTRIBUTE]: wanted ? '1' : '' }).catch(() => {});
-		untrack(refreshRoster);
-	});
-
-	$effect(() => {
-		if (!transcribing) return;
-		void micTrackVersion;
-		const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
-		if (!track) return;
-		const uploader = createCaptionUploader({
-			code: meetingCode,
-			token: captionToken,
-			fetch: (input, init) => fetch(input, init),
-			onText: publishOwnCaption,
-			onPartial: publishOwnPartial,
-			onStop: stopCaptions,
-			language: () => spokenLanguage
-		});
-		let stop: (() => void) | null = null;
-		let cancelled = false;
-		startCaptionCapture(
-			track,
-			(wav) => uploader.send(wav),
-			(wav) => uploader.sendPartial(wav)
-		)
-			.then((stopCapture) => {
-				if (cancelled) stopCapture();
-				else stop = stopCapture;
-			})
-			.catch(() => {});
-		return () => {
-			cancelled = true;
-			stop?.();
-		};
-	});
-
-	// Captions fade a few seconds after they're spoken, and a stranded partial expires, so both need a clock.
-	$effect(() => {
-		if (!wantsCaptions) return;
-		const timer = setInterval(() => (captionClock = Date.now()), 1000);
-		return () => clearInterval(timer);
-	});
 
 	function togglePanel(next: 'participants' | 'chat' | 'settings' | 'transcript') {
 		panel = panel === next ? 'none' : next;
@@ -1591,8 +1443,8 @@
 				if (requireApproval) startAdmissionsPolling();
 				applyScreenShareSettings({ policy: body.meeting.screen_share_policy, mode: body.meeting.screen_share_mode });
 				broadcastScreenShareSettings();
-				applyCaptionsAllowed(body.meeting.captions_enabled);
-				broadcastCaptionsSetting();
+				captions.applyAllowed(body.meeting.captions_enabled);
+				captions.broadcastAllowed();
 			}
 		} catch {
 			// The settings panel just shows the last-known (default) value — not worth surfacing an error for.
@@ -1677,7 +1529,7 @@
 		playLeaveChime();
 		stopAdmissionsPolling();
 		room?.disconnect();
-		onleave(captionLines, reason);
+		onleave(captions.lines, reason);
 	}
 
 	/** Set while the host's own end request is out, so the room closing under them isn't read as being ended. */
@@ -1739,7 +1591,7 @@
 					: t('meet.recordingBy', { name: other.name })}
 			</span>
 		{/each}
-		{#if someoneWantsCaptions}
+		{#if captions.someoneWants}
 			<span class="call-header-notice call-header-captions" role="status">
 				<Icon name="closed-captioning-line" size={14} />
 				{t('meet.captionsActive')}
@@ -1887,28 +1739,28 @@
 				{screenShareBusyIdentity}
 				onUpdateScreenShare={updateScreenShareSettings}
 				onRespondToScreenShare={respondToScreenShare}
-				{captionsAllowed}
+				captionsAllowed={captions.allowed}
 				onSetCaptionsAllowed={setCaptionsAllowed}
 				onClose={() => (panel = 'none')}
 			/>
 		{:else if panel === 'transcript'}
 			<CallTranscriptPanel
-				lines={captionLines}
-				partials={shownPartials}
-				language={spokenLanguage}
-				onSetLanguage={setSpokenLanguage}
-				onDownload={downloadTranscript}
+				lines={captions.lines}
+				partials={captions.shownPartials}
+				language={captions.spokenLanguage}
+				onSetLanguage={(code) => captions.setSpokenLanguage(code)}
+				onDownload={(format) => captions.download(format)}
 				onClose={() => (panel = 'none')}
 			/>
 		{/if}
 	</div>
 
-	{#if captionsOn}
+	{#if captions.on}
 		<div class="call-captions" aria-live="polite">
-			{#each shownCaptions as line (line.id)}
+			{#each captions.shown as line (line.id)}
 				<p class="call-caption"><span class="call-caption-name">{line.name}</span> {line.text}</p>
 			{/each}
-			{#each shownPartials as partial (partial.identity)}
+			{#each captions.shownPartials as partial (partial.identity)}
 				<p class="call-caption call-caption-partial">
 					<span class="call-caption-name">{partial.name}</span> {partial.text}
 				</p>
@@ -1944,9 +1796,9 @@
 		{unread}
 		{isHost}
 		pendingAdmissionsCount={pendingAdmissions.length + screenShareRequests.length}
-		{captionsAllowed}
-		{captionsOn}
-		onToggleCaptions={() => (captionsOn = !captionsOn)}
+		captionsAllowed={captions.allowed}
+		captionsOn={captions.on}
+		onToggleCaptions={() => captions.toggle()}
 		onToggleDeafen={toggleDeafen}
 		onSelectMic={selectMic}
 		onToggleMic={toggleMic}
