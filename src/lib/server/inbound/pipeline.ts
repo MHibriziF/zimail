@@ -1,4 +1,4 @@
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { R2Bucket } from '@cloudflare/workers-types';
 import { inboundAttachmentMetadata, insertAttachmentBytes } from '../attachments';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_EMAIL } from '../constants';
 import { recordUnroutedEmail, resolveInboundRoute, type InboundRoute } from '../domains';
