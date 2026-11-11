@@ -157,6 +157,13 @@ describe('createOpenAiCompatible', () => {
 		assert.equal(await (form.get('file') as Blob).text(), 'RIFF');
 	});
 
+	test('caption audio may also come as bytes', async () => {
+		const { fetch, sent } = fakeFetch(() => jsonResponse({ text: '' }));
+		const ai = createOpenAiCompatible({ baseUrl: 'http://whisper/v1', model: 'm', transcriptionModel: 'whisper-1', fetch });
+		await ai.run(CAPTION_MODEL, { audio: new TextEncoder().encode('RIFF') });
+		assert.equal(await ((sent[0].init.body as FormData).get('file') as Blob).text(), 'RIFF');
+	});
+
 	test('captions fail clearly without a transcription model', async () => {
 		const { fetch, sent } = fakeFetch(() => jsonResponse({}));
 		const ai = createOpenAiCompatible({ baseUrl: 'http://ollama/v1', model: 'm', fetch });

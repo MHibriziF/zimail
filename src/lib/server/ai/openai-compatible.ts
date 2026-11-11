@@ -84,15 +84,24 @@ export function tabsFromChat(result: unknown, slots: string[]): { answers: Recor
 	return { answers };
 }
 
-function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
-	const binary = atob(base64);
+/** Workers AI takes the audio as base64; bytes are accepted too. */
+function audioBytes(audio: unknown): Uint8Array<ArrayBuffer> {
+	if (audio instanceof Uint8Array) return new Uint8Array(audio);
+	if (audio instanceof ArrayBuffer) return new Uint8Array(audio.slice(0));
+	const binary = atob(typeof audio === 'string' ? audio : '');
 	const bytes = new Uint8Array(binary.length);
 	for (let index = 0; index < binary.length; index++) bytes[index] = binary.codePointAt(index) ?? 0;
 	return bytes;
 }
 
+function withoutTrailingSlashes(url: string): string {
+	let end = url.length;
+	while (end > 0 && url[end - 1] === '/') end--;
+	return url.slice(0, end);
+}
+
 export function createOpenAiCompatible(options: OpenAiCompatibleOptions): AiBinding {
-	const base = options.baseUrl.replace(/\/+$/, '');
+	const base = withoutTrailingSlashes(options.baseUrl);
 	const send = options.fetch ?? fetch;
 	const auth: Record<string, string> = options.apiKey ? { Authorization: `Bearer ${options.apiKey}` } : {};
 
@@ -100,7 +109,8 @@ export function createOpenAiCompatible(options: OpenAiCompatibleOptions): AiBind
 		const response = await send(base + path, { method: 'POST', headers: { ...auth, ...headers }, body });
 		if (!response.ok) {
 			const detail = (await response.text().catch(() => '')).slice(0, 300);
-			throw new Error(`AI endpoint returned ${response.status}${detail ? `: ${detail}` : ''}`);
+			const suffix = detail ? ': ' + detail : '';
+			throw new Error(`AI endpoint returned ${response.status}${suffix}`);
 		}
 		return response.json();
 	}
@@ -113,7 +123,7 @@ export function createOpenAiCompatible(options: OpenAiCompatibleOptions): AiBind
 	async function transcribe(inputs: Record<string, unknown>): Promise<unknown> {
 		if (!options.transcriptionModel) throw new Error('No transcription model is configured (AI_TRANSCRIPTION_MODEL).');
 		const form = new FormData();
-		form.append('file', new Blob([base64ToBytes(String(inputs.audio ?? ''))], { type: 'audio/wav' }), 'speech.wav');
+		form.append('file', new Blob([audioBytes(inputs.audio)], { type: 'audio/wav' }), 'speech.wav');
 		form.append('model', options.transcriptionModel);
 		if (typeof inputs.language === 'string' && inputs.language) form.append('language', inputs.language);
 		return post('/audio/transcriptions', form);
