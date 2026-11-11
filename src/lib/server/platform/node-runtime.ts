@@ -31,6 +31,9 @@ export async function startNodeRuntime(
 		running = true;
 		try {
 			await run(platform);
+		} catch (error) {
+			// An unhandled rejection here would take the whole server down with it.
+			console.error('scheduled jobs failed', error);
 		} finally {
 			running = false;
 		}
