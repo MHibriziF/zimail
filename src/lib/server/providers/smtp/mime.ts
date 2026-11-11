@@ -88,13 +88,15 @@ function headerText(value: string): string {
 	return isPrintableAscii(line) ? line : encodeWords(line);
 }
 
+const BACKSLASH = String.fromCodePoint(0x5c);
+
 /** `Name <addr>`, with the name quoted or encoded as it needs. */
 export function formatAddress(address: string, name?: string): string {
 	const addr = oneLine(address).replaceAll(/[<>]/g, '');
 	const display = name ? oneLine(name) : '';
 	if (!display) return `<${addr}>`;
 	if (!isPrintableAscii(display)) return `${encodeWords(display)} <${addr}>`;
-	const quoted = display.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+	const quoted = display.replaceAll(BACKSLASH, BACKSLASH + BACKSLASH).replaceAll('"', BACKSLASH + '"');
 	return `"${quoted}" <${addr}>`;
 }
 
