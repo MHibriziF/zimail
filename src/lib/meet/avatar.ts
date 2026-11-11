@@ -12,9 +12,9 @@ export function initialsFor(name: string): string {
 	);
 }
 
-/** A stable colour per identity, so returning to a tile always looks the same. */
+/** A stable colour per identity, so returning to a tile always looks the same. The hue is kept in range as it goes, so nothing overflows. */
 export function colorFor(seed: string): string {
-	let hash = 0;
-	for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-	return `hsl(${Math.abs(hash) % 360}, 45%, 38%)`;
+	let hue = 0;
+	for (const char of seed) hue = (hue * 31 + (char.codePointAt(0) ?? 0)) % 360;
+	return `hsl(${hue}, 45%, 38%)`;
 }
