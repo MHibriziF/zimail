@@ -1,48 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
-import type { D1Database } from '@cloudflare/workers-types';
-import { MIGRATIONS } from '../../migrations/migrations.generated';
-import { applyToNewDatabase } from '../../migrations/squash';
+import { createSqliteD1 } from '../../__tests__/support/sqlite-d1';
 import { createD1AuthRepository, type LockPolicy } from '../repository';
+
+const POLICY: LockPolicy = { threshold: 10, baseLockMs: 60_000, maxLockMs: 3_600_000 };
+const NOW = 1_800_000_000_000;
 
 /**
  * The throttle's correctness lives in its SQL (the count and the lock in one
  * UPDATE), so these run it in real SQLite, on the schema the migrations build.
  */
-function d1Over(db: DatabaseSync): D1Database {
-	function statement(sql: string, args: SQLInputValue[]) {
-		return {
-			bind: (...next: SQLInputValue[]) => statement(sql, next),
-			first: async () => db.prepare(sql).get(...args) ?? null,
-			all: async () => ({ results: db.prepare(sql).all(...args) }),
-			run: async () => ({ success: true, meta: { changes: Number(db.prepare(sql).run(...args).changes) } })
-		};
-	}
-	return {
-		prepare: (sql: string) => statement(sql, []),
-		batch: async (statements: Array<{ run: () => Promise<unknown> }>) => {
-			db.exec('BEGIN');
-			try {
-				const results = [];
-				for (const stmt of statements) results.push(await stmt.run());
-				db.exec('COMMIT');
-				return results;
-			} catch (error) {
-				db.exec('ROLLBACK');
-				throw error;
-			}
-		}
-	} as unknown as D1Database;
-}
-
-const POLICY: LockPolicy = { threshold: 10, baseLockMs: 60_000, maxLockMs: 3_600_000 };
-const NOW = 1_800_000_000_000;
-
 function setup() {
-	const db = applyToNewDatabase(MIGRATIONS.filter((migration) => !migration.archived));
-	db.prepare("INSERT INTO users (id, email, name, password_hash) VALUES ('u1', 'ada@example.com', 'Ada', 'hash')").run();
-	return { db, repo: createD1AuthRepository(d1Over(db)) };
+	const { db, sqlite } = createSqliteD1();
+	sqlite.exec("INSERT INTO users (id, email, name, password_hash) VALUES ('u1', 'ada@example.com', 'Ada', 'hash')");
+	return { db: sqlite, repo: createD1AuthRepository(db) };
 }
 
 describe('AuthRepository — login throttle (SQLite)', () => {
