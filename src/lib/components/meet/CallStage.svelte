@@ -25,7 +25,7 @@
 	import { CallRecording } from '$lib/meet/call-recording.svelte';
 	import { colorFor, initialsFor } from '$lib/meet/avatar';
 	import { CallPictureInPicture } from '$lib/meet/call-pip.svelte';
-	import { layoutCallTiles, type TileRect } from '$lib/meet/tile-layout';
+	import { CallLayout } from '$lib/meet/call-layout.svelte';
 	import { parseRecordingAttribute, type RecordingKind } from '$lib/meet/recording-kind';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
 	import {
@@ -122,14 +122,7 @@
 	let room: Room | null = null;
 	let localMediaEl = $state<HTMLDivElement>();
 	let remoteContainerEl = $state<HTMLDivElement>();
-	let gridEl = $state<HTMLDivElement>();
-	let tilePage = $state(0);
-	let tilePages = $state(1);
-	/** Level with the paged tiles, so under a screen share the arrows sit by the strip, not over the screen. */
-	let pageArrowTop = $state('50%');
-	let layoutFrame = 0;
-	let swipeStart: { x: number; y: number } | null = null;
-	const SWIPE_THRESHOLD_PX = 50;
+	const layout = new CallLayout();
 	let connecting = $state(true);
 	let connectionError = $state('');
 	/** Until connect() settles: a Disconnected event then means it failed, not that the call ended. */
@@ -508,89 +501,6 @@
 			tile.el.setAttribute('aria-pressed', String(isFeatured));
 		}
 	});
-
-	/** The featured share goes first, so it is the one the layout gives the stage. */
-	function stageTiles(grid: HTMLElement): HTMLElement[] {
-		const tiles = Array.from(
-			grid.querySelectorAll<HTMLElement>(':scope > .call-tile, :scope > .call-tile-group > .call-tile')
-		).filter((el) => !el.hidden);
-		const featured = tiles.find((el) => el.classList.contains('call-tile-featured'));
-		return featured ? [featured, ...tiles.filter((el) => el !== featured)] : tiles;
-	}
-
-	/** Tiles on other pages sit a page-width away, so changing page slides them in. */
-	function placeTile(el: HTMLElement, rect: TileRect | undefined, page: number, pageWidth: number) {
-		if (!rect) return;
-		const offset = rect.page === null ? 0 : (rect.page - page) * pageWidth;
-		el.style.left = `${rect.x + offset}px`;
-		el.style.top = `${rect.y}px`;
-		el.style.width = `${rect.width}px`;
-		el.style.height = `${rect.height}px`;
-		el.inert = rect.page !== null && rect.page !== page;
-	}
-
-	function layoutStage() {
-		layoutFrame = 0;
-		if (!gridEl) return;
-		const tiles = stageTiles(gridEl);
-		const featured = tiles[0]?.classList.contains('call-tile-featured') ?? false;
-		const { clientWidth: width, clientHeight: height } = gridEl;
-		const layout = layoutCallTiles(tiles.length, featured, width, height);
-		tilePages = layout.pages;
-		tilePage = Math.min(tilePage, layout.pages - 1);
-		const paged = layout.rects.find((rect) => rect.page !== null);
-		pageArrowTop = paged ? `${paged.y + paged.height / 2}px` : '50%';
-		tiles.forEach((el, index) => placeTile(el, layout.rects[index], tilePage, width));
-	}
-
-	function scheduleLayout() {
-		if (!layoutFrame) layoutFrame = requestAnimationFrame(layoutStage);
-	}
-
-	// Tiles come and go as hand-built DOM, so the layout watches the grid rather than any state.
-	$effect(() => {
-		const grid = gridEl;
-		if (!grid) return;
-		const resize = new ResizeObserver(scheduleLayout);
-		resize.observe(grid);
-		const mutations = new MutationObserver(scheduleLayout);
-		mutations.observe(grid, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'class'] });
-		const cancelSwipe = () => (swipeStart = null);
-		grid.addEventListener('pointerdown', handleSwipeStart);
-		grid.addEventListener('pointerup', handleSwipeEnd);
-		grid.addEventListener('pointercancel', cancelSwipe);
-		return () => {
-			grid.removeEventListener('pointerdown', handleSwipeStart);
-			grid.removeEventListener('pointerup', handleSwipeEnd);
-			grid.removeEventListener('pointercancel', cancelSwipe);
-			resize.disconnect();
-			mutations.disconnect();
-			cancelAnimationFrame(layoutFrame);
-			layoutFrame = 0;
-		};
-	});
-
-	$effect(() => {
-		tilePage;
-		scheduleLayout();
-	});
-
-	function showTilePage(page: number) {
-		tilePage = Math.max(0, Math.min(tilePages - 1, page));
-	}
-
-	function handleSwipeStart(event: PointerEvent) {
-		swipeStart = event.pointerType === 'mouse' || tilePages < 2 ? null : { x: event.clientX, y: event.clientY };
-	}
-
-	function handleSwipeEnd(event: PointerEvent) {
-		if (!swipeStart) return;
-		const dx = event.clientX - swipeStart.x;
-		const dy = event.clientY - swipeStart.y;
-		swipeStart = null;
-		if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return;
-		showTilePage(dx < 0 ? tilePage + 1 : tilePage - 1);
-	}
 
 	/** Routes one attached remote element to the chosen output device, if a non-default one is picked. */
 	function attachRemoteTrack(
@@ -1551,7 +1461,7 @@
 
 	<div class="call-body">
 		<div class="call-tiles">
-			<div class="call-grid" bind:this={gridEl}>
+			<div class="call-grid" bind:this={layout.grid}>
 				<div
 					class="call-tile call-tile-screen"
 					class:call-tile-featured={featuredShare === LOCAL_SHARE_KEY}
@@ -1617,37 +1527,37 @@
 					</div>
 				{/if}
 			</div>
-			{#if tilePages > 1}
+			{#if layout.pages > 1}
 				<button
 					type="button"
 					class="call-page-arrow call-page-previous"
-					style:top={pageArrowTop}
-					disabled={tilePage === 0}
+					style:top={layout.arrowTop}
+					disabled={layout.page === 0}
 					title={t('meet.tilesPreviousPage')}
 					aria-label={t('meet.tilesPreviousPage')}
-					onclick={() => showTilePage(tilePage - 1)}
+					onclick={() => layout.showPage(layout.page - 1)}
 				>
 					<Icon name="arrow-left-s-line" size={22} />
 				</button>
 				<button
 					type="button"
 					class="call-page-arrow call-page-next"
-					style:top={pageArrowTop}
-					disabled={tilePage === tilePages - 1}
+					style:top={layout.arrowTop}
+					disabled={layout.page === layout.pages - 1}
 					title={t('meet.tilesNextPage')}
 					aria-label={t('meet.tilesNextPage')}
-					onclick={() => showTilePage(tilePage + 1)}
+					onclick={() => layout.showPage(layout.page + 1)}
 				>
 					<Icon name="arrow-right-s-line" size={22} />
 				</button>
 				<div class="call-page-dots">
-					{#each { length: tilePages } as _, page (page)}
+					{#each { length: layout.pages } as _, page (page)}
 						<button
 							type="button"
 							class="call-page-dot"
-							aria-label={t('meet.tilesPage', { page: page + 1, total: tilePages })}
-							aria-current={page === tilePage ? 'true' : undefined}
-							onclick={() => showTilePage(page)}
+							aria-label={t('meet.tilesPage', { page: page + 1, total: layout.pages })}
+							aria-current={page === layout.page ? 'true' : undefined}
+							onclick={() => layout.showPage(page)}
 						></button>
 					{/each}
 				</div>
@@ -1919,7 +1829,7 @@
 		min-height: 15rem;
 	}
 
-	/* Tiles are placed absolutely by layoutStage(), which sizes them to this box. */
+	/* Tiles are placed absolutely by CallLayout, which sizes them to this box. */
 	.call-grid {
 		position: relative;
 		flex: 1;
@@ -2273,7 +2183,7 @@
 		cursor: pointer;
 	}
 
-	/* The share being watched; layoutStage() gives it the stage. */
+	/* The share being watched; CallLayout gives it the stage. */
 	:global(.call-tile-featured) {
 		cursor: default;
 	}
