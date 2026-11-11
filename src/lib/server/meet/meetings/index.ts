@@ -1,5 +1,5 @@
 import { getLiveKitClient } from '../../context';
-import { createD1AdmissionsRepository } from '../admissions/repository';
+import { createD1AdmissionsRepository } from '../admissions';
 import { createD1MeetingsRepository } from './repository';
 import { createMeetingsService, type MeetingsService } from './service';
 

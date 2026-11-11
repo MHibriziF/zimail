@@ -1,4 +1,4 @@
-import type { MailFlagUpdate } from '../mail-store/repository';
+import type { MailFlagUpdate } from '../mail-store';
 import { authenticationFailed } from './authentication';
 import type { SpamRepository } from './repository';
 

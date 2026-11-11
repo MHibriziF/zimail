@@ -1,9 +1,7 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { MAILBOX_PAGE_SIZE } from '$lib/constants';
-import type { Label } from '$lib/mail/labels';
 import { MAIL_CATEGORIES, type MailCategory } from '$lib/mail/categories';
 import { deliveryStatusesBefore } from '$lib/mail/delivery-status';
-import { createD1LabelsRepository } from '../labels/repository';
 import { TRASH_CANCELS_SCHEDULE, withLocationRules } from './location';
 import type {
 	DeliveryStatus,
@@ -109,8 +107,6 @@ export type ThreadMessageRow = {
 export type MailboxRowsPage = {
 	/** Each entry is one conversation's messages, oldest first. */
 	threads: ThreadMessageRow[][];
-	/** Labels per conversation id, for the conversations on this page. */
-	labels: Map<string, Label[]>;
 	total: number;
 	page: number;
 	pageCount: number;
@@ -503,7 +499,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 			const page = Math.min(Math.max(1, query.page ?? 1), pageCount);
 
 			if (total === 0) {
-				return { threads: [], labels: new Map(), total, page, pageCount, pageSize };
+				return { threads: [], total, page, pageCount, pageSize };
 			}
 
 			const { results: rows } = await db
@@ -523,7 +519,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 
 			const threadIds = rows.map((row) => row.thread_id);
 			if (threadIds.length === 0) {
-				return { threads: [], labels: new Map(), total, page, pageCount, pageSize };
+				return { threads: [], total, page, pageCount, pageSize };
 			}
 
 			const placeholders = threadIds.map(() => '?').join(', ');
@@ -551,8 +547,7 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 				.map((threadId) => byThread.get(threadId))
 				.filter((group): group is ThreadMessageRow[] => Boolean(group?.length));
 
-			const labels = await createD1LabelsRepository(db).listForConversations(userId, threadIds);
-			return { threads, labels, total, page, pageCount, pageSize };
+			return { threads, total, page, pageCount, pageSize };
 		},
 
 		async listFlatRows(userId, options) {

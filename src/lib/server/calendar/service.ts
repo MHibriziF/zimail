@@ -44,6 +44,13 @@ export type CalendarService = {
 	reschedule(userId: string, id: string, start: Date, end: Date): Promise<'ok' | 'not_found'>;
 	/** Events with a meeting room, from those in progress through the next `UPCOMING_MEETING_DAYS`. */
 	upcomingMeetings(userId: string, now: Date): Promise<CalendarEvent[]>;
+	/**
+	 * Events touching `[from, to]` as stored, unfiltered, for peers that read the
+	 * calendar in bulk: free-slot search, and the events near a proposed time.
+	 */
+	listOverlapping(userId: string, from: Date, to: Date, limit: number): Promise<CalendarEvent[]>;
+	/** Deletes the event behind a booking; the booking itself belongs to reservations. */
+	deleteReservationEvent(userId: string, id: string): Promise<boolean>;
 };
 
 export const UPCOMING_MEETING_DAYS = 14;
@@ -289,6 +296,14 @@ export function createCalendarService({
 				},
 				MAX_UPCOMING_MEETINGS
 			);
+		},
+
+		listOverlapping(userId, from, to, limit) {
+			return repo.listOverlapping(userId, from.toISOString(), to.toISOString(), limit);
+		},
+
+		deleteReservationEvent(userId, id) {
+			return repo.deleteReservation(userId, id);
 		},
 
 		async remove(userId, id) {

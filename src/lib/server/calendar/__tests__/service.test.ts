@@ -468,3 +468,41 @@ describe('CalendarService', () => {
 		assert.deepEqual(closed, ['room-9']);
 	});
 });
+
+// What reservations and invitations use instead of the repository (#234).
+describe('calendar service: the slice peers read', () => {
+	const booked: Row = {
+		id: 'res-1',
+		userId: 'u1',
+		title: 'Office hours',
+		start: '2026-09-24T09:00:00.000Z',
+		end: '2026-09-24T10:00:00.000Z',
+		allDay: false,
+		location: null,
+		notes: null,
+		source: 'reservation',
+		busy: true,
+		calendar: null,
+		meetingCode: null
+	};
+	const manual: Row = { ...booked, id: 'own-1', source: 'manual', start: '2026-09-25T09:00:00.000Z', end: '2026-09-25T10:00:00.000Z' };
+
+	test('listOverlapping hands back the stored events in the window, unfiltered', async () => {
+		const { repo } = fakeRepo([booked, manual]);
+		const service = createCalendarService({ repo });
+
+		const events = await service.listOverlapping('u1', new Date('2026-09-24T00:00:00.000Z'), new Date('2026-09-25T00:00:00.000Z'), 10);
+		assert.deepEqual(events.map((event) => event.id), ['res-1']);
+		assert.deepEqual(await service.listOverlapping('u2', new Date('2026-09-24T00:00:00.000Z'), new Date('2026-09-26T00:00:00.000Z'), 10), []);
+	});
+
+	test('deleteReservationEvent removes a booking\u2019s event and nothing else', async () => {
+		const { repo, rows } = fakeRepo([booked, manual]);
+		const service = createCalendarService({ repo });
+
+		assert.equal(await service.deleteReservationEvent('u1', 'own-1'), false);
+		assert.equal(await service.deleteReservationEvent('u2', 'res-1'), false);
+		assert.equal(await service.deleteReservationEvent('u1', 'res-1'), true);
+		assert.deepEqual(rows.map((row) => row.id), ['own-1']);
+	});
+});
