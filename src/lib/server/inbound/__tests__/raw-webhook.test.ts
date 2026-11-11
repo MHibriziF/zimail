@@ -101,6 +101,11 @@ describe('parseHeaderBlock', () => {
 		assert.equal(headers.get('subject'), 'one two');
 		assert.equal(headers.get('x-a'), 'b');
 	});
+
+	test('keeps a field that carries raw UTF-8, instead of dropping it', () => {
+		const headers = parseHeaderBlock(new TextEncoder().encode('Authentication-Results: mx.exämple.test; spf=pass 日本\r\n\r\n'));
+		assert.equal(headers.get('authentication-results'), 'mx.exämple.test; spf=pass ??');
+	});
 });
 
 describe('asWebhookRequest', () => {

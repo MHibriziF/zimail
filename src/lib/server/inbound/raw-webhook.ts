@@ -54,6 +54,14 @@ function presentedSecret(headers: Headers): string | null {
 	return null;
 }
 
+/**
+ * `Headers` only takes byte-range characters, and raw UTF-8 in a header (which
+ * some mailers send) would make it drop the whole field. A `?` keeps the rest.
+ */
+function byteString(value: string): string {
+	return Array.from(value, (char) => ((char.codePointAt(0) ?? 0) > 0xff ? '?' : char)).join('');
+}
+
 /** A header block's fields, unfolded, as `Headers`, for the bits the pipeline reads straight off them. */
 export function parseHeaderBlock(raw: Uint8Array): Headers {
 	const head = new TextDecoder().decode(raw.subarray(0, Math.min(raw.length, 256 * 1024)));
@@ -64,7 +72,7 @@ export function parseHeaderBlock(raw: Uint8Array): Headers {
 		const colon = field.indexOf(':');
 		if (colon <= 0) continue;
 		const name = field.slice(0, colon).trim();
-		const value = field.slice(colon + 1).replaceAll(/\r?\n[ \t]+/g, ' ').trim();
+		const value = byteString(field.slice(colon + 1).replaceAll(/\r?\n[ \t]+/g, ' ').trim());
 		try {
 			headers.append(name, value);
 		} catch {
