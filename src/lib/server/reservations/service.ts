@@ -19,7 +19,7 @@ import {
 	type ReservationPageSettings
 } from '../../calendar/reservations';
 import { computeSlots, isFreeSlot, type DaySlots, type Interval } from '../../calendar/slots';
-import type { CalendarRepository } from '../calendar/repository';
+import type { CalendarService } from '../calendar';
 import { bookingIcs, type BookingDetails, type InviteKind } from './email';
 import {
 	nextReminderAt,
@@ -115,7 +115,8 @@ export type ReservationsService = {
 
 export type ReservationsServiceDeps = {
 	repo: ReservationsRepository;
-	calendar: CalendarRepository;
+	/** The calendar the bookings live in, as far as this module needs it. */
+	calendar: Pick<CalendarService, 'listOverlapping' | 'deleteReservationEvent'>;
 	hostOf: (userId: string) => Promise<{ name: string; email: string } | null>;
 	/** Meeting rooms for bookings; `null` when video meetings aren't set up on this deployment. */
 	meetings: MeetingRooms | null;
@@ -217,12 +218,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 	async function busyNear(page: StoredPage, fromKey: string, days: number, excluding?: string): Promise<Interval[]> {
 		const from = startOfDayIn(fromKey, page.timeZone).getTime() - DAY_MS;
 		const to = from + (days + 2) * DAY_MS;
-		const events = await deps.calendar.listOverlapping(
-			page.userId,
-			new Date(from).toISOString(),
-			new Date(to).toISOString(),
-			2000
-		);
+		const events = await deps.calendar.listOverlapping(page.userId, new Date(from), new Date(to), 2000);
 		return events
 			.filter((event) => event.busy && event.id !== excluding)
 			.map((event) => eventInterval(event, page.timeZone));
@@ -501,7 +497,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		async cancelBooking(userId, eventId) {
 			// Read before deleting: the guest's details go with the row.
 			const booking = await repo.getBookingByEvent(userId, eventId);
-			if (!(await deps.calendar.deleteReservation(userId, eventId))) return false;
+			if (!(await deps.calendar.deleteReservationEvent(userId, eventId))) return false;
 			if (!booking) return true;
 			if (booking.meetingCode) await closeRoom(userId, booking.meetingCode);
 			await tellGuest(userId, 'cancel', detailsFor(eventId, booking, { meetingUrl: null }));
@@ -616,7 +612,7 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			const { booking, page } = loaded;
 			const block = blockFor(booking, page, 'cancel');
 			if (block) return { type: block };
-			if (!(await deps.calendar.deleteReservation(booking.userId, booking.eventId))) return { type: 'not_found' };
+			if (!(await deps.calendar.deleteReservationEvent(booking.userId, booking.eventId))) return { type: 'not_found' };
 			if (booking.meetingCode) await closeRoom(booking.userId, booking.meetingCode);
 			await tellGuest(booking.userId, 'guest-cancel', detailsFor(booking.eventId, booking, { meetingUrl: null }));
 			return { type: 'ok', start: booking.start, end: booking.end };

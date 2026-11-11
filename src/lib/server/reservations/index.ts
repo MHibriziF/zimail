@@ -1,4 +1,4 @@
-import { createD1CalendarRepository } from '../calendar/repository';
+import { calendarServiceFor } from '../calendar';
 import { calendarFeedsServiceForDb } from '../calendar-feeds';
 import { getEmailProvider } from '../context';
 import { getMeetingsService } from '../meet/meetings';
@@ -75,7 +75,7 @@ export function getReservationsService(platform: App.Platform | undefined | null
 
 	return createReservationsService({
 		repo: createD1ReservationsRepository(db),
-		calendar: createD1CalendarRepository(db),
+		calendar: calendarServiceFor(db),
 		meetings: meetingRooms(platform),
 		refreshCalendars: (userId) => calendarFeedsServiceForDb(db).refreshStale(userId),
 		defer: (work) => platform?.ctx?.waitUntil(work),

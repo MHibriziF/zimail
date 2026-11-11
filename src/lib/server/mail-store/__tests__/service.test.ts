@@ -107,7 +107,7 @@ function fakeRepo(overrides: Partial<MailStoreRepository> = {}) {
 		getForUser: async () => null,
 		async listMailboxRows(userId: string, query: MailboxQuery): Promise<MailboxRowsPage> {
 			record('listMailboxRows', [userId, query]);
-			return { threads: [], labels: new Map(), total: 0, page: 1, pageCount: 1, pageSize: 25 };
+			return { threads: [], total: 0, page: 1, pageCount: 1, pageSize: 25 };
 		},
 		async listFlatRows() {
 			return [];
@@ -376,7 +376,7 @@ describe('listMailbox / listEmails — row to view-model mapping', () => {
 		];
 		const { repo } = fakeRepo({
 			async listMailboxRows() {
-				return { threads: [messages], labels: new Map(), total: 1, page: 1, pageCount: 1, pageSize: 25 };
+				return { threads: [messages], total: 1, page: 1, pageCount: 1, pageSize: 25 };
 			}
 		});
 		const service = createMailStoreService({ repo, resolveThread: async (_u, input) => input.emailId });
@@ -441,5 +441,58 @@ describe('listThreadMessages / markThreadRead', () => {
 
 		await service.markThreadRead('user-1', emailRow({ id: 'e2', thread_id: 'thread-9' }));
 		assert.deepEqual(calls.markThreadRead?.[1], ['user-1', 'thread-9']);
+	});
+});
+
+// Labels belong to the labels module; the service asks for them per page (#234).
+describe('listMailbox labels', () => {
+	test('asks the labels module once per page, for the conversations on it', async () => {
+		const asked: string[][] = [];
+		const { repo } = fakeRepo({
+			async listMailboxRows() {
+				return {
+					threads: [[threadRow({ id: 'm1', thread_id: 't1' })], [threadRow({ id: 'm2', thread_id: 't2' })]],
+					total: 2,
+					page: 1,
+					pageCount: 1,
+					pageSize: 25
+				};
+			}
+		});
+		const service = createMailStoreService({
+			repo,
+			resolveThread: async (_u, input) => input.emailId,
+			async labelsFor(_userId, conversationIds) {
+				asked.push(conversationIds);
+				return new Map([['t2', [{ id: 'l1', name: 'Work', color: 'blue' as const }]]]);
+			}
+		});
+
+		const page = await service.listMailbox('user-1', { view: 'inbox' });
+		assert.deepEqual(asked, [['t1', 't2']]);
+		assert.deepEqual(page.threads.map((thread) => thread.labels.map((label) => label.name)), [[], ['Work']]);
+	});
+
+	test('an empty page asks for nothing, and without the labels module pages carry none', async () => {
+		let asked = 0;
+		const { repo } = fakeRepo();
+		const withLabels = createMailStoreService({
+			repo,
+			resolveThread: async (_u, input) => input.emailId,
+			async labelsFor() {
+				asked++;
+				return new Map();
+			}
+		});
+		await withLabels.listMailbox('user-1', { view: 'inbox' });
+		assert.equal(asked, 0);
+
+		const { repo: oneThread } = fakeRepo({
+			async listMailboxRows() {
+				return { threads: [[threadRow({ id: 'm1', thread_id: 't1' })]], total: 1, page: 1, pageCount: 1, pageSize: 25 };
+			}
+		});
+		const without = createMailStoreService({ repo: oneThread, resolveThread: async (_u, input) => input.emailId });
+		assert.deepEqual((await without.listMailbox('user-1', { view: 'inbox' })).threads[0].labels, []);
 	});
 });

@@ -549,7 +549,7 @@ describe('MailStoreRepository — mailbox listing', () => {
 		const { repo, setView } = setup();
 		setView('inbox');
 		const page = await repo.listMailboxRows('user-1', { view: 'inbox' });
-		assert.deepEqual(page, { threads: [], labels: new Map(), total: 0, page: 1, pageCount: 1, pageSize: 25 });
+		assert.deepEqual(page, { threads: [], total: 0, page: 1, pageCount: 1, pageSize: 25 });
 	});
 
 	test('listFlatRows defaults to inbox for inbound and sent for outbound', async () => {

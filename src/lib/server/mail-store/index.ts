@@ -2,9 +2,10 @@ import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import type { DeliveryStatus } from '$lib/types';
 import { resolveThreadId } from './threads';
 import { createD1MailStoreRepository } from './repository';
+import { createD1LabelsRepository } from '../labels';
 import { createMailStoreService, type InsertEmailInput, type MailStoreService } from './service';
 
-export type { MailStoreRepository, MailboxQuery, MailFlagUpdate } from './repository';
+export type { MailStoreRepository, MailboxQuery, MailFlagUpdate, ThreadMessageRow } from './repository';
 export {
 	createMailStoreService,
 	encodeMailboxCursor,
@@ -20,7 +21,8 @@ type PlatformLike = App.Platform | undefined | null;
 export function mailStoreServiceForDb(db: D1Database): MailStoreService {
 	return createMailStoreService({
 		repo: createD1MailStoreRepository(db),
-		resolveThread: (userId, input) => resolveThreadId(db, userId, input)
+		resolveThread: (userId, input) => resolveThreadId(db, userId, input),
+		labelsFor: (userId, conversationIds) => createD1LabelsRepository(db).listForConversations(userId, conversationIds)
 	});
 }
 

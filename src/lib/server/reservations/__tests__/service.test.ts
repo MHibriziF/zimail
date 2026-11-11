@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { CalendarEvent } from '../../../calendar/events';
-import type { CalendarRepository } from '../../calendar/repository';
+import type { CalendarService } from '../../calendar';
 import type { BookingDetails } from '../email';
 import type { NewBooking, ReservationsRepository, StoredPage } from '../repository';
 import { createReservationsService, MAX_BOOKINGS_PER_DAY, MAX_UPCOMING_PER_GUEST, type RoomSchedule } from '../service';
@@ -160,7 +160,7 @@ function setup(options: SetupOptions = {}) {
 	};
 
 	const calendar = {
-		async deleteReservation(userId: string, eventId: string) {
+		async deleteReservationEvent(userId: string, eventId: string) {
 			const index = bookings.findIndex((entry) => entry.userId === userId && entry.eventId === eventId);
 			if (index < 0) return false;
 			bookings.splice(index, 1);
@@ -185,7 +185,7 @@ function setup(options: SetupOptions = {}) {
 				}));
 			return [...(options.busy ?? []), ...booked];
 		}
-	} as unknown as CalendarRepository;
+	} as unknown as CalendarService;
 
 	const rooms = {
 		opened: [] as { userId: string; title: string; code: string }[],
@@ -824,7 +824,7 @@ describe('ReservationsService reminders', () => {
 		assert.equal((await state.service.book('office-hours', guest, BASE)).type, 'ok');
 		const failing = createReservationsService({
 			repo: state.repo,
-			calendar: {} as CalendarRepository,
+			calendar: {} as CalendarService,
 			meetings: null,
 			hostOf: async () => ({ name: 'Izi', email: 'me@example.test' }),
 			notify: async () => undefined,

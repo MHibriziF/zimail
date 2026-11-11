@@ -189,10 +189,12 @@ export type MailStoreServiceDeps = {
 	 * real/fake D1.
 	 */
 	resolveThread: (userId: string, input: ThreadLookup) => Promise<string>;
+	/** Labels per conversation, from the labels module; without it, pages carry none. */
+	labelsFor?: (userId: string, conversationIds: string[]) => Promise<Map<string, Label[]>>;
 };
 
 export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreService {
-	const { repo, resolveThread } = deps;
+	const { repo, resolveThread, labelsFor } = deps;
 
 	async function insertEmail(input: InsertEmailInput): Promise<string> {
 		const id = crypto.randomUUID();
@@ -299,7 +301,10 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 		getEmailForUser: (userId, emailId) => repo.getForUser(userId, emailId),
 
 		async listMailbox(userId, query) {
-			const { threads, labels, total, page, pageCount, pageSize } = await repo.listMailboxRows(userId, query);
+			const { threads, total, page, pageCount, pageSize } = await repo.listMailboxRows(userId, query);
+			const conversationIds = threads.map((messages) => messages[0].thread_id);
+			const labels =
+				labelsFor && conversationIds.length > 0 ? await labelsFor(userId, conversationIds) : new Map<string, Label[]>();
 			return {
 				threads: threads.map((messages) => toThreadSummary(messages, labels.get(messages[0].thread_id))),
 				total,

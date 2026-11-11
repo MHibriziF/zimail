@@ -1,8 +1,7 @@
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { isCalendarAttachment } from '../../utils/attachments';
 import { getAttachmentForUser, listAttachments, readAttachmentBytes } from '../attachments';
-import { getCalendarService } from '../calendar';
-import { createD1CalendarRepository } from '../calendar/repository';
+import { calendarServiceFor, getCalendarService } from '../calendar';
 import { getEmailProvider } from '../context';
 import { listAddressesForUser } from '../domains';
 import type { EmailProvider } from '../email-provider';
@@ -124,8 +123,7 @@ export function answersServiceFor(db: D1Database, bucket: R2Bucket | undefined, 
 		timeZone: (userId) => userTimeZone(db, userId),
 		reschedule: actions?.reschedule ?? (async () => 'not_found'),
 		declineProposal: actions?.declineProposal ?? (async () => undefined),
-		eventsBetween: (userId, from, to) =>
-			createD1CalendarRepository(db).listOverlapping(userId, from.toISOString(), to.toISOString(), MAX_NEARBY_EVENTS)
+		eventsBetween: (userId, from, to) => calendarServiceFor(db).listOverlapping(userId, from, to, MAX_NEARBY_EVENTS)
 	});
 }
 
