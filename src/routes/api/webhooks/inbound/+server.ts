@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { aiFromEnv } from '$lib/server/ai/provider';
-import { handleCloudflareInbound } from '$lib/server/inbound/cloudflare-inbound';
+import { handleRawInbound } from '$lib/server/inbound/raw-mime';
 import { readRawInbound } from '$lib/server/inbound/raw-webhook';
 
 /**
@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	if (outcome.kind === 'invalid') return json({ error: outcome.reason }, { status: 400 });
 
 	try {
-		await handleCloudflareInbound(outcome.message, {
+		await handleRawInbound(outcome.message, {
 			DB: db,
 			ATTACHMENTS: bucket,
 			AI: aiFromEnv(platform?.env) ?? undefined,

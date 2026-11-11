@@ -1,9 +1,6 @@
 import type { ExecutionContext, ScheduledController } from '@cloudflare/workers-types';
-import {
-	handleCloudflareInbound,
-	type CloudflareInboundEnv,
-	type CloudflareInboundMessage
-} from './lib/server/inbound/cloudflare-inbound';
+import { handleRawInbound, type RawInboundMessage } from './lib/server/inbound/raw-mime';
+import type { InboundEnv } from './lib/server/inbound/pipeline';
 import { aiFromEnv } from './lib/server/ai/provider';
 import { asWebhookRequest } from './lib/server/inbound/webhook-request';
 import { ensureSchema } from './lib/server/migrations/migrate';
@@ -34,7 +31,7 @@ export default {
 		return svelteApp.fetch(asWebhookRequest(request), env, ctx);
 	},
 
-	async email(message: CloudflareInboundMessage, env: Env, ctx: ExecutionContext) {
+	async email(message: RawInboundMessage, env: Env, ctx: ExecutionContext) {
 		if (env.EMAIL_PROVIDER?.trim().toLowerCase() !== 'cloudflare') {
 			message.setReject('Cloudflare email provider is not enabled');
 			return;
@@ -43,7 +40,7 @@ export default {
 		// Inbound mail can be the first thing a fresh deploy ever sees.
 		await ensureSchema(env.DB);
 
-		const inboundEnv: CloudflareInboundEnv = {
+		const inboundEnv: InboundEnv = {
 			DB: env.DB,
 			ATTACHMENTS: env.ATTACHMENTS,
 			AI: aiFromEnv(env) ?? undefined,
@@ -57,7 +54,7 @@ export default {
 			waitUntil: (promise) => ctx.waitUntil(promise)
 		};
 
-		await handleCloudflareInbound(message, inboundEnv);
+		await handleRawInbound(message, inboundEnv);
 	},
 
 	/**
