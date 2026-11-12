@@ -21,17 +21,11 @@
 	import { takeUnseenAdmissions } from '$lib/meet/admission-alerts';
 	import { normalizeDisplayName } from '$lib/meet/display-name';
 	import { isHostIdentity } from '$lib/meet/host-identity';
-	import {
-		downloadBlob,
-		formatElapsed,
-		recordingFilename,
-		recordingSupported,
-		startRecording,
-		type ActiveRecording
-	} from '$lib/meet/recorder';
-	import { meetingRecordingSupported, startMeetingRecording, type CompositeSource } from '$lib/meet/composite-recorder';
+	import { downloadBlob, formatElapsed } from '$lib/meet/recorder';
+	import { CallRecording } from '$lib/meet/call-recording.svelte';
+	import { colorFor, initialsFor } from '$lib/meet/avatar';
 	import { layoutCallTiles, type TileRect } from '$lib/meet/tile-layout';
-	import { parseRecordingAttribute, recordingChoices, type RecordingKind } from '$lib/meet/recording-kind';
+	import { parseRecordingAttribute, type RecordingKind } from '$lib/meet/recording-kind';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
 	import {
 		DEFAULT_SCREEN_SHARE,
@@ -218,17 +212,14 @@
 	let notice = $state('');
 	let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
-	// MediaRecorder + getDisplayMedia: desktop Chromium, Firefox and Safari; not phones.
-	const canRecordView = typeof window !== 'undefined' && recordingSupported();
-	const canRecordMeeting = typeof window !== 'undefined' && meetingRecordingSupported();
-	/** This participant's own recording, if running. Not reactive state — it holds live media objects. */
-	let activeRecording: ActiveRecording | null = null;
-	let recording = $state(false);
-	/** Which kind is running, for the header and for what everyone else is told. */
-	let recordingKind = $state<RecordingKind>('view');
-	let recordingSaving = $state(false);
-	let recordingElapsed = $state(0);
-	let recordingTimer: ReturnType<typeof setInterval> | null = null;
+	const recorder = new CallRecording({
+		room: () => room,
+		meetingCode: () => meetingCode,
+		localName: () => localName,
+		labels: () => ({ guest: t('meet.guest'), screenShareOf: (name) => t('meet.screenShareOf', { name }) }),
+		onChange: () => refreshRoster(),
+		notify: (key) => showNotice(t(key))
+	});
 
 	let handRaisedAt = $state<number | null>(null);
 	const handNoticeGate = createRequestChimeGate(HAND_NOTICE_WINDOW_MS);
@@ -298,25 +289,6 @@
 		} catch {
 			// Private mode: the choice lasts for this call only.
 		}
-	}
-
-	function initialsFor(name: string): string {
-		return (
-			name
-				.trim()
-				.split(/\s+/)
-				.filter(Boolean)
-				.slice(0, 2)
-				.map((part) => part[0]!.toUpperCase())
-				.join('') || '?'
-		);
-	}
-
-	/** A stable color per identity, so returning to a tile always looks the same. */
-	function colorFor(seed: string): string {
-		let hash = 0;
-		for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-		return `hsl(${Math.abs(hash) % 360}, 45%, 38%)`;
 	}
 
 	let localName = $state(untrack(() => displayName));
@@ -691,10 +663,7 @@
 		applySinkId(el);
 		if (track.kind === Track.Kind.Audio && deafened) el.muted = true;
 		tile.media.appendChild(el);
-		// Someone who starts talking mid-recording has to join the mix too.
-		if (track.kind === Track.Kind.Audio && activeRecording?.mixesRemoteAudio) {
-			activeRecording.addAudioTrack(track.mediaStreamTrack);
-		}
+		if (track.kind === Track.Kind.Audio) recorder.remoteAudioAdded(track.mediaStreamTrack);
 		if (pipActive && track.kind === Track.Kind.Video) refreshPipVideo();
 	}
 
@@ -706,7 +675,7 @@
 		// The avatar layer sits behind the media layer, so emptying it (camera
 		// off, or a full unpublish) is all it takes for the avatar to show again.
 		for (const el of track.detach()) el.remove();
-		if (track.kind === Track.Kind.Audio) activeRecording?.removeAudioTrack(track.mediaStreamTrack);
+		if (track.kind === Track.Kind.Audio) recorder.remoteAudioRemoved(track.mediaStreamTrack);
 		// The screen tile has no avatar fallback, so it only makes sense while sharing.
 		if (track.source === Track.Source.ScreenShare) removeScreenTile(participant.identity);
 		if (pipActive && track.kind === Track.Kind.Video) refreshPipVideo();
@@ -754,7 +723,7 @@
 				isLocal: true,
 				isHost: isHostIdentity(room.localParticipant.identity),
 				canShareScreen,
-				recording: recording ? recordingKind : null,
+				recording: recorder.attribute,
 				handRaisedAt,
 				wantsCaptions
 			},
@@ -996,9 +965,8 @@
 		if (publication.source === Track.Source.Camera || publication.source === Track.Source.Microphone) {
 			syncLocalAvState();
 		}
-		// A mic first turned on after recording started still belongs in it.
 		if (publication.source === Track.Source.Microphone && publication.track) {
-			activeRecording?.addAudioTrack(publication.track.mediaStreamTrack);
+			recorder.micPublished(publication.track.mediaStreamTrack);
 			micTrackVersion += 1;
 		}
 		if (publication.source !== Track.Source.ScreenShare || !publication.track) return;
@@ -1202,7 +1170,7 @@
 
 	onDestroy(() => {
 		// However the call ends — Leave, a dropped connection, closing the page — keep what was recorded.
-		void finishRecording();
+		void recorder.finish();
 		room?.disconnect();
 		pipWindow?.close();
 		stopAdmissionsPolling();
@@ -1836,96 +1804,11 @@
 		}
 	}
 
-	function remoteAudioTracks(): MediaStreamTrack[] {
-		if (!room) return [];
-		return Array.from(room.remoteParticipants.values()).flatMap((participant) =>
-			Array.from(participant.audioTrackPublications.values()).flatMap((publication) =>
-				publication.track ? [publication.track.mediaStreamTrack] : []
-			)
-		);
-	}
-
-	/** What "Record meeting" draws each frame: everyone's camera (or initials) and any screen share. */
-	function compositeSources(): CompositeSource[] {
-		if (!room) return [];
-		const local = room.localParticipant;
-		return [local, ...room.remoteParticipants.values()].flatMap((participant) => {
-			const name = participant === local ? localName : participant.name || t('meet.guest');
-			const camera = participant.getTrackPublication(Track.Source.Camera);
-			const screen = participant.getTrackPublication(Track.Source.ScreenShare);
-			const person: CompositeSource = {
-				key: participant.identity,
-				label: name,
-				video: camera?.track && !camera.isMuted ? camera.track.mediaStreamTrack : null,
-				screen: false,
-				color: colorFor(participant.identity),
-				initials: initialsFor(name)
-			};
-			if (!screen?.track) return [person];
-			return [
-				{
-					...person,
-					key: `${participant.identity}:screen`,
-					label: t('meet.screenShareOf', { name }),
-					video: screen.track.mediaStreamTrack,
-					screen: true
-				},
-				person
-			];
-		});
-	}
-
-	async function beginRecording(kind: RecordingKind) {
-		if (!room || activeRecording || recordingSaving) return;
-		const micTrack = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack ?? null;
-		try {
-			activeRecording =
-				kind === 'meeting'
-					? await startMeetingRecording({ getSources: compositeSources, micTrack, remoteAudioTracks: remoteAudioTracks() })
-					: await startRecording({ micTrack, remoteAudioTracks: remoteAudioTracks(), onEnded: () => void finishRecording() });
-		} catch (error) {
-			// Closing the browser's picker is a choice, not a failure worth reporting.
-			if (!(error instanceof DOMException && error.name === 'NotAllowedError')) showNotice(t('meet.recordingFailed'));
-			return;
-		}
-		recording = true;
-		recordingKind = kind;
-		recordingElapsed = 0;
-		recordingTimer = setInterval(() => {
-			if (activeRecording) recordingElapsed = (Date.now() - activeRecording.startedAt.getTime()) / 1000;
-		}, 1000);
-		room.localParticipant.setAttributes({ recording: kind }).catch(() => {});
-		refreshRoster();
-	}
-
-	async function finishRecording() {
-		const current = activeRecording;
-		if (!current) return;
-		activeRecording = null;
-		recording = false;
-		recordingSaving = true;
-		if (recordingTimer) clearInterval(recordingTimer);
-		recordingTimer = null;
-		room?.localParticipant.setAttributes({ recording: '0' }).catch(() => {});
-		refreshRoster();
-		try {
-			const blob = await current.stop();
-			if (blob.size > 0) downloadBlob(blob, recordingFilename(meetingCode, current.startedAt, current.mimeType));
-			showNotice(t('meet.recordingSaved'));
-		} catch {
-			showNotice(t('meet.recordingFailed'));
-		} finally {
-			recordingSaving = false;
-		}
-	}
-
-	const recordChoices = $derived(
-		recordingChoices({ isHost, meetingSupported: canRecordMeeting, viewSupported: canRecordView })
-	);
+	const recordChoices = $derived(recorder.choices(isHost));
 
 	async function leave(reason: 'left' | 'ended' | 'deleted' = 'left') {
 		// Save first: MediaRecorder only hands over its last chunk after stop() settles.
-		await finishRecording();
+		await recorder.finish();
 		playLeaveChime();
 		stopAdmissionsPolling();
 		room?.disconnect();
@@ -1970,17 +1853,17 @@
 		{:else if notice}
 			<span class="call-header-notice" role="status">{notice}</span>
 		{/if}
-		{#if recording}
+		{#if recorder.active}
 			<span class="call-header-notice call-header-recording" role="status">
 				<span class="call-recording-dot" aria-hidden="true"></span>
-				{recordingKind === 'meeting'
-					? t('meet.recordingMeetingSelf', { time: formatElapsed(recordingElapsed) })
-					: t('meet.recordingSelf', { time: formatElapsed(recordingElapsed) })}
-				<button type="button" class="call-header-notice-action" onclick={() => void finishRecording()}>
+				{recorder.kind === 'meeting'
+					? t('meet.recordingMeetingSelf', { time: formatElapsed(recorder.elapsed) })
+					: t('meet.recordingSelf', { time: formatElapsed(recorder.elapsed) })}
+				<button type="button" class="call-header-notice-action" onclick={() => void recorder.finish()}>
 					{t('meet.stopRecording')}
 				</button>
 			</span>
-		{:else if recordingSaving}
+		{:else if recorder.saving}
 			<span class="call-header-notice" role="status">{t('meet.recordingSaving')}</span>
 		{/if}
 		{#each othersRecording as other (other.identity)}
@@ -2187,8 +2070,8 @@
 		{pipSupported}
 		{pipActive}
 		{recordChoices}
-		{recording}
-		{recordingSaving}
+		recording={recorder.active}
+		recordingSaving={recorder.saving}
 		{panel}
 		rosterCount={roster.length}
 		handRaised={handRaisedAt !== null}
@@ -2208,8 +2091,8 @@
 		onShowBackgroundPicker={() => (showBackgroundPicker = true)}
 		onToggleScreenShare={toggleScreenShare}
 		onTogglePip={togglePip}
-		onRecord={(kind) => void beginRecording(kind)}
-		onStopRecording={() => void finishRecording()}
+		onRecord={(kind) => void recorder.begin(kind)}
+		onStopRecording={() => void recorder.finish()}
 		onTogglePanel={togglePanel}
 		onToggleHand={toggleHand}
 		onSendReaction={sendReaction}
