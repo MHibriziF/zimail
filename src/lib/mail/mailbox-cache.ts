@@ -85,19 +85,29 @@ export function saveMailboxSnapshot(owner: string, key: string, data: MailboxDat
  */
 export function markThreadReadInSnapshots(threadId: string): void {
 	generation += 1;
+	let tab: MailCategory | null = null;
+	const alreadyRead = new Set<Snapshot>();
 	for (const [key, snapshot] of snapshots) {
 		snapshot.generation = generation;
 		const { data } = snapshot;
 		const row = data.mailbox.threads.find((thread) => thread.thread_id === threadId);
-		if (!row || row.is_read) continue;
+		if (!row) continue;
+		if (row.is_read) {
+			alreadyRead.add(snapshot);
+			continue;
+		}
+		tab ??= (data.filters.tab as MailCategory | '') || null;
 		if (data.filters.unreadOnly) {
 			snapshots.delete(key);
 			continue;
 		}
 		row.is_read = true;
-		const tab = data.filters.tab as MailCategory | '';
-		if (tab && data.tabCounts) {
-			data.tabCounts[tab] = Math.max(0, data.tabCounts[tab] - 1);
-		}
+	}
+	if (!tab) return;
+	// Every inbox list carries the counts of all tabs, not only its own, so the
+	// thread's tab drops in each of them: Primary's list shows Promotions' badge too.
+	for (const snapshot of snapshots.values()) {
+		const counts = snapshot.data.tabCounts;
+		if (counts && !alreadyRead.has(snapshot)) counts[tab] = Math.max(0, counts[tab] - 1);
 	}
 }
