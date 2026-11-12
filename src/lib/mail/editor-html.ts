@@ -3,7 +3,7 @@ import { isFullDocument } from '$lib/utils/email-html';
 /** Tags the rich editor can't hold: in the app's own page they would run, load, or restyle the app. */
 const DROPPED_TAGS = ['script', 'style', 'link', 'meta', 'title', 'base', 'iframe', 'frame', 'object', 'embed', 'form'];
 
-const URL_ATTRIBUTES = ['href', 'src', 'action', 'formaction', 'xlink:href'];
+const URL_ATTRIBUTES = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
 const UNSAFE_SCHEMES = ['javascript:', 'vbscript:'];
 
 /**
@@ -16,14 +16,14 @@ export function needsHtmlMode(html: string): boolean {
 
 function isUnsafeUrl(value: string): boolean {
 	// Browsers ignore control characters and spaces inside a scheme, so `java\tscript:` still runs.
-	const compact = [...value].filter((char) => char.charCodeAt(0) > 32).join('').toLowerCase();
+	const compact = [...value].filter((char) => (char.codePointAt(0) ?? 0) > 32).join('').toLowerCase();
 	return UNSAFE_SCHEMES.some((scheme) => compact.startsWith(scheme));
 }
 
 function cleanAttributes(element: Element) {
 	for (const { name, value } of Array.from(element.attributes)) {
 		const lower = name.toLowerCase();
-		if (lower.startsWith('on') || (URL_ATTRIBUTES.includes(lower) && isUnsafeUrl(value))) {
+		if (lower.startsWith('on') || (URL_ATTRIBUTES.has(lower) && isUnsafeUrl(value))) {
 			element.removeAttribute(name);
 		}
 	}
