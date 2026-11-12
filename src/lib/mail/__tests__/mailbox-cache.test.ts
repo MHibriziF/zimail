@@ -110,6 +110,32 @@ test('reading a thread patches it read and lowers its tab count', () => {
 	assert.equal(hit?.tabCounts?.primary, 0);
 });
 
+test('reading a thread in one tab lowers that tab\'s badge on the other tabs\' lists', () => {
+	const counts = { primary: 0, promotions: 1, social: 0, updates: 0 } as MailboxData['tabCounts'];
+	save('/inbox?', { ...list('5:50', [thread('p1', true)]), tabCounts: structuredClone(counts) });
+	save('/inbox?tab=promotions', {
+		...list('5:50', [thread('t1', false)], { tab: 'promotions' }),
+		tabCounts: structuredClone(counts)
+	});
+	markThreadReadInSnapshots('t1');
+	assert.equal(readMailboxSnapshot(OWNER, '/inbox?')?.tabCounts?.promotions, 0);
+	assert.equal(readMailboxSnapshot(OWNER, '/inbox?tab=promotions')?.tabCounts?.promotions, 0);
+});
+
+test('a list that already shows the thread read keeps its counts', () => {
+	save('/inbox?tab=promotions', {
+		...list('5:50', [thread('t1', false)], { tab: 'promotions' }),
+		tabCounts: { primary: 0, promotions: 2, social: 0, updates: 0 } as MailboxData['tabCounts']
+	});
+	save('/inbox?tab=promotions&starred=1', {
+		...list('5:50', [thread('t1', true)], { tab: 'promotions' }),
+		tabCounts: { primary: 0, promotions: 1, social: 0, updates: 0 } as MailboxData['tabCounts']
+	});
+	markThreadReadInSnapshots('t1');
+	assert.equal(readMailboxSnapshot(OWNER, '/inbox?tab=promotions')?.tabCounts?.promotions, 1);
+	assert.equal(readMailboxSnapshot(OWNER, '/inbox?tab=promotions&starred=1')?.tabCounts?.promotions, 1);
+});
+
 test('reading a thread drops unread-only lists, which it would leave', () => {
 	save('/inbox?unread=1', list('5:50', [thread('t1', false)], { unreadOnly: true }));
 	markThreadReadInSnapshots('t1');
