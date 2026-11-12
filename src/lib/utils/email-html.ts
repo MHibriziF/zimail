@@ -132,7 +132,9 @@ html, body { height: auto !important; }
    declare a scheme of their own to match. */
 /* Safari inflates text in a frame on its own judgement; keep the sizes set. */
 html { overflow-x: auto; overflow-y: hidden; background: transparent; -webkit-text-size-adjust: 100%; }
-body { margin: 0; }
+/* flow-root keeps the first and last child's margins inside the body; collapsed out of it, they
+   were missing from the measured height and a message's last line was cut off. */
+body { margin: 0; display: flow-root; }
 /* Set from outside the frame; the control that clears it lives out there too. */
 .quote-hidden { display: none !important; }
 `;
@@ -223,7 +225,7 @@ export function emailCss(rich: boolean): string {
 export const EMAIL_STYLE_ID = '__mail-frame-style';
 
 /** Senders differ on whether the HTML part is a fragment or a whole document. */
-function isFullDocument(html: string): boolean {
+export function isFullDocument(html: string): boolean {
 	return /<html[\s>]/i.test(html) || /<body[\s>]/i.test(html);
 }
 

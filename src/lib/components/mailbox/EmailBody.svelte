@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { browser } from '$app/environment';
 	import { EMAIL_STYLE_ID, adaptsToDark, buildEmailDocument, emailCss, isRichHtml, supportsDarkScheme } from '$lib/utils/email-html';
 	import Icon from '$lib/components/Icon.svelte';
@@ -6,11 +7,20 @@
 	import { t } from '$lib/i18n';
 
 	/** `remote`: the reader asked to see this message's remote images. The control for it lives with each theme. */
-	let { html, remote = false }: { html: string; remote?: boolean } = $props();
+	let {
+		html,
+		remote = false,
+		originalColours = false
+	}: {
+		html: string;
+		remote?: boolean;
+		/** Open on the message's own colours, as a composer's preview does: it shows what was written. */
+		originalColours?: boolean;
+	} = $props();
 
 	const rich = $derived(isRichHtml(html));
 	/** In dark mode, the reader asked for this message's own light colours instead of the recoloured ones. */
-	let original = $state(false);
+	let original = $state(untrack(() => originalColours));
 
 	/**
 	 * Stamped on <html> by the inline script in app.html, so it is settled well
