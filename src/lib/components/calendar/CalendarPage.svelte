@@ -231,72 +231,74 @@
 	{#if loadError}<p class="cal-error" role="alert">{loadError}</p>{/if}
 
 	{#if view === 'month'}
-		<div class="cal-grid surface-lg">
-			{#each weekdayLabels as label, index (index)}
-				<div class="cal-weekday" aria-hidden="true">{label}</div>
-			{/each}
-			{#each grid as key (key)}
-				{@const dayEvents = byDay.get(key) ?? []}
-				<div
-					class="cal-day"
-					class:outside={!key.startsWith(monthPrefix)}
-					class:today={key === today}
-					class:selected={key === selectedDay}
-				>
-					<button
-						type="button"
-						class="cal-day-hit"
-						aria-label={dayHeading.format(dateKeyToUtc(key)!)}
-						aria-pressed={key === selectedDay}
-						onclick={() => (selected = key)}
-						ondblclick={() => openNew(key)}
-					></button>
-					<span class="cal-day-num">{Number(key.slice(8))}</span>
-					<ul class="cal-chips">
-						{#each dayEvents.slice(0, MAX_CHIPS) as event (event.id)}
-							<li>
-								<button
-									type="button"
-									class="cal-chip"
-									class:allday={event.allDay}
-									class:free={!event.busy}
-									style="--event-color: {eventColor(event)}"
-									title={event.calendar ? `${event.title} · ${event.calendar.name}` : event.title}
-									onclick={() => openEvent(event)}
-								>
-									{#if !event.allDay && dateKeyIn(new Date(event.start), timeZone) === key}
-										<span class="cal-chip-time">{timeFormat.format(new Date(event.start))}</span>
-									{/if}
-									<span class="cal-chip-title">{event.title}</span>
-								</button>
-							</li>
+		<div class="cal-month-layout">
+			<div class="cal-grid surface-lg">
+				{#each weekdayLabels as label, index (index)}
+					<div class="cal-weekday" aria-hidden="true">{label}</div>
+				{/each}
+				{#each grid as key (key)}
+					{@const dayEvents = byDay.get(key) ?? []}
+					<div
+						class="cal-day"
+						class:outside={!key.startsWith(monthPrefix)}
+						class:today={key === today}
+						class:selected={key === selectedDay}
+					>
+						<button
+							type="button"
+							class="cal-day-hit"
+							aria-label={dayHeading.format(dateKeyToUtc(key)!)}
+							aria-pressed={key === selectedDay}
+							onclick={() => (selected = key)}
+							ondblclick={() => openNew(key)}
+						></button>
+						<span class="cal-day-num">{Number(key.slice(8))}</span>
+						<ul class="cal-chips">
+							{#each dayEvents.slice(0, MAX_CHIPS) as event (event.id)}
+								<li>
+									<button
+										type="button"
+										class="cal-chip"
+										class:allday={event.allDay}
+										class:free={!event.busy}
+										style="--event-color: {eventColor(event)}"
+										title={event.calendar ? `${event.title} · ${event.calendar.name}` : event.title}
+										onclick={() => openEvent(event)}
+									>
+										{#if !event.allDay && dateKeyIn(new Date(event.start), timeZone) === key}
+											<span class="cal-chip-time">{timeFormat.format(new Date(event.start))}</span>
+										{/if}
+										<span class="cal-chip-title">{event.title}</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+						{#if dayEvents.length > MAX_CHIPS}
+							<span class="cal-more">{t('calendar.more', { count: dayEvents.length - MAX_CHIPS })}</span>
+						{/if}
+						{#if dayEvents.length > 0}<span class="cal-dot" aria-hidden="true"></span>{/if}
+					</div>
+				{/each}
+			</div>
+
+			<section class="cal-day-panel surface-lg">
+				<header class="cal-day-panel-head">
+					<h3>{dayHeading.format(dateKeyToUtc(selectedDay)!)}</h3>
+					<button type="button" class="icon-btn" aria-label={t('calendar.newEvent')} onclick={() => openNew(selectedDay)}>
+						<Icon name="add-line" size={18} />
+					</button>
+				</header>
+				{#if (byDay.get(selectedDay) ?? []).length === 0}
+					<p class="cal-empty">{t('calendar.nothingThisDay')}</p>
+				{:else}
+					<ul class="cal-rows">
+						{#each byDay.get(selectedDay) ?? [] as event (event.id)}
+							{@render eventRow(event, selectedDay)}
 						{/each}
 					</ul>
-					{#if dayEvents.length > MAX_CHIPS}
-						<span class="cal-more">{t('calendar.more', { count: dayEvents.length - MAX_CHIPS })}</span>
-					{/if}
-					{#if dayEvents.length > 0}<span class="cal-dot" aria-hidden="true"></span>{/if}
-				</div>
-			{/each}
+				{/if}
+			</section>
 		</div>
-
-		<section class="cal-day-panel surface-lg">
-			<header class="cal-day-panel-head">
-				<h3>{dayHeading.format(dateKeyToUtc(selectedDay)!)}</h3>
-				<button type="button" class="icon-btn" aria-label={t('calendar.newEvent')} onclick={() => openNew(selectedDay)}>
-					<Icon name="add-line" size={18} />
-				</button>
-			</header>
-			{#if (byDay.get(selectedDay) ?? []).length === 0}
-				<p class="cal-empty">{t('calendar.nothingThisDay')}</p>
-			{:else}
-				<ul class="cal-rows">
-					{#each byDay.get(selectedDay) ?? [] as event (event.id)}
-						{@render eventRow(event, selectedDay)}
-					{/each}
-				</ul>
-			{/if}
-		</section>
 	{:else}
 		<section class="cal-agenda surface-lg">
 			{#each agendaDays.filter((key) => byDay.has(key)) as key (key)}
@@ -349,7 +351,37 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		max-width: 64rem;
+		max-width: 96rem;
+		container-type: inline-size;
+	}
+
+	.cal-month-layout {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 1rem;
+	}
+
+	/* Keyed to the page's own width, not the viewport, since the sidebar's width varies. */
+	@container (min-width: 60rem) {
+		.cal-month-layout {
+			grid-template-columns: minmax(0, 1fr) 18rem;
+			align-items: start;
+		}
+
+		.cal-month-layout .cal-day-panel {
+			position: sticky;
+			top: 0;
+			max-height: calc(100dvh - 2rem);
+			overflow-y: auto;
+		}
+
+		.cal-month-layout .cal-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.cal-month-layout .cal-row-meta {
+			grid-column: 1;
+		}
 	}
 
 	.cal-page :global(.stack-header) {

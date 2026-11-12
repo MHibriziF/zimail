@@ -1,13 +1,14 @@
 import type { LayoutServerLoad } from './$types';
 import { getApiTokenService } from '$lib/server/api-tokens';
 import { getAuthService } from '$lib/server/auth';
+import { getPreferencesService } from '$lib/server/preferences';
 import { readVapidConfiguration } from '$lib/server/push-notifications';
 import { DEFAULT_CLEANUP_SETTINGS, getCleanupSettings } from '$lib/server/cleanup';
 
 export const load: LayoutServerLoad = async ({ locals, platform }) => {
 	const db = platform?.env.DB;
 	const auth = db ? getAuthService(platform) : null;
-	const signature = locals.user && auth ? await auth.getEmailSignature(locals.user.id) : '';
+	const signature = locals.user && db ? await getPreferencesService(platform).getEmailSignature(locals.user.id) : '';
 	const apiTokens =
 		locals.user && db ? await getApiTokenService(platform).listApiTokens(locals.user.id) : [];
 	const vapid = platform?.env ? readVapidConfiguration(platform.env) : null;

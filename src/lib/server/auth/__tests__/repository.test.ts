@@ -627,17 +627,3 @@ describe('AuthRepository — 2FA', () => {
 		assert.equal(backupCodes.length, 0);
 	});
 });
-
-describe('AuthRepository — profile settings', () => {
-	test('email signature, ui theme, and locale round-trip', async () => {
-		const { repo } = setup([{ id: 'u1' }]);
-		await repo.setEmailSignature('u1', 'Cheers');
-		assert.equal(await repo.getEmailSignature('u1'), 'Cheers');
-
-		await repo.setUiTheme('u1', 'dark');
-		assert.equal(await repo.getUiTheme('u1'), 'dark');
-
-		await repo.setLocale('u1', 'fr');
-		assert.equal(await repo.getLocale('u1'), 'fr');
-	});
-});

@@ -15,7 +15,7 @@ import {
 	listAddressesForUser
 } from '../domains';
 import { parseEmailAddress } from '../util/email-address';
-import { getEmailSignature } from '../auth';
+import { preferencesServiceForDb } from '../preferences';
 import { stripHtml } from '../util/html';
 import { insertEmail } from '../mail-store';
 import { initialOutboundStatus, type EmailProvider } from '../email-provider';
@@ -194,7 +194,7 @@ export async function sendAndStore(
 		html: bodyHtml,
 		signature: input.signatureIncluded
 			? ''
-			: pickEmailSignature(from.signature, await getEmailSignature(env.DB, user.id))
+			: pickEmailSignature(from.signature, await preferencesServiceForDb(env.DB).getEmailSignature(user.id))
 	});
 
 	const attachments = input.attachments ?? [];

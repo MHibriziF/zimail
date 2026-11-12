@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import type { D1Database } from '@cloudflare/workers-types';
 import { createFakeD1 } from '../../__tests__/support/fake-d1';
-import { getAuthService, getEmailSignature, getUserById } from '../index';
+import { getAuthService, getUserById } from '../index';
 
 function fakeDb(handlers: Partial<Record<string, unknown[]>> = {}): D1Database {
 	return createFakeD1(({ sql }) => {
@@ -34,10 +34,5 @@ describe('legacy db-first facade', () => {
 		});
 		const found = await getUserById(db, 'u1');
 		assert.equal(found?.name, 'Ada');
-	});
-
-	test('getEmailSignature delegates to the repository', async () => {
-		const db = fakeDb({ email_signature: [{ email_signature: 'Cheers' }] });
-		assert.equal(await getEmailSignature(db, 'u1'), 'Cheers');
 	});
 });

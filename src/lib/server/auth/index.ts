@@ -40,7 +40,3 @@ export function getAuthService(platform: PlatformLike): AuthService {
 export function getUserById(db: D1Database, id: string) {
 	return createAuthService(createD1AuthRepository(db)).getUserById(id);
 }
-
-export function getEmailSignature(db: D1Database, userId: string) {
-	return createAuthService(createD1AuthRepository(db)).getEmailSignature(userId);
-}

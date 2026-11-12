@@ -1,5 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { getAuthService } from '$lib/server/auth';
+import { getPreferencesService } from '$lib/server/preferences';
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, isLocale } from '$lib/i18n/locales';
 
 export const PATCH: RequestHandler = async ({ request, locals, platform, cookies }) => {
@@ -18,7 +18,7 @@ export const PATCH: RequestHandler = async ({ request, locals, platform, cookies
 		return json({ error: 'Unknown locale' }, { status: 400 });
 	}
 
-	const locale = await getAuthService(platform).setUserLocale(locals.user.id, body.locale);
+	const locale = await getPreferencesService(platform).setLocale(locals.user.id, body.locale);
 	cookies.set(LOCALE_COOKIE, locale, {
 		path: '/',
 		maxAge: LOCALE_COOKIE_MAX_AGE,

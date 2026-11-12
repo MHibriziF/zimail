@@ -264,28 +264,6 @@ function fakeRepo(overrides: Partial<AuthRepository> = {}) {
 			return true;
 		},
 
-		async getEmailSignature(userId) {
-			return users.get(userId)?.signature ?? '';
-		},
-		async setEmailSignature(userId, value) {
-			const u = users.get(userId);
-			if (u) u.signature = value;
-		},
-		async getUiTheme(userId) {
-			return users.get(userId)?.theme ?? null;
-		},
-		async setUiTheme(userId, theme) {
-			const u = users.get(userId);
-			if (u) u.theme = theme;
-		},
-		async getLocale(userId) {
-			return users.get(userId)?.locale ?? null;
-		},
-		async setLocale(userId, locale) {
-			const u = users.get(userId);
-			if (u) u.locale = locale;
-		},
-
 		...overrides
 	};
 
@@ -907,48 +885,5 @@ describe('two-factor', () => {
 		await service.disableTwoFactor('user-1');
 		assert.equal(await service.isTwoFactorEnabled('user-1'), false);
 		assert.equal((await service.getTwoFactorStatus('user-1')).backupCodesRemaining, 0);
-	});
-});
-
-describe('profile settings', () => {
-	test('updateEmailSignature normalizes before saving', async () => {
-		const { repo, addUser } = fakeRepo();
-		addUser({ ...user(), passwordHash: 'h' });
-		const service = createAuthService(repo);
-		const saved = await service.updateEmailSignature('user-1', '  Cheers,\nAda  ');
-		assert.equal(await service.getEmailSignature('user-1'), saved);
-	});
-
-	test('setUserUiTheme rejects a malformed theme id', async () => {
-		// isThemeId is a shape check (lowercase/digits/hyphen), not a check
-		// against the registered theme list — matching the original ui-theme.ts.
-		const { repo, addUser } = fakeRepo();
-		addUser({ ...user(), passwordHash: 'h' });
-		const service = createAuthService(repo);
-		await assert.rejects(service.setUserUiTheme('user-1', 'Not A Valid Theme!'), /Unknown theme/);
-	});
-
-	test('getUserLocale falls back to the default for an unset/unknown value', async () => {
-		const { repo, addUser } = fakeRepo();
-		addUser({ ...user(), passwordHash: 'h' });
-		const service = createAuthService(repo);
-		assert.ok(await service.getUserLocale('user-1'));
-	});
-
-	test('setUserUiTheme saves a well-formed theme id', async () => {
-		const { repo, addUser } = fakeRepo();
-		addUser({ ...user(), passwordHash: 'h' });
-		const service = createAuthService(repo);
-		const saved = await service.setUserUiTheme('user-1', 'zero-dark');
-		assert.equal(saved, 'zero-dark');
-		assert.equal(await service.getUserUiTheme('user-1'), 'zero-dark');
-	});
-
-	test('setUserLocale resolves and saves the locale', async () => {
-		const { repo, addUser } = fakeRepo();
-		addUser({ ...user(), passwordHash: 'h' });
-		const service = createAuthService(repo);
-		const saved = await service.setUserLocale('user-1', 'fr');
-		assert.equal(await service.getUserLocale('user-1'), saved);
 	});
 });

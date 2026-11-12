@@ -1,6 +1,6 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { MAX_EMAIL_SIGNATURE_LENGTH } from '$lib/email-signature';
-import { getAuthService } from '$lib/server/auth';
+import { getPreferencesService } from '$lib/server/preferences';
 
 export const PATCH: RequestHandler = async ({ request, locals, platform }) => {
 	if (!platform?.env.DB || !locals.user) {
@@ -24,6 +24,6 @@ export const PATCH: RequestHandler = async ({ request, locals, platform }) => {
 		);
 	}
 
-	const signature = await getAuthService(platform).updateEmailSignature(locals.user.id, body.signature);
+	const signature = await getPreferencesService(platform).updateEmailSignature(locals.user.id, body.signature);
 	return json({ ok: true, signature });
 };
