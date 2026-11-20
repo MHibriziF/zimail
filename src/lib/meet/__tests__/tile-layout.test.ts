@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { layoutCallTiles, tilesPerPage, type TileRect } from '../tile-layout';
+import {
+	clampPage,
+	featuredFirst,
+	layoutCallTiles,
+	pageArrowTop,
+	placeOnPage,
+	swipeStep,
+	tilesPerPage,
+	type TileRect
+} from '../tile-layout';
 
 const inside = (width: number, height: number) => (rect: TileRect) =>
 	rect.x >= 0 &&
@@ -76,5 +85,47 @@ describe('call tile layout', () => {
 
 	test('an unmeasured stage lays nothing out', () => {
 		assert.deepEqual(layoutCallTiles(3, false, 0, 0), { pages: 1, rects: [] });
+	});
+});
+
+describe('paging the stage', () => {
+	test('the featured tile moves to the front and the rest keep their order', () => {
+		assert.deepEqual(featuredFirst(['a', 'b', 'share', 'c'], (tile) => tile === 'share'), ['share', 'a', 'b', 'c']);
+	});
+
+	test('with nothing featured the order is untouched', () => {
+		assert.deepEqual(featuredFirst(['a', 'b'], () => false), ['a', 'b']);
+	});
+
+	test('a page number is kept within the pages there are', () => {
+		assert.equal(clampPage(5, 3), 2);
+		assert.equal(clampPage(-1, 3), 0);
+		assert.equal(clampPage(1, 3), 1);
+	});
+
+	test('the arrows sit level with the strip under a share, and mid-stage otherwise', () => {
+		assert.equal(pageArrowTop({ pages: 2, rects: [{ x: 0, y: 0, width: 800, height: 400, page: null }, { x: 0, y: 412, width: 240, height: 120, page: 0 }] }), '472px');
+		assert.equal(pageArrowTop({ pages: 1, rects: [{ x: 0, y: 0, width: 800, height: 600, page: null }] }), '50%');
+	});
+
+	test('a swipe left goes forward, right goes back', () => {
+		assert.equal(swipeStep(-120, 10), 1);
+		assert.equal(swipeStep(120, -10), -1);
+	});
+
+	test('a short or mostly vertical swipe does not page', () => {
+		assert.equal(swipeStep(-30, 0), 0);
+		assert.equal(swipeStep(-80, 200), 0);
+	});
+
+	test('a tile on another page sits a page-width away and cannot be reached', () => {
+		const rect: TileRect = { x: 10, y: 20, width: 240, height: 135, page: 2 };
+		assert.deepEqual(placeOnPage(rect, 0, 1000), { left: 2010, top: 20, width: 240, height: 135, offPage: true });
+		assert.deepEqual(placeOnPage(rect, 2, 1000), { left: 10, top: 20, width: 240, height: 135, offPage: false });
+	});
+
+	test('the featured share stays put on every page', () => {
+		const rect: TileRect = { x: 0, y: 0, width: 800, height: 400, page: null };
+		assert.deepEqual(placeOnPage(rect, 3, 1000), { left: 0, top: 0, width: 800, height: 400, offPage: false });
 	});
 });

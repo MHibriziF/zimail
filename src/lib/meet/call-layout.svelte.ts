@@ -1,6 +1,12 @@
-import { layoutCallTiles, type TileRect } from './tile-layout';
-
-const SWIPE_THRESHOLD_PX = 50;
+import {
+	clampPage,
+	featuredFirst,
+	layoutCallTiles,
+	pageArrowTop,
+	placeOnPage,
+	swipeStep,
+	type TileRect
+} from './tile-layout';
 
 /**
  * Arranges the call's tiles in the grid: a featured share on the stage, the
@@ -46,7 +52,7 @@ export class CallLayout {
 	}
 
 	showPage(page: number) {
-		this.page = Math.max(0, Math.min(this.pages - 1, page));
+		this.page = clampPage(page, this.pages);
 		this.schedule();
 	}
 
@@ -58,14 +64,12 @@ export class CallLayout {
 		this.frame = 0;
 		const grid = this.grid;
 		if (!grid) return;
-		const tiles = stageTiles(grid);
-		const featured = tiles[0]?.classList.contains('call-tile-featured') ?? false;
+		const tiles = featuredFirst(visibleTiles(grid), isFeatured);
 		const { clientWidth: width, clientHeight: height } = grid;
-		const layout = layoutCallTiles(tiles.length, featured, width, height);
+		const layout = layoutCallTiles(tiles.length, tiles.length > 0 && isFeatured(tiles[0]), width, height);
 		this.pages = layout.pages;
-		this.page = Math.min(this.page, layout.pages - 1);
-		const paged = layout.rects.find((rect) => rect.page !== null);
-		this.arrowTop = paged ? `${paged.y + paged.height / 2}px` : '50%';
+		this.page = clampPage(this.page, layout.pages);
+		this.arrowTop = pageArrowTop(layout);
 		tiles.forEach((el, index) => placeTile(el, layout.rects[index], this.page, width));
 	}
 
@@ -75,30 +79,26 @@ export class CallLayout {
 
 	private handleSwipeEnd(event: PointerEvent) {
 		if (!this.swipeStart) return;
-		const dx = event.clientX - this.swipeStart.x;
-		const dy = event.clientY - this.swipeStart.y;
+		const step = swipeStep(event.clientX - this.swipeStart.x, event.clientY - this.swipeStart.y);
 		this.swipeStart = null;
-		if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return;
-		this.showPage(dx < 0 ? this.page + 1 : this.page - 1);
+		if (step) this.showPage(this.page + step);
 	}
 }
 
-/** The featured share goes first, so it is the one the layout gives the stage. */
-function stageTiles(grid: HTMLElement): HTMLElement[] {
-	const tiles = Array.from(
+const isFeatured = (el: HTMLElement) => el.classList.contains('call-tile-featured');
+
+function visibleTiles(grid: HTMLElement): HTMLElement[] {
+	return Array.from(
 		grid.querySelectorAll<HTMLElement>(':scope > .call-tile, :scope > .call-tile-group > .call-tile')
 	).filter((el) => !el.hidden);
-	const featured = tiles.find((el) => el.classList.contains('call-tile-featured'));
-	return featured ? [featured, ...tiles.filter((el) => el !== featured)] : tiles;
 }
 
-/** Tiles on other pages sit a page-width away, so changing page slides them in. */
 function placeTile(el: HTMLElement, rect: TileRect | undefined, page: number, pageWidth: number) {
 	if (!rect) return;
-	const offset = rect.page === null ? 0 : (rect.page - page) * pageWidth;
-	el.style.left = `${rect.x + offset}px`;
-	el.style.top = `${rect.y}px`;
-	el.style.width = `${rect.width}px`;
-	el.style.height = `${rect.height}px`;
-	el.inert = rect.page !== null && rect.page !== page;
+	const box = placeOnPage(rect, page, pageWidth);
+	el.style.left = `${box.left}px`;
+	el.style.top = `${box.top}px`;
+	el.style.width = `${box.width}px`;
+	el.style.height = `${box.height}px`;
+	el.inert = box.offPage;
 }
