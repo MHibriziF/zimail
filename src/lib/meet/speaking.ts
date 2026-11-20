@@ -5,10 +5,10 @@
  */
 
 /** How loud a frame is: the root mean square of its samples, 0 for silence up to 1. */
-export function rms(samples: ArrayLike<number>): number {
+export function rms(samples: Float32Array | readonly number[]): number {
 	if (samples.length === 0) return 0;
 	let sum = 0;
-	for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
+	for (const sample of samples) sum += sample * sample;
 	return Math.sqrt(sum / samples.length);
 }
 

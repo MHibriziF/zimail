@@ -88,7 +88,7 @@ export class SpeakingDetector {
 	}
 
 	stop() {
-		for (const id of [...this.watched.keys()]) this.unwatch(id);
+		for (const id of this.watched.keys()) this.unwatch(id);
 		void this.context?.close().catch(() => undefined);
 		this.context = null;
 	}
