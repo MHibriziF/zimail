@@ -64,8 +64,8 @@ export class CallCaptions {
 	/** The language this participant speaks, for their own captions; `''` lets Whisper guess. */
 	spokenLanguage = $state('');
 	private clock = $state(Date.now());
-	/** Bumped whenever the mic's underlying track may have been replaced, so capture follows it. */
-	private micTrackVersion = $state(0);
+	/** The mic's track as of its last publish or device switch; capture restarts when it changes. */
+	private micTrack = $state.raw<MediaStreamTrack | undefined>();
 
 	// Getters rather than `$derived` fields: a field initialiser would read `deps` before the constructor sets it.
 	/** This viewer wants captions: the strip is on, or the transcript is open. */
@@ -114,8 +114,7 @@ export class CallCaptions {
 		});
 
 		$effect(() => {
-			if (!this.transcribing) return;
-			void this.micTrackVersion;
+			if (!this.transcribing || !this.micTrack) return;
 			return this.capture();
 		});
 
@@ -142,7 +141,11 @@ export class CallCaptions {
 
 	/** The mic track may have been replaced (turned on, or switched), so capture should follow it. */
 	micTrackChanged() {
-		this.micTrackVersion += 1;
+		this.micTrack = this.currentMicTrack();
+	}
+
+	private currentMicTrack(): MediaStreamTrack | undefined {
+		return this.deps.room()?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
 	}
 
 	/** The host's setting, as loaded or as the host just broadcast it. */
@@ -218,7 +221,7 @@ export class CallCaptions {
 
 	/** Starts capturing this participant's mic; returns what stops it. */
 	private capture(): (() => void) | undefined {
-		const track = this.deps.room()?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track?.mediaStreamTrack;
+		const track = this.currentMicTrack();
 		if (!track) return undefined;
 		const uploader = createCaptionUploader({
 			code: this.deps.meetingCode(),
