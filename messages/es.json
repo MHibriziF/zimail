@@ -385,7 +385,14 @@
 		"emojiTravel": "Viajes y lugares",
 		"emojiObjects": "Objetos",
 		"emojiSymbols": "Símbolos",
-		"emojiFlags": "Banderas"
+		"emojiFlags": "Banderas",
+		"editHtml": "Editar como HTML",
+		"backToEditor": "Editor",
+		"htmlSource": "HTML",
+		"preview": "Vista previa",
+		"htmlSourceLabel": "Código HTML",
+		"htmlKeptAsWritten": "Este HTML tiene sus propios estilos o una página completa, así que se envía tal cual. Volver al editor los elimina.",
+		"htmlCleanedOnSave": "Las firmas solo conservan el formato básico, así que los estilos, clases y scripts se eliminan al guardar. La vista previa muestra lo que se conservará."
 	},
 	"thread": {
 		"close": "Cerrar",

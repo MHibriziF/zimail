@@ -5,6 +5,8 @@ const LINE_ENDS = 'p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote, pre, tabl
 
 export function htmlToPlainText(html: string): string {
 	const doc = new DOMParser().parseFromString(html, 'text/html');
+	// Their text is code, not words: a hand-written message's CSS would otherwise lead its plain-text copy.
+	for (const code of doc.body.querySelectorAll('style, script, template')) code.remove();
 	for (const br of doc.body.querySelectorAll('br')) br.replaceWith('\n');
 	for (const block of doc.body.querySelectorAll(LINE_ENDS)) block.append('\n');
 	for (const cell of doc.body.querySelectorAll('td, th')) cell.append(' ');

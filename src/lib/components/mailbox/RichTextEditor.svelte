@@ -1,8 +1,11 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import Icon from '../Icon.svelte';
 	import EmojiPicker from './EmojiPicker.svelte';
+	import EmailBody from './EmailBody.svelte';
 	import { t } from '$lib/i18n';
 	import { linkHtml, normalizeLinkUrl } from '$lib/utils/links';
+	import { needsHtmlMode, richEditorHtml } from '$lib/mail/editor-html';
 
 	let {
 		html = $bindable(''),
@@ -33,6 +36,26 @@
 	let editor = $state<HTMLDivElement | null>(null);
 
 	/**
+	 * `html` edits the source in a plain text box and `preview` shows it the way the reader shows
+	 * received mail. Neither renders it in the editor, which is part of the app's own page: a
+	 * style tag there would restyle the app, and a handler would run in it.
+	 */
+	let mode = $state<'rich' | 'html' | 'preview'>(untrack(() => (needsHtmlMode(html) ? 'html' : 'rich')));
+	/** A signature is cleaned when it is saved, so its preview shows what will be kept. */
+	const previewHtml = $derived(cleanPaste ? cleanPaste(html) : html);
+	/** A signature never goes out as written; a message with its own styles always does. */
+	const modeNote = $derived.by(() => {
+		if (mode === 'rich') return '';
+		if (cleanPaste) return previewHtml === html ? '' : t('compose.htmlCleanedOnSave');
+		return needsHtmlMode(html) ? t('compose.htmlKeptAsWritten') : '';
+	});
+
+	function backToEditor() {
+		html = cleanPaste ? cleanPaste(html) : richEditorHtml(html);
+		mode = 'rich';
+	}
+
+	/**
 	 * Seed the editable div from `html`.
 	 *
 	 * A contenteditable is not a controlled input: the binding only ever ran
@@ -47,9 +70,10 @@
 	 */
 	$effect(() => {
 		const incoming = html;
-		if (editor && incoming !== editor.innerHTML) {
-			editor.innerHTML = incoming;
-		}
+		if (!editor || incoming === editor.innerHTML) return;
+		// A draft written in HTML mode reopens there rather than being cut down to fit the editor.
+		if (needsHtmlMode(incoming)) mode = 'html';
+		else editor.innerHTML = incoming;
 	});
 
 	function exec(command: string, value?: string) {
@@ -110,7 +134,7 @@
 
 	/** Keeps html in step after the content was changed from outside, such as resizing an image. */
 	export function sync() {
-		html = editor?.innerHTML ?? '';
+		if (editor) html = editor.innerHTML;
 	}
 
 	/** Remembers the cursor before focus leaves the editor, such as for a file picker. */
@@ -129,6 +153,10 @@
 	}
 
 	export function insertHtml(markup: string) {
+		if (mode !== 'rich') {
+			html = `${html}${markup}`;
+			return;
+		}
 		placeAtSavedSelection();
 		document.execCommand('insertHTML', false, markup);
 		sync();
@@ -280,30 +308,57 @@
 
 <div class="editor-shell" class:editor-shell-embedded={embedded} class:editor-shell-fill={fill}>
 	<div class="toolbar">
-		{#each tools as tool (tool.command)}
+		{#if mode === 'rich'}
+			{#each tools as tool (tool.command)}
+				<button
+					type="button"
+					class="icon-btn"
+					title={tool.label}
+					aria-label={tool.label}
+					onmousedown={(event) => event.preventDefault()}
+					onclick={() => handleTool(tool)}
+				>
+					<Icon name={tool.icon} size={16} />
+				</button>
+			{/each}
 			<button
 				type="button"
 				class="icon-btn"
-				title={tool.label}
-				aria-label={tool.label}
+				title={t('compose.emoji')}
+				aria-label={t('compose.emoji')}
 				onmousedown={(event) => event.preventDefault()}
-				onclick={() => handleTool(tool)}
+				onpointerenter={() => emojiPicker?.preload()}
+				onfocus={() => emojiPicker?.preload()}
+				onclick={openEmoji}
 			>
-				<Icon name={tool.icon} size={16} />
+				<Icon name="emotion-happy-line" size={16} />
 			</button>
-		{/each}
-		<button
-			type="button"
-			class="icon-btn"
-			title={t('compose.emoji')}
-			aria-label={t('compose.emoji')}
-			onmousedown={(event) => event.preventDefault()}
-			onpointerenter={() => emojiPicker?.preload()}
-			onfocus={() => emojiPicker?.preload()}
-			onclick={openEmoji}
-		>
-			<Icon name="emotion-happy-line" size={16} />
-		</button>
+			<button
+				type="button"
+				class="icon-btn"
+				title={t('compose.editHtml')}
+				aria-label={t('compose.editHtml')}
+				onmousedown={(event) => event.preventDefault()}
+				onclick={() => (mode = 'html')}
+			>
+				<Icon name="code-s-slash-line" size={16} />
+			</button>
+		{:else}
+			<button type="button" class="mode-btn" onclick={backToEditor}>
+				<Icon name="arrow-left-s-line" size={16} />
+				{t('compose.backToEditor')}
+			</button>
+			<div class="mode-tabs" role="tablist">
+				<button type="button" role="tab" aria-selected={mode === 'html'} onclick={() => (mode = 'html')}>
+					<Icon name="code-s-slash-line" size={14} />
+					{t('compose.htmlSource')}
+				</button>
+				<button type="button" role="tab" aria-selected={mode === 'preview'} onclick={() => (mode = 'preview')}>
+					<Icon name="eye-line" size={14} />
+					{t('compose.preview')}
+				</button>
+			</div>
+		{/if}
 		{@render toolbarExtra?.()}
 		{#if toolbarEnd}
 			<div class="toolbar-end">
@@ -312,20 +367,41 @@
 		{/if}
 	</div>
 
-	<div
-		bind:this={editor}
-		contenteditable="true"
-		role="textbox"
-		tabindex="0"
-		aria-multiline="true"
-		class="editor prose prose-sm max-w-none px-4 py-3 outline-none"
-		style:--editor-min-height="{minHeight}px"
-		data-placeholder={placeholder}
-		oninput={handleInput}
-		onpaste={handlePaste}
-		onclick={handleEditorClick}
-		onkeydown={handleEditorKey}
-	></div>
+	{#if modeNote}
+		<p class="mode-note">{modeNote}</p>
+	{/if}
+
+	{#if mode === 'html'}
+		<textarea
+			class="source"
+			style:--editor-min-height="{minHeight}px"
+			bind:value={html}
+			aria-label={t('compose.htmlSourceLabel')}
+			placeholder="<p>…</p>"
+			spellcheck="false"
+			autocomplete="off"
+			autocapitalize="off"
+		></textarea>
+	{:else if mode === 'preview'}
+		<div class="preview" style:--editor-min-height="{minHeight}px">
+			<EmailBody html={previewHtml} remote originalColours />
+		</div>
+	{:else}
+		<div
+			bind:this={editor}
+			contenteditable="true"
+			role="textbox"
+			tabindex="0"
+			aria-multiline="true"
+			class="editor prose prose-sm max-w-none px-4 py-3 outline-none"
+			style:--editor-min-height="{minHeight}px"
+			data-placeholder={placeholder}
+			oninput={handleInput}
+			onpaste={handlePaste}
+			onclick={handleEditorClick}
+			onkeydown={handleEditorKey}
+		></div>
+	{/if}
 
 	<EmojiPicker bind:this={emojiPicker} onpick={insertEmoji} onclose={restoreSelection} />
 
@@ -405,6 +481,77 @@
 		color: var(--color-text);
 	}
 
+	.mode-btn,
+	.mode-tabs button {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		height: 1.875rem;
+		padding: 0 0.625rem;
+		border-radius: 0.5rem;
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+	}
+
+	.mode-btn:hover,
+	.mode-tabs button:hover {
+		background: var(--color-surface-hover);
+	}
+
+	.mode-tabs {
+		display: flex;
+		gap: 0.125rem;
+		margin-left: 0.25rem;
+		padding: 0.125rem;
+		border-radius: 0.625rem;
+		background: var(--color-surface-muted);
+	}
+
+	.mode-tabs button[aria-selected='true'] {
+		color: var(--color-text);
+		background: var(--color-surface);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.mode-note {
+		margin: 0;
+		padding: 0 1rem 0.375rem;
+		font-size: 0.75rem;
+		color: var(--color-text-secondary);
+	}
+
+	.source {
+		display: block;
+		width: 100%;
+		min-height: var(--editor-min-height, 240px);
+		padding: 0.75rem 1rem;
+		border: none;
+		resize: vertical;
+		font: 0.8125rem/1.55 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+		tab-size: 2;
+		color: var(--color-text);
+		background: var(--color-surface-muted);
+		outline: none;
+	}
+
+	.preview {
+		min-height: var(--editor-min-height, 240px);
+		padding: 0.75rem 1rem;
+	}
+
+	.editor-shell-embedded .source,
+	.editor-shell-embedded .preview,
+	.editor-shell-embedded .mode-note {
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	.editor-shell-embedded .source {
+		padding: 0.75rem;
+		border-radius: 0.5rem;
+	}
+
 	@media (max-width: 900px) {
 		.toolbar .icon-btn {
 			width: var(--touch-target);
@@ -437,6 +584,17 @@
 			align-items: center;
 			gap: 0.125rem;
 			margin-left: auto;
+		}
+
+		.editor-shell-fill .source,
+		.editor-shell-fill .preview {
+			flex: 1;
+			min-height: 8rem;
+			overflow-y: auto;
+		}
+
+		.source {
+			font-size: 16px;
 		}
 
 		.editor-shell-fill .editor {
