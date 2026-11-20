@@ -43,15 +43,11 @@ export class CallLayout {
 				this.frame = 0;
 			};
 		});
-
-		$effect(() => {
-			void this.page;
-			this.schedule();
-		});
 	}
 
 	showPage(page: number) {
 		this.page = Math.max(0, Math.min(this.pages - 1, page));
+		this.schedule();
 	}
 
 	private schedule() {
