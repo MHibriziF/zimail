@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
 	clampPage,
-	featuredFirst,
 	layoutCallTiles,
 	pageArrowTop,
 	placeOnPage,
+	promoteSpeakers,
+	reconcileOrder,
 	swipeStep,
 	tilesPerPage,
 	type TileRect
@@ -89,14 +90,6 @@ describe('call tile layout', () => {
 });
 
 describe('paging the stage', () => {
-	test('the featured tile moves to the front and the rest keep their order', () => {
-		assert.deepEqual(featuredFirst(['a', 'b', 'share', 'c'], (tile) => tile === 'share'), ['share', 'a', 'b', 'c']);
-	});
-
-	test('with nothing featured the order is untouched', () => {
-		assert.deepEqual(featuredFirst(['a', 'b'], () => false), ['a', 'b']);
-	});
-
 	test('a page number is kept within the pages there are', () => {
 		assert.equal(clampPage(5, 3), 2);
 		assert.equal(clampPage(-1, 3), 0);
@@ -127,5 +120,28 @@ describe('paging the stage', () => {
 	test('the featured share stays put on every page', () => {
 		const rect: TileRect = { x: 0, y: 0, width: 800, height: 400, page: null };
 		assert.deepEqual(placeOnPage(rect, 3, 1000), { left: 0, top: 0, width: 800, height: 400, offPage: false });
+	});
+});
+
+describe('who goes where in the grid', () => {
+	test('tiles keep their places as people come and go, and newcomers join the end', () => {
+		assert.deepEqual(reconcileOrder(['c', 'a', 'b'], ['a', 'b', 'c', 'd']), ['c', 'a', 'b', 'd']);
+		assert.deepEqual(reconcileOrder(['c', 'a', 'b'], ['a', 'b']), ['a', 'b']);
+		assert.deepEqual(reconcileOrder([], ['x', 'y']), ['x', 'y']);
+	});
+
+	test('someone speaking on a page out of view comes to the front', () => {
+		const firstPageOnly = (index: number) => index < 2;
+		assert.deepEqual(promoteSpeakers(['a', 'b', 'c', 'd'], new Set(['d']), firstPageOnly), ['d', 'a', 'b', 'c']);
+	});
+
+	test('someone speaking who is already in view stays where they are', () => {
+		const order = ['a', 'b', 'c'];
+		assert.deepEqual(promoteSpeakers(order, new Set(['b']), () => true), order);
+	});
+
+	test('several people speaking out of view come forward in their own order', () => {
+		const firstPageOnly = (index: number) => index < 1;
+		assert.deepEqual(promoteSpeakers(['a', 'b', 'c', 'd'], new Set(['d', 'b']), firstPageOnly), ['b', 'd', 'a', 'c']);
 	});
 });

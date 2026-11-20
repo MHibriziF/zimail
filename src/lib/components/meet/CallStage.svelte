@@ -26,6 +26,8 @@
 	import { colorFor, initialsFor } from '$lib/meet/avatar';
 	import { CallPictureInPicture } from '$lib/meet/call-pip.svelte';
 	import { CallLayout } from '$lib/meet/call-layout.svelte';
+	import { tileControls } from '$lib/meet/tile-controls';
+	import { featuredTileKey, nextPin, personTileKey, pinAfterRemoval, screenTileKey } from '$lib/meet/tile-focus';
 	import { parseRecordingAttribute, type RecordingKind } from '$lib/meet/recording-kind';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
 	import {
@@ -178,9 +180,24 @@
 	const requestChimeGate = createRequestChimeGate();
 	/** Active shares, oldest first. */
 	let shareOrder = $state<string[]>([]);
-	/** A share the viewer clicked to watch instead of the newest. */
-	let pinnedShare = $state<string | null>(null);
-	const featuredShare = $derived(pickFeaturedShare(shareOrder, pinnedShare, LOCAL_SHARE_KEY));
+	/** The tile the viewer clicked to watch large, a person's or a share's; `null` lets the newest share have the stage. */
+	let pinned = $state<string | null>(null);
+	const featuredShare = $derived(pickFeaturedShare(shareOrder, null, LOCAL_SHARE_KEY));
+	const featuredKey = $derived(featuredTileKey(pinned, featuredShare));
+	const LOCAL_PERSON_TILE = personTileKey(LOCAL_SHARE_KEY);
+	const LOCAL_SCREEN_TILE = screenTileKey(LOCAL_SHARE_KEY);
+	/** Whether LiveKit hears this participant speaking; remote tiles get a class instead. */
+	let localSpeaking = $state(false);
+	const tileControlOptions = (zoomable: boolean) => ({
+		zoomable,
+		labels: {
+			fullscreen: t('meet.fullscreen'),
+			exitFullscreen: t('meet.exitFullscreen'),
+			zoomIn: t('meet.zoomIn'),
+			zoomOut: t('meet.zoomOut'),
+			resetZoom: t('meet.zoomReset')
+		}
+	});
 	let ownShareStartedAt = 0;
 	let notice = $state('');
 	let noticeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -305,9 +322,16 @@
 	const remoteTiles = new Map<string, Tile>();
 	const screenTiles = new Map<string, Tile>();
 
-	function createTile(identity: string, label: string, extraClass = ''): Tile {
+	function createTile(identity: string, label: string, kind: 'person' | 'screen'): Tile {
 		const el = document.createElement('div');
-		el.className = extraClass ? `call-tile ${extraClass}` : 'call-tile';
+		el.className = kind === 'screen' ? 'call-tile call-tile-screen' : 'call-tile';
+		const key = kind === 'screen' ? screenTileKey(identity) : personTileKey(identity);
+		el.dataset.tileKey = key;
+		el.tabIndex = 0;
+		el.setAttribute('role', 'button');
+		el.title = t('meet.focusTile');
+		el.addEventListener('click', (event) => handleTileClick(event, key));
+		el.addEventListener('keydown', (event) => handleTileKey(event, key));
 
 		const avatar = document.createElement('div');
 		avatar.className = 'call-tile-avatar';
@@ -352,6 +376,7 @@
 		}
 
 		el.append(avatar, media, status, handIcon, nameRow);
+		tileControls(el, tileControlOptions(kind === 'screen'));
 		return { el, avatar, nameEl: name, media, micIcon, cameraIcon, deafenedIcon, handIcon };
 	}
 
@@ -396,7 +421,7 @@
 	function ensureRemoteTile(participant: Participant): Tile {
 		let tile = remoteTiles.get(participant.identity);
 		if (!tile) {
-			tile = createTile(participant.identity, participant.name || t('meet.guest'));
+			tile = createTile(participant.identity, participant.name || t('meet.guest'), 'person');
 			remoteContainerEl?.appendChild(tile.el);
 			remoteTiles.set(participant.identity, tile);
 			remoteCount = remoteTiles.size;
@@ -450,17 +475,7 @@
 		let tile = screenTiles.get(participant.identity);
 		if (!tile) {
 			const identity = participant.identity;
-			tile = createTile(identity, t('meet.screenShareOf', { name: participant.name || t('meet.guest') }), 'call-tile-screen');
-			tile.el.tabIndex = 0;
-			tile.el.setAttribute('role', 'button');
-			tile.el.title = t('meet.focusScreenShare');
-			tile.el.addEventListener('click', () => focusShare(identity));
-			tile.el.addEventListener('keydown', (event) => {
-				if (event.key === 'Enter' || event.key === ' ') {
-					event.preventDefault();
-					focusShare(identity);
-				}
-			});
+			tile = createTile(identity, t('meet.screenShareOf', { name: participant.name || t('meet.guest') }), 'screen');
 			remoteContainerEl?.appendChild(tile.el);
 			screenTiles.set(identity, tile);
 		}
@@ -480,27 +495,53 @@
 	function addShare(key: string) {
 		if (shareOrder.includes(key)) return;
 		shareOrder = [...shareOrder, key];
-		pinnedShare = null;
+		pinned = null;
 	}
 
 	function removeShare(key: string) {
 		shareOrder = shareOrder.filter((entry) => entry !== key);
+		pinned = pinAfterRemoval(pinned, [screenTileKey(key)]);
 	}
 
-	function focusShare(key: string) {
-		pinnedShare = key;
+	function focusTile(key: string) {
+		if (layout.justSwiped()) return;
+		pinned = nextPin(key, featuredKey);
+	}
+
+	/** A button inside a tile (its controls, Retry) does its own job rather than moving the tile. */
+	function handleTileClick(event: MouseEvent, key: string) {
+		if ((event.target as HTMLElement).closest('button')) return;
+		focusTile(key);
+	}
+
+	function handleTileKey(event: KeyboardEvent, key: string) {
+		if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
+		event.preventDefault();
+		focusTile(key);
+	}
+
+	function tileTitle(key: string): string {
+		if (key !== featuredKey) return t('meet.focusTile');
+		return pinned === key ? t('meet.unfocusTile') : '';
 	}
 
 	// Remote tiles are hand-built DOM, so the featured class has to be pushed onto them.
 	$effect(() => {
-		const featured = featuredShare;
-		shareOrder;
-		for (const [identity, tile] of screenTiles) {
-			const isFeatured = identity === featured;
-			tile.el.classList.toggle('call-tile-featured', isFeatured);
-			tile.el.setAttribute('aria-pressed', String(isFeatured));
+		const featured = featuredKey;
+		for (const tile of [...remoteTiles.values(), ...screenTiles.values()]) {
+			const key = tile.el.dataset.tileKey ?? '';
+			tile.el.classList.toggle('call-tile-featured', key === featured);
+			tile.el.classList.toggle('call-tile-pinned', key === pinned);
+			tile.el.setAttribute('aria-pressed', String(key === featured));
+			tile.el.title = tileTitle(key);
 		}
 	});
+
+	function handleActiveSpeakers(speakers: Participant[]) {
+		const speaking = new Set(speakers.map((participant) => participant.identity));
+		for (const [identity, tile] of remoteTiles) tile.el.classList.toggle('call-tile-speaking', speaking.has(identity));
+		localSpeaking = room !== null && speaking.has(room.localParticipant.identity);
+	}
 
 	function attachRemoteTrack(
 		track: RemoteTrack,
@@ -556,6 +597,7 @@
 			remoteCount = remoteTiles.size;
 		}
 		removeScreenTile(participant.identity);
+		pinned = pinAfterRemoval(pinned, [personTileKey(participant.identity)]);
 		requestChimeGate.forget(participant.identity);
 		handNoticeGate.forget(participant.identity);
 		reactionLimiter.forget(participant.identity);
@@ -824,6 +866,7 @@
 		instance.on(RoomEvent.ParticipantNameChanged, handleParticipantNameChanged);
 		instance.on(RoomEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
 		instance.on(RoomEvent.TrackPublished, handleRemoteTrackPublished);
+		instance.on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
 
 		instance.registerTextStreamHandler(CHAT_TOPIC, async (reader, participantInfo) => {
 			const text = await reader.readAll();
@@ -868,6 +911,7 @@
 			instance.off(RoomEvent.ParticipantNameChanged, handleParticipantNameChanged);
 			instance.off(RoomEvent.ParticipantPermissionsChanged, handlePermissionsChanged);
 			instance.off(RoomEvent.TrackPublished, handleRemoteTrackPublished);
+			instance.off(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakers);
 			instance.unregisterTextStreamHandler(CHAT_TOPIC);
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_REQUEST_TOPIC);
 			instance.unregisterTextStreamHandler(SCREEN_SHARE_DECLINED_TOPIC);
@@ -1463,19 +1507,17 @@
 			<div class="call-grid" bind:this={layout.grid}>
 				<div
 					class="call-tile call-tile-screen"
-					class:call-tile-featured={featuredShare === LOCAL_SHARE_KEY}
+					class:call-tile-featured={featuredKey === LOCAL_SCREEN_TILE}
+					class:call-tile-pinned={pinned === LOCAL_SCREEN_TILE}
+					data-tile-key={LOCAL_SCREEN_TILE}
 					hidden={!screenShareEnabled}
 					role="button"
 					tabindex="0"
-					title={t('meet.focusScreenShare')}
-					aria-pressed={featuredShare === LOCAL_SHARE_KEY}
-					onclick={() => focusShare(LOCAL_SHARE_KEY)}
-					onkeydown={(event) => {
-						if (event.key === 'Enter' || event.key === ' ') {
-							event.preventDefault();
-							focusShare(LOCAL_SHARE_KEY);
-						}
-					}}
+					title={tileTitle(LOCAL_SCREEN_TILE)}
+					aria-pressed={featuredKey === LOCAL_SCREEN_TILE}
+					onclick={(event) => handleTileClick(event, LOCAL_SCREEN_TILE)}
+					onkeydown={(event) => handleTileKey(event, LOCAL_SCREEN_TILE)}
+					use:tileControls={tileControlOptions(true)}
 				>
 					<div class="call-tile-media" bind:this={localScreenMediaEl}></div>
 					<span class="call-tile-name">
@@ -1486,6 +1528,17 @@
 					class="call-tile call-tile-local"
 					class:call-tile-joining={connecting || connectionError}
 					class:call-tile-hand-raised={handRaisedAt !== null}
+					class:call-tile-speaking={localSpeaking}
+					class:call-tile-featured={featuredKey === LOCAL_PERSON_TILE}
+					class:call-tile-pinned={pinned === LOCAL_PERSON_TILE}
+					data-tile-key={LOCAL_PERSON_TILE}
+					role="button"
+					tabindex="0"
+					title={tileTitle(LOCAL_PERSON_TILE)}
+					aria-pressed={featuredKey === LOCAL_PERSON_TILE}
+					onclick={(event) => handleTileClick(event, LOCAL_PERSON_TILE)}
+					onkeydown={(event) => handleTileKey(event, LOCAL_PERSON_TILE)}
+					use:tileControls={tileControlOptions(false)}
 				>
 					<div class="call-tile-avatar" style="background: {localColor}">{localInitials}</div>
 					<div class="call-tile-media" bind:this={localMediaEl}></div>
@@ -1521,7 +1574,7 @@
 				</div>
 				<div class="call-tile-group" bind:this={remoteContainerEl}></div>
 				{#if !connecting && !connectionError && remoteCount === 0}
-					<div class="call-tile call-tile-placeholder">
+					<div class="call-tile call-tile-placeholder" data-tile-key="placeholder">
 						<span>{t('meet.waitingForOthers')}</span>
 					</div>
 				{/if}
@@ -2133,6 +2186,8 @@
 		position: relative;
 		width: 100%;
 		height: 100%;
+		/* Zoom's translate-then-scale assumes the top-left corner. */
+		transform-origin: 0 0;
 	}
 
 	:global(.call-tile-media video) {
@@ -2179,17 +2234,125 @@
 
 	:global(.call-tile-screen) {
 		background: #000;
+	}
+
+	/* Clicking a tile puts it on the stage (CallLayout gives the featured tile the stage). */
+	:global(.call-tile[role='button']) {
 		cursor: pointer;
 	}
 
-	/* The share being watched; CallLayout gives it the stage. */
-	:global(.call-tile-featured) {
+	/* The share picked automatically: clicking it has nothing to give back. */
+	:global(.call-tile-featured:not(.call-tile-pinned)) {
 		cursor: default;
 	}
 
-	:global(.call-tile-screen:focus-visible) {
+	:global(.call-tile[role='button']:focus-visible) {
 		outline: 2px solid rgba(255, 255, 255, 0.6);
 		outline-offset: 2px;
+	}
+
+	/* An overlay rather than the tile's own shadow, which the video would cover. */
+	:global(.call-tile::after) {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		box-shadow:
+			inset 0 0 0 3px #4ade80,
+			inset 0 0 18px rgba(74, 222, 128, 0.35);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.2s ease;
+	}
+
+	:global(.call-tile-speaking::after) {
+		opacity: 1;
+	}
+
+	:global(.call-tile:fullscreen) {
+		border-radius: 0;
+		background: #000;
+	}
+
+	:global(.call-tile-zoomed) {
+		cursor: grab;
+	}
+
+	:global(.call-tile-zoomed:active) {
+		cursor: grabbing;
+	}
+
+	:global(.call-tile-controls) {
+		position: absolute;
+		right: 0.5rem;
+		bottom: 0.5rem;
+		display: flex;
+		gap: 0.25rem;
+		opacity: 0;
+		transition: opacity 0.15s ease;
+	}
+
+	:global(.call-tile:hover .call-tile-controls),
+	:global(.call-tile:focus-within .call-tile-controls),
+	:global(.call-tile:fullscreen .call-tile-controls) {
+		opacity: 1;
+	}
+
+	/* Nothing to hover with on a touch screen. */
+	@media (hover: none) {
+		:global(.call-tile-controls) {
+			opacity: 1;
+		}
+	}
+
+	:global(.call-tile-zoom) {
+		display: none;
+		gap: 0.25rem;
+	}
+
+	:global(.call-tile-featured .call-tile-zoom),
+	:global(.call-tile:fullscreen .call-tile-zoom) {
+		display: flex;
+	}
+
+	:global(.call-tile-control) {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.75rem;
+		height: 1.75rem;
+		padding: 0;
+		border: none;
+		border-radius: 999px;
+		font-size: 1rem;
+		color: #fff;
+		background: rgba(0, 0, 0, 0.6);
+		cursor: pointer;
+	}
+
+	:global(.call-tile-control:hover:not(:disabled)) {
+		background: rgba(0, 0, 0, 0.85);
+	}
+
+	:global(.call-tile-control:disabled) {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	:global(.call-tile-control[hidden]) {
+		display: none;
+	}
+
+	:global(.call-tile-control:focus-visible) {
+		outline: 2px solid rgba(255, 255, 255, 0.6);
+		outline-offset: 1px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		:global(.call-tile::after),
+		:global(.call-tile-controls) {
+			transition: none;
+		}
 	}
 
 	:global(.call-tile-screen .call-tile-media video) {
