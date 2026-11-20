@@ -111,3 +111,39 @@ export function layoutCallTiles(count: number, featured: boolean, width: number,
 	const rest = strip(count - 1, stage.height + GAP, width, stripHeight, aspect);
 	return { pages: rest.pages, rects: [stage, ...rest.rects] };
 }
+
+/** The featured tile goes first, so it is the one the layout gives the stage. */
+export function featuredFirst<T>(tiles: readonly T[], isFeatured: (tile: T) => boolean): T[] {
+	const featured = tiles.find(isFeatured);
+	return featured === undefined ? [...tiles] : [featured, ...tiles.filter((tile) => tile !== featured)];
+}
+
+export function clampPage(page: number, pages: number): number {
+	return Math.max(0, Math.min(pages - 1, page));
+}
+
+/** Level with the paged tiles, so under a screen share the arrows sit by the strip, not over the screen. */
+export function pageArrowTop(layout: TileLayout): string {
+	const paged = layout.rects.find((rect) => rect.page !== null);
+	return paged ? `${paged.y + paged.height / 2}px` : '50%';
+}
+
+const SWIPE_THRESHOLD_PX = 50;
+
+/** How many pages a swipe moves: 1 forward for a swipe left, -1 back, 0 for one too short or mostly vertical. */
+export function swipeStep(dx: number, dy: number): number {
+	if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return 0;
+	return dx < 0 ? 1 : -1;
+}
+
+/** A tile's box on the page being shown. Tiles on other pages sit a page-width away, so changing page slides them in. */
+export function placeOnPage(rect: TileRect, page: number, pageWidth: number) {
+	const offset = rect.page === null ? 0 : (rect.page - page) * pageWidth;
+	return {
+		left: rect.x + offset,
+		top: rect.y,
+		width: rect.width,
+		height: rect.height,
+		offPage: rect.page !== null && rect.page !== page
+	};
+}
