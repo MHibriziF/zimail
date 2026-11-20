@@ -103,7 +103,7 @@ function startTicker(onTick: () => void): () => void {
 }
 
 /** Fits a frame into a rect: `cover` crops a camera to fill its tile, `contain` keeps a whole screen visible. */
-function fit(sourceWidth: number, sourceHeight: number, rect: Rect, mode: 'cover' | 'contain'): Rect {
+export function fit(sourceWidth: number, sourceHeight: number, rect: Rect, mode: 'cover' | 'contain'): Rect {
 	const scale =
 		mode === 'cover'
 			? Math.max(rect.width / sourceWidth, rect.height / sourceHeight)
@@ -113,7 +113,7 @@ function fit(sourceWidth: number, sourceHeight: number, rect: Rect, mode: 'cover
 	return { x: rect.x + (rect.width - width) / 2, y: rect.y + (rect.height - height) / 2, width, height };
 }
 
-function drawAvatar(ctx: CanvasRenderingContext2D, source: CompositeSource, rect: Rect): void {
+export function drawAvatar(ctx: CanvasRenderingContext2D, source: CompositeSource, rect: Rect): void {
 	ctx.fillStyle = '#1c1c21';
 	ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
 	const radius = Math.min(rect.width, rect.height) * 0.18;
@@ -128,7 +128,7 @@ function drawAvatar(ctx: CanvasRenderingContext2D, source: CompositeSource, rect
 	ctx.fillText(source.initials, rect.x + rect.width / 2, rect.y + rect.height / 2);
 }
 
-function drawLabel(ctx: CanvasRenderingContext2D, label: string, rect: Rect): void {
+export function drawLabel(ctx: CanvasRenderingContext2D, label: string, rect: Rect): void {
 	const size = Math.max(12, Math.min(18, rect.height / 12));
 	ctx.font = `500 ${size}px system-ui, sans-serif`;
 	ctx.textAlign = 'left';
