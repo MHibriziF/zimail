@@ -19,8 +19,10 @@ function within(view: ZoomView): ZoomView {
 	return { scale, x: clamp(view.x, 1 - scale, 0), y: clamp(view.y, 1 - scale, 0) };
 }
 
+const CENTRE = { x: 0.5, y: 0.5 };
+
 /** Zooms by `factor` about a point given as a fraction of the tile, so what is under it stays put. */
-export function zoomAt(view: ZoomView, factor: number, at = { x: 0.5, y: 0.5 }): ZoomView {
+export function zoomAt(view: ZoomView, factor: number, at: { x: number; y: number } = CENTRE): ZoomView {
 	const scale = clamp(view.scale * factor, 1, MAX_ZOOM);
 	const ratio = scale / view.scale;
 	return within({ scale, x: at.x - (at.x - view.x) * ratio, y: at.y - (at.y - view.y) * ratio });

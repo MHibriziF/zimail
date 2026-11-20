@@ -85,8 +85,8 @@ export class CallLayout {
 		const offset = stage ? 1 : 0;
 		const speaking = new Set(others.filter(isSpeaking).map(keyOf));
 		this.order = promoteSpeakers(reconcileOrder(this.order, [...byKey.keys()]), speaking, (index) => {
-			const rect = layout.rects[index + offset];
-			return !rect || rect.page === null || rect.page === this.page;
+			// The stage (page null) is on every page.
+			return (layout.rects[index + offset]?.page ?? this.page) === this.page;
 		});
 		const tiles = this.order.map((key) => byKey.get(key)).filter((el) => el !== undefined);
 		if (stage) tiles.unshift(stage);
