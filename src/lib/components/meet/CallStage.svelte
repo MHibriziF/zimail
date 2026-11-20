@@ -592,7 +592,6 @@
 		showTilePage(dx < 0 ? tilePage + 1 : tilePage - 1);
 	}
 
-	/** Routes one attached remote element to the chosen output device, if a non-default one is picked. */
 	function attachRemoteTrack(
 		track: RemoteTrack,
 		_publication: RemoteTrackPublication,
