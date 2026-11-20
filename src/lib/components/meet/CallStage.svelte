@@ -27,6 +27,7 @@
 	import { CallPictureInPicture } from '$lib/meet/call-pip.svelte';
 	import { CallLayout } from '$lib/meet/call-layout.svelte';
 	import { tileControls } from '$lib/meet/tile-controls';
+	import { SpeakingDetector } from '$lib/meet/speaking-detector';
 	import { featuredTileKey, nextPin, personTileKey, pinAfterRemoval, screenTileKey } from '$lib/meet/tile-focus';
 	import { parseRecordingAttribute, type RecordingKind } from '$lib/meet/recording-kind';
 	import { cooldownSecondsLeft, createRequestChimeGate } from '$lib/meet/share-request-throttle';
@@ -132,7 +133,13 @@
 	let micEnabled = $state(untrack(() => initialMicEnabled));
 	let cameraEnabled = $state(untrack(() => initialCameraEnabled));
 	const devices = new CallDevices(
-		{ room: () => room, onMicChanged: () => captions.micTrackChanged() },
+		{
+			room: () => room,
+			onMicChanged: () => {
+				captions.micTrackChanged();
+				watchLocalMic();
+			}
+		},
 		{ micId: untrack(() => initialMicDeviceId), cameraId: untrack(() => initialCameraDeviceId) }
 	);
 	let backgroundOption = $state(untrack(() => initialBackgroundOption));
@@ -537,8 +544,22 @@
 		}
 	});
 
-	function handleActiveSpeakers(speakers: Participant[]) {
-		const speaking = new Set(speakers.map((participant) => participant.identity));
+	const speakers = new SpeakingDetector(showSpeaking);
+
+	function showSpeaking(identity: string, speaking: boolean) {
+		if (room && identity === room.localParticipant.identity) localSpeaking = speaking;
+		else remoteTiles.get(identity)?.el.classList.toggle('call-tile-speaking', speaking);
+	}
+
+	function watchLocalMic() {
+		const track = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
+		if (room && track) speakers.watch(room.localParticipant.identity, track.mediaStreamTrack);
+	}
+
+	/** The server's view of who is speaking, a beat behind; only used while this browser can't measure it itself. */
+	function handleActiveSpeakers(activeSpeakers: Participant[]) {
+		if (speakers.running) return;
+		const speaking = new Set(activeSpeakers.map((participant) => participant.identity));
 		for (const [identity, tile] of remoteTiles) tile.el.classList.toggle('call-tile-speaking', speaking.has(identity));
 		localSpeaking = room !== null && speaking.has(room.localParticipant.identity);
 	}
@@ -564,6 +585,7 @@
 		if (track.kind === Track.Kind.Audio && deafened) el.muted = true;
 		tile.media.appendChild(el);
 		if (track.kind === Track.Kind.Audio) recorder.remoteAudioAdded(track.mediaStreamTrack);
+		if (track.source === Track.Source.Microphone) speakers.watch(participant.identity, track.mediaStreamTrack);
 		if (pip.active && track.kind === Track.Kind.Video) pip.refreshVideo();
 	}
 
@@ -576,6 +598,7 @@
 		// off, or a full unpublish) is all it takes for the avatar to show again.
 		for (const el of track.detach()) el.remove();
 		if (track.kind === Track.Kind.Audio) recorder.remoteAudioRemoved(track.mediaStreamTrack);
+		if (track.source === Track.Source.Microphone) speakers.unwatch(participant.identity, track.mediaStreamTrack);
 		// The screen tile has no avatar fallback, so it only makes sense while sharing.
 		if (track.source === Track.Source.ScreenShare) removeScreenTile(participant.identity);
 		if (pip.active && track.kind === Track.Kind.Video) pip.refreshVideo();
@@ -598,6 +621,7 @@
 		}
 		removeScreenTile(participant.identity);
 		pinned = pinAfterRemoval(pinned, [personTileKey(participant.identity)]);
+		speakers.unwatch(participant.identity);
 		requestChimeGate.forget(participant.identity);
 		handNoticeGate.forget(participant.identity);
 		reactionLimiter.forget(participant.identity);
@@ -735,6 +759,7 @@
 		if (publication.source === Track.Source.Microphone && publication.track) {
 			recorder.micPublished(publication.track.mediaStreamTrack);
 			captions.micTrackChanged();
+			watchLocalMic();
 		}
 		if (publication.source !== Track.Source.ScreenShare || !publication.track) return;
 		screenShareEnabled = true;
@@ -925,6 +950,7 @@
 		// However the call ends — Leave, a dropped connection, closing the page — keep what was recorded.
 		void recorder.finish();
 		room?.disconnect();
+		speakers.stop();
 		pip.close();
 		stopAdmissionsPolling();
 		releasePendingScreenShare();
@@ -2262,11 +2288,13 @@
 			inset 0 0 18px rgba(74, 222, 128, 0.35);
 		opacity: 0;
 		pointer-events: none;
-		transition: opacity 0.2s ease;
+		/* Slow to fade out, quick to light: the detector already holds through pauses. */
+		transition: opacity 0.25s ease;
 	}
 
 	:global(.call-tile-speaking::after) {
 		opacity: 1;
+		transition-duration: 0.06s;
 	}
 
 	:global(.call-tile:fullscreen) {
