@@ -112,12 +112,6 @@ export function layoutCallTiles(count: number, featured: boolean, width: number,
 	return { pages: rest.pages, rects: [stage, ...rest.rects] };
 }
 
-/** The featured tile goes first, so it is the one the layout gives the stage. */
-export function featuredFirst<T>(tiles: readonly T[], isFeatured: (tile: T) => boolean): T[] {
-	const featured = tiles.find(isFeatured);
-	return featured === undefined ? [...tiles] : [featured, ...tiles.filter((tile) => tile !== featured)];
-}
-
 export function clampPage(page: number, pages: number): number {
 	return Math.max(0, Math.min(pages - 1, page));
 }
@@ -146,4 +140,28 @@ export function placeOnPage(rect: TileRect, page: number, pageWidth: number) {
 		height: rect.height,
 		offPage: rect.page !== null && rect.page !== page
 	};
+}
+
+/** Keeps the tiles still here in the order they had, with newcomers after them in the order given. */
+export function reconcileOrder(previous: readonly string[], present: readonly string[]): string[] {
+	const here = new Set(present);
+	const kept = previous.filter((key) => here.has(key));
+	const known = new Set(kept);
+	return [...kept, ...present.filter((key) => !known.has(key))];
+}
+
+/**
+ * Brings anyone speaking on a page the viewer can't see to the front, where
+ * the first page shows them. Tiles already in view stay where they are, so
+ * the grid doesn't reshuffle every time somebody talks.
+ */
+export function promoteSpeakers(
+	order: readonly string[],
+	speaking: ReadonlySet<string>,
+	inView: (index: number) => boolean
+): string[] {
+	const promoted = order.filter((key, index) => speaking.has(key) && !inView(index));
+	if (promoted.length === 0) return [...order];
+	const moved = new Set(promoted);
+	return [...promoted, ...order.filter((key) => !moved.has(key))];
 }

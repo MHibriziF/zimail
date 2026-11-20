@@ -1,17 +1,18 @@
 import {
 	clampPage,
-	featuredFirst,
 	layoutCallTiles,
 	pageArrowTop,
 	placeOnPage,
+	promoteSpeakers,
+	reconcileOrder,
 	swipeStep,
 	type TileRect
 } from './tile-layout';
 
 /**
- * Arranges the call's tiles in the grid: a featured share on the stage, the
+ * Arranges the call's tiles in the grid: a featured tile on the stage, the
  * rest in pages that slide sideways, with arrows and a swipe to move between
- * them. The tiles are hand-built DOM, so this watches the grid itself (size,
+ * them, and anyone speaking out of view brought onto the first page. The tiles are hand-built DOM, so this watches the grid itself (size,
  * children, `hidden`/`class`) rather than any state. Construct it while the
  * component initialises and `bind:this` the grid to `grid`.
  */
@@ -23,6 +24,9 @@ export class CallLayout {
 	arrowTop = $state('50%');
 	private frame = 0;
 	private swipeStart: { x: number; y: number } | null = null;
+	private swipedAt = 0;
+	/** The non-featured tiles' keys, in the order they are laid out. */
+	private order: string[] = [];
 
 	constructor() {
 		$effect(() => {
@@ -56,6 +60,11 @@ export class CallLayout {
 		this.schedule();
 	}
 
+	/** A swipe ends in a click on whatever tile it started on, which shouldn't count as clicking it. */
+	justSwiped(): boolean {
+		return performance.now() - this.swipedAt < 400;
+	}
+
 	private schedule() {
 		if (!this.frame) this.frame = requestAnimationFrame(() => this.layout());
 	}
@@ -64,12 +73,23 @@ export class CallLayout {
 		this.frame = 0;
 		const grid = this.grid;
 		if (!grid) return;
-		const tiles = featuredFirst(visibleTiles(grid), isFeatured);
+		const visible = visibleTiles(grid);
+		const stage = visible.find(isFeatured);
+		const others = visible.filter((el) => el !== stage);
+		const byKey = new Map(others.map((el) => [keyOf(el), el]));
 		const { clientWidth: width, clientHeight: height } = grid;
-		const layout = layoutCallTiles(tiles.length, tiles.length > 0 && isFeatured(tiles[0]), width, height);
+		const layout = layoutCallTiles(visible.length, stage !== undefined, width, height);
 		this.pages = layout.pages;
 		this.page = clampPage(this.page, layout.pages);
 		this.arrowTop = pageArrowTop(layout);
+		const offset = stage ? 1 : 0;
+		const speaking = new Set(others.filter(isSpeaking).map(keyOf));
+		this.order = promoteSpeakers(reconcileOrder(this.order, [...byKey.keys()]), speaking, (index) => {
+			// The stage (page null) is on every page.
+			return (layout.rects[index + offset]?.page ?? this.page) === this.page;
+		});
+		const tiles = this.order.map((key) => byKey.get(key)).filter((el) => el !== undefined);
+		if (stage) tiles.unshift(stage);
 		tiles.forEach((el, index) => placeTile(el, layout.rects[index], this.page, width));
 	}
 
@@ -81,11 +101,16 @@ export class CallLayout {
 		if (!this.swipeStart) return;
 		const step = swipeStep(event.clientX - this.swipeStart.x, event.clientY - this.swipeStart.y);
 		this.swipeStart = null;
-		if (step) this.showPage(this.page + step);
+		if (!step) return;
+		this.swipedAt = performance.now();
+		this.showPage(this.page + step);
 	}
 }
 
 const isFeatured = (el: HTMLElement) => el.classList.contains('call-tile-featured');
+const isSpeaking = (el: HTMLElement) => el.classList.contains('call-tile-speaking');
+/** Every tile has one: see tile-focus.ts. */
+const keyOf = (el: HTMLElement) => el.dataset.tileKey ?? '';
 
 function visibleTiles(grid: HTMLElement): HTMLElement[] {
 	return Array.from(
