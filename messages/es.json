@@ -249,6 +249,7 @@
 		"activeFilters": "Filtros activos",
 		"markRead": "Marcar como leído",
 		"markUnread": "Marcar como no leído",
+		"actionsFor": "Acciones para {subject}",
 		"star": "Destacar",
 		"unstar": "Quitar destacado",
 		"addStar": "Añadir destacado",
