@@ -20,7 +20,7 @@
 	import UiThemePicker from './UiThemePicker.svelte';
 	import { APP_NAME } from '$lib/constants';
 	import type { SettingsSection } from '$lib/settings-section';
-	import type { LayoutData } from '../../../routes/settings/$types';
+	import type { LayoutData } from '../../../routes/(app)/settings/$types';
 
 	/**
 	 * Classic shows the whole page; Zero shows one pane at a time, chosen by

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import './layout.css';
-	import { page } from '$app/stores';
 	import favicon from '$lib/assets/logo.png';
 	import { watchSystemTheme } from '$lib/theme';
 	import {
@@ -11,49 +10,10 @@
 	import { setupMobileViewTransitions } from '$lib/view-transitions';
 	import { persistUiTheme } from '$lib/ui-theme/apply';
 	import { persistLocale } from '$lib/i18n';
-	import { getTheme } from '$lib/ui-theme/registry';
-	import MailboxLiveSync from '$lib/components/mailbox/MailboxLiveSync.svelte';
-	import SendToast from '$lib/components/mailbox/SendToast.svelte';
 	import NavigationProgress from '$lib/components/NavigationProgress.svelte';
-	import type { ThemeShellData } from '$lib/ui-theme/types';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
-
-	/** Signed-out pages, which a client-side redirect can reach while `data.user` still holds the old account. */
-	const SIGNED_OUT_PATHS = ['/login', '/forgot', '/reset', '/setup', '/account/recovery'];
-	const signedOutPage = $derived(
-		SIGNED_OUT_PATHS.some((path) => $page.url.pathname === path || $page.url.pathname.startsWith(`${path}/`))
-	);
-
-	// Onboarding runs before the user has an address, so the shell would be empty.
-	// /meet is a call — even a signed-in host should see it full-screen, the way
-	// a Gmeet link opens on its own rather than inside Gmail's chrome.
-	// /book is a public booking page, the same for the host as for a guest.
-	const showShell = $derived(
-		Boolean(data.user) &&
-			!signedOutPage &&
-			$page.url.pathname !== '/onboarding' &&
-			$page.url.pathname !== '/account/setup' &&
-			!$page.url.pathname.startsWith('/meet/') &&
-			!$page.url.pathname.startsWith('/book/')
-	);
-
-	// The shell is the theme's — everything below it is the same routes either way.
-	const ThemeShell = $derived(getTheme(data.uiTheme).Shell);
-	const shellData = $derived.by((): ThemeShellData | null => {
-		if (!data.user) return null;
-		return {
-			user: data.user,
-			domains: data.domains,
-			addresses: data.addresses,
-			activeDomainId: data.activeDomainId,
-			counts: data.counts,
-			labels: data.labels,
-			upcoming: data.upcoming,
-			uiTheme: data.uiTheme
-		};
-	});
 
 	setupMobileViewTransitions();
 
@@ -104,12 +64,4 @@
 
 <NavigationProgress />
 
-{#if showShell && shellData}
-	<MailboxLiveSync />
-	<ThemeShell data={shellData}>
-		{@render children()}
-	</ThemeShell>
-	<SendToast />
-{:else}
-	{@render children()}
-{/if}
+{@render children()}

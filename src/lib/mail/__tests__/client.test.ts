@@ -56,7 +56,7 @@ test('every composer offers scheduled send', () => {
 	// caret in ComposerActions — so this asserts the capability reaches the
 	// send call, not the markup.
 	const composers = [
-		'src/routes/compose/+page.svelte',
+		'src/routes/(app)/compose/+page.svelte',
 		'src/themes/zero/overlays/ComposeDialog.svelte'
 	];
 
@@ -68,7 +68,7 @@ test('every composer offers scheduled send', () => {
 });
 
 test('every thread view can send a reply and recall a scheduled one', () => {
-	const threads = ['src/routes/mail/[id]/+page.svelte', 'src/themes/zero/mail/ThreadPane.svelte'];
+	const threads = ['src/routes/(app)/mail/[id]/+page.svelte', 'src/themes/zero/mail/ThreadPane.svelte'];
 
 	for (const file of threads) {
 		const source = readFileSync(join(root, file), 'utf8');

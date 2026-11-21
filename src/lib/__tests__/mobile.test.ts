@@ -78,7 +78,7 @@ test('stacked back controls do not trust the tab session history length', () => 
 	for (const file of [
 		'src/lib/components/SwipeBack.svelte',
 		'src/lib/components/StackHeader.svelte',
-		'src/routes/mail/[id]/+page.svelte'
+		'src/routes/(app)/mail/[id]/+page.svelte'
 	]) {
 		const source = readFileSync(join(root, file), 'utf8');
 		assert.match(source, /hasInAppHistory/, file);
@@ -161,7 +161,7 @@ test('service worker is a classic worker, not a Vite module', () => {
 });
 
 test('signed-in shell refreshes the mailbox without a manual reload', () => {
-	const layout = readFileSync(join(root, 'src/routes/+layout.svelte'), 'utf8');
+	const layout = readFileSync(join(root, 'src/routes/(app)/+layout.svelte'), 'utf8');
 	assert.match(layout, /MailboxLiveSync/);
 	const live = readFileSync(join(root, 'src/lib/mail/live.ts'), 'utf8');
 	assert.match(live, /mailboxSyncUrl/);
