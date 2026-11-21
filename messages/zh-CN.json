@@ -385,7 +385,14 @@
 		"emojiTravel": "旅行与地点",
 		"emojiObjects": "物品",
 		"emojiSymbols": "符号",
-		"emojiFlags": "旗帜"
+		"emojiFlags": "旗帜",
+		"editHtml": "以 HTML 编辑",
+		"backToEditor": "编辑器",
+		"htmlSource": "HTML",
+		"preview": "预览",
+		"htmlSourceLabel": "HTML 源代码",
+		"htmlKeptAsWritten": "此 HTML 包含自己的样式或完整页面，将按原样发送。返回编辑器会移除这些内容。",
+		"htmlCleanedOnSave": "签名只保留基本格式，保存时会移除样式、class 和脚本。预览显示将被保留的内容。"
 	},
 	"thread": {
 		"close": "关闭",

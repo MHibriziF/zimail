@@ -385,7 +385,14 @@
 		"emojiTravel": "Voyages et lieux",
 		"emojiObjects": "Objets",
 		"emojiSymbols": "Symboles",
-		"emojiFlags": "Drapeaux"
+		"emojiFlags": "Drapeaux",
+		"editHtml": "Modifier en HTML",
+		"backToEditor": "Éditeur",
+		"htmlSource": "HTML",
+		"preview": "Aperçu",
+		"htmlSourceLabel": "Source HTML",
+		"htmlKeptAsWritten": "Ce HTML a ses propres styles ou une page entière : il est envoyé tel quel. Revenir à l’éditeur les supprime.",
+		"htmlCleanedOnSave": "Les signatures ne gardent que la mise en forme de base : styles, classes et scripts sont retirés à l’enregistrement. L’aperçu montre ce qui sera conservé."
 	},
 	"thread": {
 		"close": "Fermer",

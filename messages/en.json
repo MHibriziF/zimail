@@ -385,7 +385,14 @@
 		"emojiTravel": "Travel & places",
 		"emojiObjects": "Objects",
 		"emojiSymbols": "Symbols",
-		"emojiFlags": "Flags"
+		"emojiFlags": "Flags",
+		"editHtml": "Edit as HTML",
+		"backToEditor": "Editor",
+		"htmlSource": "HTML",
+		"preview": "Preview",
+		"htmlSourceLabel": "HTML source",
+		"htmlKeptAsWritten": "This HTML has its own styles or a whole page, so it is sent exactly as written. Going back to the editor removes them.",
+		"htmlCleanedOnSave": "Signatures keep only basic formatting, so styles, classes and scripts are removed when you save. The preview shows what will be kept."
 	},
 	"thread": {
 		"close": "Close",

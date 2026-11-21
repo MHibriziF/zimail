@@ -385,7 +385,14 @@
 		"emojiTravel": "Perjalanan & tempat",
 		"emojiObjects": "Benda",
 		"emojiSymbols": "Simbol",
-		"emojiFlags": "Bendera"
+		"emojiFlags": "Bendera",
+		"editHtml": "Edit sebagai HTML",
+		"backToEditor": "Editor",
+		"htmlSource": "HTML",
+		"preview": "Pratinjau",
+		"htmlSourceLabel": "Sumber HTML",
+		"htmlKeptAsWritten": "HTML ini punya gaya sendiri atau satu halaman penuh, jadi dikirim persis seperti yang ditulis. Kembali ke editor akan menghapusnya.",
+		"htmlCleanedOnSave": "Tanda tangan hanya menyimpan format dasar, jadi gaya, class, dan skrip dihapus saat disimpan. Pratinjau menampilkan yang akan disimpan."
 	},
 	"thread": {
 		"close": "Tutup",

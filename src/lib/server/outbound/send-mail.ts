@@ -1,4 +1,5 @@
 import type { MailAddress, OutboundAttachmentInput } from '$lib/types';
+import { isFullDocument } from '$lib/utils/email-html';
 import type { EmailProvider } from '../email-provider';
 
 export type OutboundMailInput = {
@@ -90,6 +91,8 @@ export function parseRecipients(value: string | string[] | undefined | null): st
  * recipient sees exactly what was written.
  */
 export function buildHtmlEmail(bodyHtml: string): string {
+	// A page written in HTML mode is already a document; nesting it would bury its <head> styles.
+	if (isFullDocument(bodyHtml)) return bodyHtml;
 	return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
