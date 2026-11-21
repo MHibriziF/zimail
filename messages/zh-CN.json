@@ -249,6 +249,7 @@
 		"activeFilters": "当前筛选",
 		"markRead": "标为已读",
 		"markUnread": "标为未读",
+		"actionsFor": "{subject} 的操作",
 		"star": "加星标",
 		"unstar": "取消星标",
 		"addStar": "添加星标",

@@ -85,6 +85,10 @@ declare global {
 			/** UI language — saved choice, else the cookie, else Accept-Language. */
 			locale: string;
 		}
+		interface PageState {
+			/** This history entry opened a conversation from the list, so closing it can go Back to that list. */
+			fromList?: boolean;
+		}
 	}
 
 	/** `node` in `bun run build:node`, otherwise `cloudflare`. Set by Vite's `define`. */

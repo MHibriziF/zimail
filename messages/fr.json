@@ -249,6 +249,7 @@
 		"activeFilters": "Filtres actifs",
 		"markRead": "Marquer comme lu",
 		"markUnread": "Marquer comme non lu",
+		"actionsFor": "Actions pour {subject}",
 		"star": "Suivre",
 		"unstar": "Ne plus suivre",
 		"addStar": "Ajouter un suivi",

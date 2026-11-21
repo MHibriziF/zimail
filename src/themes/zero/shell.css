@@ -624,18 +624,24 @@
 
 [data-ui-theme='zero'] .z-row {
 	position: relative;
+	margin: 0.15rem 0.25rem;
+	border-radius: 0.5rem;
+}
+
+[data-ui-theme='zero'] .z-row-open {
 	display: flex;
 	gap: 0.75rem;
 	align-items: flex-start;
 	padding: 0.5rem 1rem;
-	margin: 0.15rem 0.25rem;
-	border-radius: 0.5rem;
-	cursor: pointer;
-	border: none;
-	width: calc(100% - 0.5rem);
-	background: none;
+	border-radius: inherit;
 	color: inherit;
-	text-align: left;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+[data-ui-theme='zero'] .z-row-open:focus-visible {
+	outline: 2px solid var(--color-focus-line);
+	outline-offset: -2px;
 }
 
 [data-ui-theme='zero'] .z-row:hover {
@@ -648,10 +654,6 @@
 
 [data-ui-theme='zero'] .z-row.selected {
 	background: color-mix(in srgb, var(--z-fg) 5%, transparent);
-}
-
-[data-ui-theme='zero'] .z-row.read {
-	opacity: 0.6;
 }
 
 [data-ui-theme='zero'] .z-row-hover {
@@ -668,8 +670,15 @@
 	z-index: 2;
 }
 
-[data-ui-theme='zero'] .z-row:hover .z-row-hover {
+[data-ui-theme='zero'] .z-row:hover .z-row-hover,
+[data-ui-theme='zero'] .z-row:focus-within .z-row-hover,
+[data-ui-theme='zero'] .z-row.menu-open .z-row-hover {
 	display: flex;
+}
+
+[data-ui-theme='zero'] .z-row-quick {
+	display: flex;
+	gap: 0.15rem;
 }
 
 [data-ui-theme='zero'] .z-row-hover button {
@@ -681,8 +690,20 @@
 	cursor: pointer;
 	display: grid;
 	place-items: center;
-	color: #9d9d9d;
-	--icon-color: #9d9d9d;
+	color: var(--z-muted);
+	--icon-color: var(--z-muted);
+}
+
+[data-ui-theme='zero'] .z-row-hover button:hover,
+[data-ui-theme='zero'] .z-row-more[aria-expanded='true'] {
+	background: var(--z-hover);
+	color: var(--z-fg);
+	--icon-color: var(--z-fg);
+}
+
+[data-ui-theme='zero'] .z-row-more:focus-visible {
+	outline: 2px solid var(--color-focus-line);
+	outline-offset: 1px;
 }
 
 [data-ui-theme='zero'] .z-row-hover .danger {
@@ -696,6 +717,103 @@
 
 [data-ui-theme='zero'][data-theme='dark'] .z-row-hover .danger:hover {
 	background: #411d23;
+}
+
+/* No hover on a phone: the actions button stays in view and the quick buttons give way to it. */
+@media (hover: none) {
+	[data-ui-theme='zero'] .z-row-open {
+		padding-right: calc(var(--touch-target) + 0.25rem);
+	}
+
+	[data-ui-theme='zero'] .z-row-hover {
+		display: flex;
+		top: 0;
+		right: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		box-shadow: none;
+	}
+
+	[data-ui-theme='zero'] .z-row-quick {
+		display: none;
+	}
+
+	[data-ui-theme='zero'] .z-row-hover .z-row-more {
+		width: var(--touch-target);
+		height: var(--touch-target);
+		border-radius: 0.75rem;
+	}
+}
+
+[data-ui-theme='zero'] .z-row-menu {
+	position: fixed;
+	inset: auto;
+	margin: 0;
+	min-width: 12rem;
+	padding: 0.35rem;
+	border-radius: 0.75rem;
+	border: 1px solid var(--z-border);
+	background: var(--z-panel);
+	color: var(--z-fg);
+	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+
+[data-ui-theme='zero'][data-theme='dark'] .z-row-menu {
+	background: #232323;
+}
+
+[data-ui-theme='zero'] .z-row-menu button {
+	display: flex;
+	width: 100%;
+	align-items: center;
+	gap: 0.6rem;
+	min-height: 2.25rem;
+	padding: 0 0.6rem;
+	border: none;
+	background: none;
+	border-radius: 0.5rem;
+	color: inherit;
+	--icon-color: var(--z-muted);
+	font-size: 0.875rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+[data-ui-theme='zero'] .z-row-menu button:hover,
+[data-ui-theme='zero'] .z-row-menu button:focus-visible {
+	background: var(--z-hover);
+	outline: none;
+}
+
+[data-ui-theme='zero'] .z-row-menu button:focus-visible {
+	box-shadow: inset 0 0 0 2px var(--color-focus-line);
+}
+
+[data-ui-theme='zero'] .z-row-menu .danger {
+	color: #e11d48;
+	--icon-color: #e11d48;
+}
+
+[data-ui-theme='zero'][data-theme='dark'] .z-row-menu .danger {
+	color: #fb7185;
+	--icon-color: #fb7185;
+}
+
+@media (pointer: coarse) {
+	[data-ui-theme='zero'] .z-row-menu button {
+		min-height: var(--touch-target);
+		font-size: 0.9375rem;
+	}
+}
+
+[data-ui-theme='zero'] .z-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }
 
 [data-ui-theme='zero'] .z-star-on {
@@ -725,8 +843,16 @@
 	min-width: 0;
 }
 
+[data-ui-theme='zero'] .z-row.read .z-row-name {
+	font-weight: 400;
+}
+
 [data-ui-theme='zero'] .z-row.unread .z-row-name {
 	font-weight: 700;
+}
+
+[data-ui-theme='zero'] .z-row.unread .z-row-subject {
+	color: var(--z-fg);
 }
 
 [data-ui-theme='zero'] .z-unread-dot {
@@ -745,7 +871,7 @@
 
 [data-ui-theme='zero'] .z-row-date {
 	font-size: 0.75rem;
-	color: #8c8c8c;
+	color: var(--z-muted);
 	flex-shrink: 0;
 	white-space: nowrap;
 }
@@ -754,7 +880,7 @@
 [data-ui-theme='zero'] .z-row-preview {
 	display: block;
 	font-size: 0.875rem;
-	color: #8c8c8c;
+	color: var(--z-muted);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1952,6 +2078,25 @@
 	[data-ui-theme='zero'] .z-search kbd,
 	[data-ui-theme='zero'] .z-views {
 		display: none;
+	}
+
+	/* The chips are the phone's filter control (Views is hidden), so they get a finger-sized target. */
+	[data-ui-theme='zero'] .z-chips {
+		gap: 0.375rem;
+		padding: 0.375rem 0.75rem;
+	}
+
+	[data-ui-theme='zero'] .z-chip {
+		position: relative;
+		height: 2rem;
+		padding: 0 0.75rem;
+		font-size: 0.8125rem;
+	}
+
+	[data-ui-theme='zero'] .z-chip::after {
+		content: '';
+		position: absolute;
+		inset: -0.375rem 0;
 	}
 
 	[data-ui-theme='zero'] .z-search-label {

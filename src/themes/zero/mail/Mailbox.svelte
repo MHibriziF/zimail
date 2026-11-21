@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { formatRelativeDate } from '$lib/utils/date';
@@ -13,7 +13,10 @@
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
 	import ThreadPane from './ThreadPane.svelte';
+	import RowActionsMenu from './RowActionsMenu.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import { closeThreadGoesBack, openThreadNavigation } from '$lib/mail/thread-history';
+	import type { RowAction } from '$lib/mail/row-actions';
 
 	let {
 		view,
@@ -56,15 +59,63 @@
 		dark = document.documentElement.dataset.theme === 'dark';
 	});
 
-	function setThread(id: string | null) {
+	function threadHref(id: string | null): string {
 		const url = new URL($page.url);
 		if (id) url.searchParams.set('thread', id);
 		else url.searchParams.delete('thread');
-		void goto(`${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ''), {
-			keepFocus: true,
-			noScroll: true,
-			replaceState: true
+		return `${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, '');
+	}
+
+	let rows = $state<HTMLDivElement | null>(null);
+	let actionsMenu = $state<ReturnType<typeof RowActionsMenu> | null>(null);
+	let menuFor = $state<string | null>(null);
+	/** Kept while the list is shown, because a phone hides the list to read and that resets its scroll. */
+	let listScroll = 0;
+	/** The row a conversation was opened from, to land on again when it closes. */
+	let returnTo: { id: string; index: number } | null = null;
+
+	/** The row itself, or, when it has left this list (read under Unread, archived), the one that took its place. */
+	function focusRow(id: string, index: number) {
+		const openers = rows?.querySelectorAll<HTMLElement>('.z-row-open') ?? [];
+		const own = rows?.querySelector<HTMLElement>(`[data-thread-id="${CSS.escape(id)}"] .z-row-open`);
+		(own ?? openers[index] ?? openers[openers.length - 1])?.focus({ preventScroll: true });
+	}
+
+	function setThread(id: string | null) {
+		if (id) {
+			const index = items.findIndex((thread) => thread.latest_id === id);
+			if (!threadId && index >= 0) returnTo = { id: items[index].thread_id, index };
+			void goto(threadHref(id), { keepFocus: true, noScroll: true, ...openThreadNavigation(threadId, $page.state) });
+		} else if (closeThreadGoesBack($page.state)) {
+			history.back();
+		} else {
+			void goto(threadHref(null), { keepFocus: true, noScroll: true, replaceState: true });
+		}
+	}
+
+	// Back on the list, however it got there (the close button, Escape, the back gesture): where it was, on the row read.
+	$effect(() => {
+		if (threadId) return;
+		const from = untrack(() => returnTo);
+		returnTo = null;
+		if (!from) return;
+		void tick().then(() => {
+			if (rows) rows.scrollTop = listScroll;
+			focusRow(from.id, from.index);
 		});
+	});
+
+	/** After an action takes a row out of this list, focus moves on to the row that took its place. */
+	async function onRowAction(action: RowAction, thread: ThreadSummary) {
+		if (action === 'delete') {
+			deleting = thread.latest_id;
+			return;
+		}
+		const index = items.findIndex((item) => item.thread_id === thread.thread_id);
+		await act(action, [thread.latest_id]);
+		await tick();
+		if (document.activeElement && document.activeElement !== document.body) return;
+		focusRow(thread.thread_id, index);
 	}
 
 	function markThreadRead(threadId: string) {
@@ -135,7 +186,15 @@
 		await invalidateAll();
 	}
 
+	function draftHref(thread: ThreadSummary): string {
+		const url = new URL($page.url);
+		url.searchParams.set('compose', '1');
+		url.searchParams.set('draft', thread.latest_id);
+		return `${url.pathname}?${url.searchParams.toString()}`;
+	}
+
 	function onRowClick(thread: ThreadSummary, event: MouseEvent) {
+		event.preventDefault();
 		if (event.metaKey || event.ctrlKey || event.shiftKey) {
 			selected = selected.includes(thread.thread_id)
 				? selected.filter((id) => id !== thread.thread_id)
@@ -143,10 +202,7 @@
 			return;
 		}
 		if (thread.is_draft) {
-			const url = new URL($page.url);
-			url.searchParams.set('compose', '1');
-			url.searchParams.set('draft', thread.latest_id);
-			void goto(`${url.pathname}?${url.searchParams.toString()}`);
+			void goto(draftHref(thread));
 			return;
 		}
 		setThread(thread.latest_id);
@@ -266,13 +322,13 @@
 		</div>
 
 		<div class="z-chips">
-			<button type="button" class="z-chip" class:active={chip === 'all'} data-chip="all" onclick={() => setChip('all')}>
+			<button type="button" class="z-chip" class:active={chip === 'all'} aria-pressed={chip === 'all'} data-chip="all" onclick={() => setChip('all')}>
 				{t('mailbox.allMailChip')}
 			</button>
 			<button
 				type="button"
 				class="z-chip"
-				class:active={chip === 'unread'}
+				class:active={chip === 'unread'} aria-pressed={chip === 'unread'}
 				data-chip="unread"
 				onclick={() => setChip('unread')}
 			>
@@ -281,7 +337,7 @@
 			<button
 				type="button"
 				class="z-chip"
-				class:active={chip === 'starred'}
+				class:active={chip === 'starred'} aria-pressed={chip === 'starred'}
 				data-chip="starred"
 				onclick={() => setChip('starred')}
 			>
@@ -295,7 +351,7 @@
 			</div>
 		{/if}
 
-		<div class="z-rows">
+		<div class="z-rows" bind:this={rows} onscroll={() => (listScroll = rows?.scrollTop ?? 0)}>
 			{#if items.length === 0}
 				<div class="z-empty">
 					<img
@@ -313,113 +369,120 @@
 					{@const name = participantName(thread.participants, view, $page.data.locale)}
 					<div
 						class="z-row"
+						data-thread-id={thread.thread_id}
 						class:selected={thread.latest_id === threadId || selected.includes(thread.thread_id)}
 						class:unread={!thread.is_read}
 						class:read={thread.is_read}
-						role="button"
-						tabindex="0"
-						onclick={(event) => onRowClick(thread, event)}
-						onkeydown={(event) => {
-							if (event.key === 'Enter') onRowClick(thread, event as unknown as MouseEvent);
-						}}
+						class:menu-open={menuFor === thread.thread_id}
 					>
-						<div class="z-row-hover">
-							<Tooltip text={thread.is_starred ? t('mailbox.unstar') : t('mailbox.star')}>
-								<button
-									type="button"
-									aria-label={thread.is_starred ? t('mailbox.unstar') : t('mailbox.star')}
-									onclick={(event) => {
-										event.stopPropagation();
-										void act(thread.is_starred ? 'unstar' : 'star', [thread.latest_id]);
-									}}
-								>
-									<Icon name="Star2" class={thread.is_starred ? 'z-star-on' : ''} size={14} />
-								</button>
-							</Tooltip>
-							<Tooltip text={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
-								<button
-									type="button"
-									aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
-									onclick={(event) => {
-										event.stopPropagation();
-										void act(view === 'archive' ? 'unarchive' : 'archive', [thread.latest_id]);
-									}}
-								>
-									<Icon name="Archive2" size={14} />
-								</button>
-							</Tooltip>
-							{#if view === 'trash'}
-								<Tooltip text={t('mailbox.restore')}>
-									<button
-										type="button"
-										aria-label={t('mailbox.restore')}
-										onclick={(event) => {
-											event.stopPropagation();
-											void act('restore', [thread.latest_id]);
-										}}
-									>
-										<Icon name="CurvedArrow" size={14} />
-									</button>
-								</Tooltip>
-								<Tooltip text={t('mailbox.deletePermanently')}>
-									<button
-										type="button"
-										class="danger"
-										aria-label={t('mailbox.deletePermanently')}
-										onclick={(event) => {
-											event.stopPropagation();
-											deleting = thread.latest_id;
-										}}
-									>
-										<Icon name="Trash" size={14} />
-									</button>
-								</Tooltip>
-							{:else}
-								<Tooltip text={t('nav.bin')}>
-									<button
-										type="button"
-										class="danger"
-										aria-label={t('nav.bin')}
-										onclick={(event) => {
-											event.stopPropagation();
-											void act('trash', [thread.latest_id]);
-										}}
-									>
-										<Icon name="Trash" size={14} />
-									</button>
-								</Tooltip>
-							{/if}
-						</div>
-						<span class="z-avatar">{initials(name)}</span>
-						<span class="z-row-main">
-							<span class="z-row-top">
-								<span class="z-row-name">
-									{name}
-									{#if !thread.is_read && view !== 'sent'}
-										<span class="z-unread-dot"></span>
-									{/if}
-									{#if thread.message_count > 1}
-										<span class="z-row-count">[{thread.message_count}]</span>
-									{/if}
-									{#if thread.is_draft}
-										<Icon name="PencilCompose" size={12} />
+						<a
+							class="z-row-open"
+							href={thread.is_draft ? draftHref(thread) : threadHref(thread.latest_id)}
+							aria-current={thread.latest_id === threadId ? 'true' : undefined}
+							onclick={(event) => onRowClick(thread, event)}
+						>
+							<span class="z-avatar">{initials(name)}</span>
+							<span class="z-row-main">
+								<span class="z-row-top">
+									<span class="z-row-name">
+										{name}
+										{#if !thread.is_read && view !== 'sent'}
+											<span class="z-unread-dot"></span>
+											<span class="z-sr-only">{t('mailbox.unread')}</span>
+										{/if}
+										{#if thread.message_count > 1}
+											<span class="z-row-count">[{thread.message_count}]</span>
+										{/if}
+										{#if thread.is_draft}
+											<Icon name="PencilCompose" size={12} />
+										{/if}
+									</span>
+									<span class="z-row-date">{formatRelativeDate(thread.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</span>
+								</span>
+								<span class="z-row-subject">
+									{thread.subject || t('mailbox.noSubject')}
+									{#each thread.labels as label (label.id)}
+										<LabelChip {label} />
+									{/each}
+									{#if thread.has_attachments}
+										<Icon name="Paper" size={12} />
 									{/if}
 								</span>
-								<span class="z-row-date">{formatRelativeDate(thread.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</span>
-							</span>
-							<span class="z-row-subject">
-								{thread.subject || t('mailbox.noSubject')}
-								{#each thread.labels as label (label.id)}
-									<LabelChip {label} />
-								{/each}
-								{#if thread.has_attachments}
-									<Icon name="Paper" size={12} />
+								{#if thread.preview}
+									<span class="z-row-preview">{thread.preview}</span>
 								{/if}
 							</span>
-							{#if thread.preview}
-								<span class="z-row-preview">{thread.preview}</span>
-							{/if}
-						</span>
+						</a>
+						<div class="z-row-hover">
+							<!-- For a mouse only: keyboard and touch get the same actions, and more, from the menu. -->
+							<span class="z-row-quick">
+								<Tooltip text={thread.is_starred ? t('mailbox.unstar') : t('mailbox.star')}>
+									<button
+										type="button"
+										tabindex="-1"
+										aria-label={thread.is_starred ? t('mailbox.unstar') : t('mailbox.star')}
+										onclick={() => void act(thread.is_starred ? 'unstar' : 'star', [thread.latest_id])}
+									>
+										<Icon name="Star2" class={thread.is_starred ? 'z-star-on' : ''} size={14} />
+									</button>
+								</Tooltip>
+								<Tooltip text={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}>
+									<button
+										type="button"
+										tabindex="-1"
+										aria-label={view === 'archive' ? t('mailbox.moveToInbox') : t('nav.archive')}
+										onclick={() => void act(view === 'archive' ? 'unarchive' : 'archive', [thread.latest_id])}
+									>
+										<Icon name="Archive2" size={14} />
+									</button>
+								</Tooltip>
+								{#if view === 'trash'}
+									<Tooltip text={t('mailbox.restore')}>
+										<button
+											type="button"
+											tabindex="-1"
+											aria-label={t('mailbox.restore')}
+											onclick={() => void act('restore', [thread.latest_id])}
+										>
+											<Icon name="CurvedArrow" size={14} />
+										</button>
+									</Tooltip>
+									<Tooltip text={t('mailbox.deletePermanently')}>
+										<button
+											type="button"
+											class="danger"
+											tabindex="-1"
+											aria-label={t('mailbox.deletePermanently')}
+											onclick={() => (deleting = thread.latest_id)}
+										>
+											<Icon name="Trash" size={14} />
+										</button>
+									</Tooltip>
+								{:else}
+									<Tooltip text={t('nav.bin')}>
+										<button
+											type="button"
+											class="danger"
+											tabindex="-1"
+											aria-label={t('nav.bin')}
+											onclick={() => void act('trash', [thread.latest_id])}
+										>
+											<Icon name="Trash" size={14} />
+										</button>
+									</Tooltip>
+								{/if}
+							</span>
+							<button
+								type="button"
+								class="z-row-more"
+								aria-haspopup="menu"
+								aria-expanded={menuFor === thread.thread_id}
+								aria-label={t('mailbox.actionsFor', { subject: thread.subject || t('mailbox.noSubject') })}
+								onclick={(event) => actionsMenu?.toggle(thread, event.currentTarget)}
+							>
+								<Icon name="ThreeDots" size={14} />
+							</button>
+						</div>
 					</div>
 				{/each}
 			{/if}
@@ -436,6 +499,8 @@
 		/>
 	</section>
 </div>
+
+<RowActionsMenu bind:this={actionsMenu} bind:openFor={menuFor} {view} onAction={onRowAction} />
 
 <ConfirmDialog
 	open={deleting !== null}

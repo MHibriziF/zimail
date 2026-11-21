@@ -249,6 +249,7 @@
 		"activeFilters": "Active filters",
 		"markRead": "Mark as read",
 		"markUnread": "Mark as unread",
+		"actionsFor": "Actions for {subject}",
 		"star": "Star",
 		"unstar": "Unstar",
 		"addStar": "Add star",

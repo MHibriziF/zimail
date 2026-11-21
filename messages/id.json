@@ -249,6 +249,7 @@
 		"activeFilters": "Filter aktif",
 		"markRead": "Tandai sudah dibaca",
 		"markUnread": "Tandai belum dibaca",
+		"actionsFor": "Tindakan untuk {subject}",
 		"star": "Beri bintang",
 		"unstar": "Hapus bintang",
 		"addStar": "Tambah bintang",
