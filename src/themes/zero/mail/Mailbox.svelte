@@ -36,6 +36,8 @@
 	let items = $state<ThreadSummary[]>(mailbox.threads);
 	let refreshing = $state(false);
 	let isMac = $state(true);
+	/** The server can't tell the platform, so the shortcut hint waits rather than flipping from ⌘ to Ctrl. */
+	let platformKnown = $state(false);
 	let viewsOpen = $state(false);
 
 	$effect(() => {
@@ -47,6 +49,7 @@
 
 	$effect(() => {
 		isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+		platformKnown = true;
 	});
 
 	const threadId = $derived($page.url.searchParams.get('thread'));
@@ -272,10 +275,12 @@
 					<button type="button" class="z-search" onclick={openPalette}>
 						<Icon name="Search" size={16} />
 						<span class="z-search-label">{t('common.search')}</span>
-						<kbd>
-							<span>{isMac ? '⌘' : 'Ctrl'}</span>
-							<span>K</span>
-						</kbd>
+						{#if platformKnown}
+							<kbd>
+								<span>{isMac ? '⌘' : 'Ctrl'}</span>
+								<span>K</span>
+							</kbd>
+						{/if}
 					</button>
 				</Tooltip>
 				<div class="z-views">
