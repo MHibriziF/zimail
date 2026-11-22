@@ -8,10 +8,24 @@ import {
 	normalizeEmailSignature,
 	pickEmailSignature,
 	signatureAsHtml,
-	signatureBlockHtml
+	signatureBlockHtml,
+	signaturePasteMarkup
 } from '../email-signature';
 
 describe('email signatures', () => {
+	test('pastes HTML source as the signature it describes, even when it also arrives highlighted', () => {
+		const source = '<table><tr><td><b>Ana</b></td></tr></table>';
+		const highlighted = '<div style="color:#d4d4d4"><span>&lt;table&gt;</span></div>';
+		assert.equal(signaturePasteMarkup(source, highlighted), source);
+		assert.equal(signaturePasteMarkup(source, ''), source);
+	});
+
+	test('pastes copied text and rendered mail as they come', () => {
+		const rendered = '<b>Ana</b><br>Ana &lt;ana@x.co&gt;';
+		assert.equal(signaturePasteMarkup('Ana, Ana <ana@x.co>', rendered), rendered);
+		assert.equal(signaturePasteMarkup('Best <3', ''), '');
+	});
+
 	test('normalizes line endings and trailing whitespace', () => {
 		assert.equal(normalizeEmailSignature('  Best,  \r\nEmmanuel  \r\n'), 'Best,\nEmmanuel');
 	});

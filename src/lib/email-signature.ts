@@ -37,7 +37,7 @@ function tagNameAt(value: string, open: number): string {
 }
 
 /** True when `value` contains real markup, rather than text such as `<3` or `Ana <ana@x.co>`. */
-function looksLikeHtml(value: string): boolean {
+export function looksLikeHtml(value: string): boolean {
 	for (let open = value.indexOf('<'); open !== -1; open = value.indexOf('<', open + 1)) {
 		if (value.startsWith('<!--', open) || isHtmlTagName(tagNameAt(value, open))) return true;
 	}
@@ -51,6 +51,15 @@ function looksLikeHtml(value: string): boolean {
 export function signatureAsHtml(value: string): string {
 	const normalized = normalizeEmailSignature(value);
 	return looksLikeHtml(normalized) ? normalized : escapeHtml(normalized).replaceAll('\n', '<br>');
+}
+
+/**
+ * The markup a paste into the signature editor brings, or '' to paste it as text. HTML source is
+ * the signature itself: copied from a code editor it also arrives as highlighted text/html, which
+ * would otherwise put the code in as text.
+ */
+export function signaturePasteMarkup(plain: string, html: string): string {
+	return looksLikeHtml(plain) ? plain : html;
 }
 
 /** Mailbox sign-off wins when set; otherwise the account signature. */

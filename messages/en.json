@@ -467,6 +467,7 @@
 		"signatureHint": "Used when a mailbox has no signature of its own.",
 		"couldNotSaveSignature": "Could not save signature",
 		"signaturePasteHint": "Type a signature, or paste one from Gmail or Outlook",
+		"signatureRecovered": "Your signature was saved as HTML code, so mail showed the code. It is shown as it should look now: save to keep it.",
 		"signatureImageAdd": "Add image",
 		"signatureImageTooLarge": "Images can be up to 1 MB",
 		"signatureImageType": "Use a PNG, JPEG, GIF or WebP image",

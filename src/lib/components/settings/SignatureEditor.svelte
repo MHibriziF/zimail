@@ -2,7 +2,8 @@
 	import Icon from '../Icon.svelte';
 	import RichTextEditor from '../mailbox/RichTextEditor.svelte';
 	import { t } from '$lib/i18n';
-	import { cleanPastedHtml } from '$lib/mail/signature-paste';
+	import { untrack } from 'svelte';
+	import { cleanPastedHtml, signatureMarkupWrittenAsText } from '$lib/mail/signature-paste';
 
 	let {
 		html = $bindable(''),
@@ -116,6 +117,17 @@
 		closeSizes();
 	}
 
+	let recovered = $state(false);
+
+	// Once, in the browser (it needs DOMParser): a signature saved as its own source code is shown as
+	// the signature it describes, ready to save.
+	$effect(() => {
+		const markup = untrack(() => signatureMarkupWrittenAsText(html));
+		if (!markup) return;
+		html = cleanPastedHtml(markup);
+		recovered = true;
+	});
+
 	// A listener rather than an onclick on the wrapper, which is not itself something to click.
 	$effect(() => {
 		const element = shell;
@@ -164,6 +176,7 @@
 		onchange={onFiles}
 	/>
 
+	{#if recovered}<p class="signature-note" role="status">{t('settings.signatureRecovered')}</p>{/if}
 	{#if error}<p class="signature-error" role="alert">{error}</p>{/if}
 
 	<div bind:this={sizePopover} class="size-popover" popover="auto" role="dialog" aria-label={t('settings.signatureImageSize')}>
@@ -190,10 +203,18 @@
 		cursor: pointer;
 	}
 
-	.signature-error {
+	.signature-error,
+	.signature-note {
 		padding: 0 0.875rem 0.625rem;
 		font-size: 0.8125rem;
+	}
+
+	.signature-error {
 		color: var(--color-danger);
+	}
+
+	.signature-note {
+		color: var(--color-text-secondary);
 	}
 
 	.size-popover {
