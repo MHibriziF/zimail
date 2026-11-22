@@ -467,6 +467,7 @@
 		"signatureHint": "Dipakai bila sebuah kotak surat tidak punya tanda tangan sendiri.",
 		"couldNotSaveSignature": "Tidak bisa menyimpan tanda tangan",
 		"signaturePasteHint": "Ketik tanda tangan, atau tempel dari Gmail atau Outlook",
+		"signatureRecovered": "Tanda tangan Anda tersimpan sebagai kode HTML, sehingga email menampilkan kodenya. Kini ditampilkan sebagaimana mestinya: simpan untuk mempertahankannya.",
 		"signatureImageAdd": "Tambah gambar",
 		"signatureImageTooLarge": "Ukuran gambar maksimal 1 MB",
 		"signatureImageType": "Gunakan gambar PNG, JPEG, GIF, atau WebP",

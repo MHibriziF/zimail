@@ -6,6 +6,7 @@
 	import { t } from '$lib/i18n';
 	import { linkHtml, normalizeLinkUrl } from '$lib/utils/links';
 	import { needsHtmlMode, richEditorHtml } from '$lib/mail/editor-html';
+	import { signaturePasteMarkup } from '$lib/email-signature';
 
 	let {
 		html = $bindable(''),
@@ -122,7 +123,9 @@
 		event.preventDefault();
 		const data = event.clipboardData;
 		const files = [...(data?.files ?? [])];
-		const pastedHtml = cleanPaste ? (data?.getData('text/html') ?? '') : '';
+		const pastedHtml = cleanPaste
+			? signaturePasteMarkup(data?.getData('text/plain') ?? '', data?.getData('text/html') ?? '')
+			: '';
 		if (files.length && onpastefiles && !pastedHtml) {
 			onpastefiles(files);
 			return;

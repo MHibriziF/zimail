@@ -467,6 +467,7 @@
 		"signatureHint": "Utilisée lorsqu’une boîte n’a pas de signature propre.",
 		"couldNotSaveSignature": "Impossible d’enregistrer la signature",
 		"signaturePasteHint": "Saisissez une signature ou collez-la depuis Gmail ou Outlook",
+		"signatureRecovered": "Votre signature avait été enregistrée comme code HTML, et les e-mails affichaient le code. Elle apparaît maintenant telle qu’elle doit être : enregistrez pour la garder.",
 		"signatureImageAdd": "Ajouter une image",
 		"signatureImageTooLarge": "Les images peuvent faire jusqu'à 1 Mo",
 		"signatureImageType": "Utilisez une image PNG, JPEG, GIF ou WebP",

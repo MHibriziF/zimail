@@ -467,6 +467,7 @@
 		"signatureHint": "Se usa cuando un buzón no tiene firma propia.",
 		"couldNotSaveSignature": "No se pudo guardar la firma",
 		"signaturePasteHint": "Escribe una firma o pégala desde Gmail u Outlook",
+		"signatureRecovered": "Tu firma se guardó como código HTML, así que los correos mostraban el código. Ahora se ve como debería: guarda para conservarla.",
 		"signatureImageAdd": "Añadir imagen",
 		"signatureImageTooLarge": "Las imágenes pueden ocupar hasta 1 MB",
 		"signatureImageType": "Usa una imagen PNG, JPEG, GIF o WebP",

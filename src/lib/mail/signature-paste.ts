@@ -1,4 +1,8 @@
+import { looksLikeHtml } from '$lib/email-signature';
 import { signatureAttribute, signatureTagRule } from '$lib/signature-html';
+
+/** Tags that only hold text: what an editor wraps a plain-text paste in, or a code editor's highlighting. */
+const TEXT_ONLY_TAGS = new Set(['BR', 'DIV', 'P', 'SPAN', 'FONT', 'PRE', 'CODE']);
 
 function cleanAttributes(element: Element) {
 	// A copy, because removing from the live list while walking it would skip the next attribute.
@@ -53,4 +57,18 @@ export function cleanPastedHtml(html: string): string {
 	const doc = new DOMParser().parseFromString(html, 'text/html');
 	cleanChildren(doc.body);
 	return doc.body.innerHTML;
+}
+
+/**
+ * The markup of a signature whose HTML went in as text, or null when it is a real signature.
+ * That happens when HTML source is pasted into the visual editor, and to HTML that was saved as a
+ * plain-text signature before signatures became HTML (migration 0059 escaped those).
+ */
+export function signatureMarkupWrittenAsText(html: string): string | null {
+	const doc = new DOMParser().parseFromString(html, 'text/html');
+	const elements = Array.from(doc.body.querySelectorAll('*'));
+	if (!elements.every((element) => TEXT_ONLY_TAGS.has(element.tagName))) return null;
+	for (const br of doc.body.querySelectorAll('br')) br.replaceWith('\n');
+	const text = (doc.body.textContent ?? '').trim();
+	return looksLikeHtml(text) ? text : null;
 }
