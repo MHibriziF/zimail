@@ -9,6 +9,7 @@
 	import {
 		ACCENT_PRESETS,
 		DEFAULT_APPEARANCE,
+		MAX_CUSTOM_CSS,
 		applyAppearance,
 		parseAccent,
 		parseAppearance,
@@ -224,6 +225,22 @@
 		{/each}
 	{/each}
 
+	<h3 class="group-heading">{t('settings.customCss')}</h3>
+	<p class="card-hint">{t('settings.customCssHint')}</p>
+	<div class="css-editor">
+		<textarea
+			value={draft.customCss}
+			rows="8"
+			spellcheck="false"
+			autocapitalize="off"
+			maxlength={MAX_CUSTOM_CSS}
+			placeholder={'[data-ui-theme] .z-row-subject {\n\tfont-weight: 600;\n}'}
+			aria-label={t('settings.customCss')}
+			oninput={(event) => update({ customCss: event.currentTarget.value })}
+		></textarea>
+		<span class="css-count">{draft.customCss.length.toLocaleString()} / {MAX_CUSTOM_CSS.toLocaleString()}</span>
+	</div>
+
 	<fieldset class="group">
 		<legend>{t('settings.themeShare')}</legend>
 		<ThemeShare appearance={draft} onimport={(theme) => update(theme)} />
@@ -390,6 +407,40 @@
 
 	.font-serif {
 		font-family: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, serif;
+	}
+
+	.css-editor {
+		position: relative;
+		margin-top: 0.75rem;
+	}
+
+	.css-editor textarea {
+		width: 100%;
+		min-height: 10rem;
+		padding: 0.75rem 0.875rem 1.75rem;
+		border: none;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
+		background: var(--color-surface-muted);
+		color: var(--color-text);
+		font-family: var(--font-geist-mono, ui-monospace, monospace);
+		font-size: 0.8125rem;
+		line-height: 1.55;
+		tab-size: 2;
+		resize: vertical;
+	}
+
+	.css-editor textarea::placeholder {
+		color: var(--color-text-secondary);
+	}
+
+	.css-count {
+		position: absolute;
+		right: 0.75rem;
+		bottom: 0.6rem;
+		font-size: 0.75rem;
+		font-variant-numeric: tabular-nums;
+		color: var(--color-text-secondary);
+		pointer-events: none;
 	}
 
 	.actions {

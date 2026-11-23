@@ -451,6 +451,9 @@
 		"noMatches": "Tidak ada yang cocok"
 	},
 	"settings": {
+		"customCss": "CSS kustom",
+		"customCssHint": "Aturan Anda sendiri, diterapkan setelah semua gaya lain di setiap halaman. Pratinjau langsung saat mengetik. Jika ada aturan yang menyembunyikan sesuatu, tambahkan ?nocss di alamat mana pun untuk memuat halaman tanpa CSS ini.",
+		"themeImportedCss": "Tema dimuat. Tema ini berisi CSS kustom: periksa di bagian CSS kustom sebelum menyimpan.",
 		"groupText": "Teks",
 		"groupLayout": "Tata letak",
 		"preview": "Pratinjau pesan",

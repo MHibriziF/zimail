@@ -41,7 +41,8 @@
 		onimport(theme);
 		pasting = false;
 		pasted = '';
-		say(t('settings.themeImported'));
+		// Someone else's CSS runs on every page once saved, so it is pointed out before that.
+		say(theme.customCss.trim() ? t('settings.themeImportedCss') : t('settings.themeImported'));
 	}
 
 	async function fromFile(event: Event & { currentTarget: HTMLInputElement }) {

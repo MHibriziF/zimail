@@ -51,9 +51,13 @@ function htmlOpenTag(locale: string, uiTheme: string, appearance = DEFAULT_APPEA
 	return `<html ${attributes.filter(Boolean).join(' ')}>`;
 }
 
-/** The user's palette as a <style> in <head>. Only checked hex values and fixed selectors go in. */
-function withAppearanceStyle(html: string, appearance = DEFAULT_APPEARANCE): string {
-	const css = appearanceCss(appearance);
+/**
+ * The user's palette and own CSS as a <style> in <head>. The palette is checked hex in fixed
+ * selectors; the CSS cannot close the element (see embeddableCss). `?nocss` leaves the user's CSS
+ * out, so a rule that hides the settings page can still be undone.
+ */
+function withAppearanceStyle(html: string, appearance = DEFAULT_APPEARANCE, safeMode = false): string {
+	const css = appearanceCss(appearance, { custom: !safeMode });
 	if (!css || !html.includes('</head>')) return html;
 	return html.replace('</head>', '<style id="' + APPEARANCE_STYLE_ID + '">' + css + '</style></head>');
 }
@@ -81,7 +85,8 @@ function render(event: RequestEvent, resolve: Resolve): ReturnType<Handle> {
 		transformPageChunk: ({ html }) =>
 			withAppearanceStyle(
 				finishHead(html.replace('<html lang="en">', htmlOpenTag(locale, uiTheme, event.locals.appearance)), preview),
-				event.locals.appearance
+				event.locals.appearance,
+				event.url.searchParams.has('nocss')
 			)
 	});
 }

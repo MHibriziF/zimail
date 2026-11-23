@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
 	appearanceAttributes,
+	appearanceCss,
+	embeddableCss,
+	MAX_CUSTOM_CSS,
 	DEFAULT_APPEARANCE,
 	parseAccent,
 	parseAppearance,
@@ -69,5 +72,24 @@ describe('appearanceAttributes', () => {
 			appearanceAttributes({ ...DEFAULT_APPEARANCE, textSize: 'large', radius: 'round', listWidth: 'wide', preview: 'none' }),
 			'data-text-size="large" data-radius="round" data-list="wide" data-preview="none"'
 		);
+	});
+});
+
+describe('custom CSS', () => {
+	test('cannot close its style element', () => {
+		const css = embeddableCss('a::after { content: "</style><script>alert(1)</script>"; }');
+		assert.ok(!css.includes('<'));
+		assert.ok(css.includes('\\3c /style>'));
+	});
+
+	test('is capped, kept out of safe mode, and counts as a change', () => {
+		const long = parseAppearance({ customCss: 'x'.repeat(MAX_CUSTOM_CSS + 50) });
+		assert.equal(long.customCss.length, MAX_CUSTOM_CSS);
+
+		const styled = { ...DEFAULT_APPEARANCE, customCss: '.z-row { letter-spacing: 0.01em; }' };
+		assert.equal(appearanceCss(styled), '.z-row { letter-spacing: 0.01em; }');
+		assert.equal(appearanceCss(styled, { custom: false }), '');
+		assert.notEqual(serializeAppearance(styled), null);
+		assert.equal(serializeAppearance({ ...DEFAULT_APPEARANCE, customCss: '   ' }), null);
 	});
 });
