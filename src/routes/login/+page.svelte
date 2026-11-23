@@ -156,7 +156,7 @@
 		display: flex;
 		margin-bottom: 1rem;
 		/* Matches the mark's own corner radius so the shadow hugs the tile. */
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-sm);
 	}
 </style>

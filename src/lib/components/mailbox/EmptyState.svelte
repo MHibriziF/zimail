@@ -36,7 +36,7 @@
 		width: 3.5rem;
 		height: 3.5rem;
 		margin-bottom: 1rem;
-		border-radius: 1rem;
+		border-radius: calc(1rem * var(--radius-scale, 1));
 		background: var(--color-surface);
 		box-shadow: var(--shadow-sm);
 		color: var(--color-muted);

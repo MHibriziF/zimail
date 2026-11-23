@@ -13,9 +13,7 @@
 		parseAccent,
 		parseAppearance,
 		type Appearance,
-		type Density,
-		type FontChoice,
-		type TextSize
+		type ChoiceKey
 	} from '$lib/ui-theme/appearance';
 
 	/** What the server has; the draft is what the screen shows while you try things. */
@@ -40,20 +38,92 @@
 	const accentValue = $derived(draft.accent ?? ACCENT_PRESETS[0]);
 	const custom = $derived(!(ACCENT_PRESETS as readonly string[]).includes(accentValue));
 
-	const DENSITY_OPTIONS = $derived<{ value: Density; label: string }[]>([
-		{ value: 'comfortable', label: t('settings.densityComfortable') },
-		{ value: 'compact', label: t('settings.densityCompact') }
+	type Segment = { key: ChoiceKey; label: string; zeroOnly?: boolean; options: { value: string; label: string }[] };
+
+	/** Each fixed choice as a row of buttons, in the order the panel shows them. */
+	const SEGMENTS = $derived<{ heading: string; rows: Segment[] }[]>([
+		{
+			heading: t('settings.groupText'),
+			rows: [
+				{
+					key: 'textSize',
+					label: t('settings.textSize'),
+					options: [
+						{ value: 'small', label: t('settings.textSmall') },
+						{ value: 'default', label: t('settings.textDefault') },
+						{ value: 'large', label: t('settings.textLarge') }
+					]
+				},
+				{
+					key: 'font',
+					label: t('settings.font'),
+					options: [
+						{ value: 'default', label: t('settings.fontDefault') },
+						{ value: 'system', label: t('settings.fontSystem') },
+						{ value: 'serif', label: t('settings.fontSerif') }
+					]
+				}
+			]
+		},
+		{
+			heading: t('settings.groupLayout'),
+			rows: [
+				{
+					key: 'density',
+					label: t('settings.density'),
+					options: [
+						{ value: 'comfortable', label: t('settings.densityComfortable') },
+						{ value: 'compact', label: t('settings.densityCompact') }
+					]
+				},
+				{
+					key: 'preview',
+					label: t('settings.preview'),
+					options: [
+						{ value: 'auto', label: t('settings.textDefault') },
+						{ value: 'none', label: t('settings.previewNone') },
+						{ value: 'one', label: t('settings.previewOne') },
+						{ value: 'two', label: t('settings.previewTwo') }
+					]
+				},
+				{
+					key: 'radius',
+					label: t('settings.radius'),
+					options: [
+						{ value: 'sharp', label: t('settings.radiusSharp') },
+						{ value: 'default', label: t('settings.textDefault') },
+						{ value: 'round', label: t('settings.radiusRound') }
+					]
+				},
+				{
+					key: 'sidebar',
+					label: t('settings.sidebarWidth'),
+					options: [
+						{ value: 'narrow', label: t('settings.widthNarrow') },
+						{ value: 'default', label: t('settings.textDefault') },
+						{ value: 'wide', label: t('settings.widthWide') }
+					]
+				},
+				{
+					key: 'listWidth',
+					label: t('settings.listWidth'),
+					zeroOnly: true,
+					options: [
+						{ value: 'narrow', label: t('settings.widthNarrow') },
+						{ value: 'default', label: t('settings.textDefault') },
+						{ value: 'wide', label: t('settings.widthWide') }
+					]
+				}
+			]
+		}
 	]);
-	const SIZE_OPTIONS = $derived<{ value: TextSize; label: string }[]>([
-		{ value: 'small', label: t('settings.textSmall') },
-		{ value: 'default', label: t('settings.textDefault') },
-		{ value: 'large', label: t('settings.textLarge') }
-	]);
-	const FONT_OPTIONS = $derived<{ value: FontChoice; label: string }[]>([
-		{ value: 'default', label: t('settings.fontDefault') },
-		{ value: 'system', label: t('settings.fontSystem') },
-		{ value: 'serif', label: t('settings.fontSerif') }
-	]);
+
+	/** Classic has no list pane beside the reader, so its width has nothing to change there. */
+	const zero = $derived(($page.data.uiTheme as string | undefined) === 'zero');
+
+	function choose(key: ChoiceKey, value: string) {
+		update({ [key]: value } as Partial<Appearance>);
+	}
 
 	function update(next: Partial<Appearance>) {
 		draft = { ...draft, ...next };
@@ -133,51 +203,26 @@
 		/>
 	</fieldset>
 
-	<fieldset class="group">
-		<legend>{t('settings.density')}</legend>
-		<div class="segmented" role="radiogroup" aria-label={t('settings.density')}>
-			{#each DENSITY_OPTIONS as option (option.value)}
-				<button
-					type="button"
-					role="radio"
-					aria-checked={draft.density === option.value}
-					class:selected={draft.density === option.value}
-					onclick={() => update({ density: option.value })}>{option.label}</button
-				>
-			{/each}
-		</div>
-	</fieldset>
-
-	<fieldset class="group">
-		<legend>{t('settings.textSize')}</legend>
-		<div class="segmented" role="radiogroup" aria-label={t('settings.textSize')}>
-			{#each SIZE_OPTIONS as option (option.value)}
-				<button
-					type="button"
-					role="radio"
-					aria-checked={draft.textSize === option.value}
-					class:selected={draft.textSize === option.value}
-					onclick={() => update({ textSize: option.value })}>{option.label}</button
-				>
-			{/each}
-		</div>
-	</fieldset>
-
-	<fieldset class="group">
-		<legend>{t('settings.font')}</legend>
-		<div class="segmented" role="radiogroup" aria-label={t('settings.font')}>
-			{#each FONT_OPTIONS as option (option.value)}
-				<button
-					type="button"
-					role="radio"
-					aria-checked={draft.font === option.value}
-					class="font-{option.value}"
-					class:selected={draft.font === option.value}
-					onclick={() => update({ font: option.value })}>{option.label}</button
-				>
-			{/each}
-		</div>
-	</fieldset>
+	{#each SEGMENTS as group (group.heading)}
+		<h3 class="group-heading">{group.heading}</h3>
+		{#each group.rows.filter((row) => zero || !row.zeroOnly) as row (row.key)}
+			<fieldset class="group row">
+				<legend>{row.label}</legend>
+				<div class="segmented" role="radiogroup" aria-label={row.label}>
+					{#each row.options as option (option.value)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={draft[row.key] === option.value}
+							class={row.key === 'font' ? `font-${option.value}` : undefined}
+							class:selected={draft[row.key] === option.value}
+							onclick={() => choose(row.key, option.value)}>{option.label}</button
+						>
+					{/each}
+				</div>
+			</fieldset>
+		{/each}
+	{/each}
 
 	<fieldset class="group">
 		<legend>{t('settings.themeShare')}</legend>
@@ -221,6 +266,32 @@
 		margin: 1.25rem 0 0;
 		padding: 0;
 		border: none;
+	}
+
+	.group-heading {
+		margin: 1.75rem 0 0;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--color-line);
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: var(--color-text);
+	}
+
+	/* Label and buttons on one line when there is room, so the long list stays scannable. */
+	.group.row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		margin-top: 0.875rem;
+	}
+
+	.group.row legend {
+		float: left;
+		margin: 0;
+		font-weight: 500;
+		color: var(--color-text-secondary);
 	}
 
 	legend {
@@ -286,7 +357,7 @@
 		flex-wrap: wrap;
 		gap: 0.25rem;
 		padding: 0.25rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 	}
 
@@ -294,7 +365,7 @@
 		min-height: 2rem;
 		padding: 0 0.875rem;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: none;
 		color: var(--color-text-secondary);
 		font-size: 0.8125rem;

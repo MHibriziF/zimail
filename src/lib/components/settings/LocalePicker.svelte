@@ -47,7 +47,7 @@
 		align-items: flex-start;
 		gap: 0.2rem;
 		padding: 0.85rem 1rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		border: 1px solid var(--color-line, var(--z-border, #e5e5e5));
 		background: var(--color-surface, var(--z-panel, #fff));
 		color: inherit;

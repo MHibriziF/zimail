@@ -345,7 +345,7 @@
 		width: 100%;
 		max-width: 26rem;
 		padding: 1.25rem 1.375rem 1.375rem;
-		border-radius: 1.25rem;
+		border-radius: calc(1.25rem * var(--radius-scale, 1));
 		background: var(--color-surface);
 		box-shadow: var(--shadow-md);
 	}
@@ -375,7 +375,7 @@
 		overflow-x: auto;
 		margin-top: 0.875rem;
 		padding: 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		line-height: 1.5;
 		word-break: break-all;
@@ -406,7 +406,7 @@
 	.text-input {
 		width: 100%;
 		padding: 0.625rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		color: var(--color-text);
 		background: var(--color-surface-muted);
@@ -448,7 +448,7 @@
 		gap: 0.5rem;
 		margin-top: 1rem;
 		padding: 0.625rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		box-shadow: inset 0 0 0 1px var(--color-line);
 	}

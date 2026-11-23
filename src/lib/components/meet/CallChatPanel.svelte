@@ -80,7 +80,7 @@
 		flex-direction: column;
 		width: 300px;
 		flex-shrink: 0;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: #17171a;
 		overflow: hidden;
 	}
@@ -123,7 +123,7 @@
 		gap: 0.125rem;
 		max-width: 85%;
 		padding: 0.375rem 0.625rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: rgba(255, 255, 255, 0.08);
 		font-size: 0.8125rem;
 		align-self: flex-start;
@@ -157,7 +157,7 @@
 		padding: 0.5rem 0.625rem;
 		font-size: 0.8125rem;
 		border: 1px solid rgba(255, 255, 255, 0.15);
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: rgba(255, 255, 255, 0.06);
 		color: #fff;
 	}
@@ -168,7 +168,7 @@
 		font-size: 0.8125rem;
 		font-weight: 500;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: #26262b;
 		color: #fff;
 		cursor: pointer;

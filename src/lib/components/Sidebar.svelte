@@ -215,7 +215,7 @@
 		gap: 0.4375rem;
 		height: 2.5rem;
 		margin-bottom: 1rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		font-weight: 500;
 		color: var(--color-on-accent);
@@ -247,7 +247,7 @@
 		gap: 0.625rem;
 		height: 2.25rem;
 		padding: 0 0.625rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		color: var(--color-text-secondary);
 		transition: background 0.15s, color 0.15s;
@@ -343,7 +343,7 @@
 		width: 1.875rem;
 		height: 1.875rem;
 		margin-left: auto;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		color: var(--color-muted);
 		background: var(--color-surface-muted);
 		transition: background 0.15s, color 0.15s;

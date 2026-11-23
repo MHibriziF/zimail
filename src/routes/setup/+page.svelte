@@ -220,7 +220,7 @@
 		width: 100%;
 		margin-top: 0.5rem;
 		padding: 0.625rem 0.875rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.9375rem;
 		background: var(--color-surface-muted);
 		box-shadow: inset 0 0 0 1px var(--color-line);
@@ -270,7 +270,7 @@
 	.snippet {
 		margin-top: 0.625rem;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-family: ui-monospace, SFMono-Regular, monospace;
 		font-size: 0.75rem;
 		color: var(--color-text);

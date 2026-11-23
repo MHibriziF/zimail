@@ -102,7 +102,7 @@
 		flex-direction: column;
 		width: 300px;
 		flex-shrink: 0;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: #17171a;
 		overflow: hidden;
 	}
@@ -141,7 +141,7 @@
 	.call-transcript-language select {
 		padding: 0.375rem 0.5rem;
 		border: 1px solid rgba(255, 255, 255, 0.12);
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: #fff;
 		background: #26262b;
@@ -204,7 +204,7 @@
 		gap: 0.375rem;
 		padding: 0.5rem;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.75rem;
 		font-weight: 500;
 		color: #fff;

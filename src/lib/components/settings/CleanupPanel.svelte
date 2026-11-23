@@ -264,7 +264,7 @@
 	.text-input {
 		width: 100%;
 		padding: 0.625rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		color: var(--color-text);
 		background: var(--color-surface-muted);

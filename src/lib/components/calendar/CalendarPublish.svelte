@@ -157,7 +157,7 @@
 		align-items: center;
 		gap: 0.375rem;
 		padding: 0.4375rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		font-weight: 500;
 		white-space: nowrap;
@@ -184,7 +184,7 @@
 
 	.publish-input {
 		padding: 0.5rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 		font-size: 0.8125rem;
 		color: var(--color-text);

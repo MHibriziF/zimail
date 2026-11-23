@@ -44,7 +44,7 @@
 		min-height: 3rem;
 		max-width: calc(100vw - 2rem);
 		padding: 0.5rem 0.75rem 0.5rem 1rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		color: var(--color-surface);
 		background: var(--color-text);
@@ -53,7 +53,7 @@
 
 	.send-toast-action {
 		padding: 0.375rem 0.5rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-weight: 600;
 		color: inherit;
 		text-decoration: none;
@@ -68,7 +68,7 @@
 		place-items: center;
 		width: 1.75rem;
 		height: 1.75rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 1.125rem;
 		color: inherit;
 		opacity: 0.7;

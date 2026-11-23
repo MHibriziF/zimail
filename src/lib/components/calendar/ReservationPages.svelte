@@ -451,7 +451,7 @@
 		align-items: center;
 		gap: 0.375rem;
 		padding: 0.4375rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		font-weight: 500;
 		white-space: nowrap;
@@ -471,7 +471,7 @@
 		flex-direction: column;
 		gap: 0.75rem;
 		padding: 0.875rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 	}
 
@@ -496,7 +496,7 @@
 	.resv-input {
 		min-width: 0;
 		padding: 0.5rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font: inherit;
 		font-size: 0.875rem;
 		color: var(--color-text);
@@ -518,7 +518,7 @@
 	.resv-day {
 		min-width: 3rem;
 		padding: 0.375rem 0.5rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text);
 		background: var(--color-surface);

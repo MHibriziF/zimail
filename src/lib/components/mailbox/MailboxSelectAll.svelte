@@ -84,7 +84,7 @@
 		min-width: 11rem;
 		padding: 0.25rem;
 		background: var(--color-surface);
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-md);
 	}
 
@@ -98,7 +98,7 @@
 		gap: 0.5rem;
 		width: 100%;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		text-align: left;
@@ -129,7 +129,7 @@
 			left: 0;
 			min-width: 0;
 			padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
-			border-radius: 1.25rem 1.25rem 0 0;
+			border-radius: calc(1.25rem * var(--radius-scale, 1)) calc(1.25rem * var(--radius-scale, 1)) 0 0;
 			animation: sheet-up 220ms cubic-bezier(0.32, 0.72, 0, 1);
 		}
 

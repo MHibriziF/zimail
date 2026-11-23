@@ -151,7 +151,7 @@
 		flex-direction: column;
 		width: 15rem;
 		padding: 0.5rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface);
 		box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.15)), inset 0 0 0 1px var(--color-line);
 	}
@@ -159,7 +159,7 @@
 	.label-search input {
 		width: 100%;
 		padding: 0.4375rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text);
 		background: var(--color-surface-muted);
@@ -184,7 +184,7 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.375rem 0.5rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		cursor: pointer;
 	}
@@ -224,7 +224,7 @@
 		align-items: center;
 		gap: 0.375rem;
 		padding: 0.375rem 0.5rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		text-align: left;
 		color: var(--color-accent-text);

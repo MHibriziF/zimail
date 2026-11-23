@@ -395,7 +395,7 @@
 		display: flex;
 		flex-direction: column;
 		background: var(--color-surface);
-		border-radius: 1rem;
+		border-radius: calc(1rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-sm);
 		overflow: hidden;
 	}
@@ -452,7 +452,7 @@
 		justify-content: center;
 		width: 1.875rem;
 		height: 1.875rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		color: var(--color-text-secondary);
 		transition: background 0.15s, color 0.15s;
 	}
@@ -507,7 +507,7 @@
 		justify-content: center;
 		width: 1.75rem;
 		height: 1.75rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		color: var(--color-text-secondary);
 		transition: background 0.15s;
 	}

@@ -154,7 +154,7 @@
 		display: flex;
 		margin-bottom: 1rem;
 		overflow: hidden;
-		border-radius: 0.775rem;
+		border-radius: calc(0.775rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-sm);
 	}
 

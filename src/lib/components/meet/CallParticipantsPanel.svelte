@@ -155,7 +155,7 @@
 		flex-direction: column;
 		width: 300px;
 		flex-shrink: 0;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: #17171a;
 		overflow: hidden;
 	}
@@ -191,7 +191,7 @@
 		gap: 0.625rem;
 		padding: 0.5rem 0.5rem;
 		font-size: 0.8125rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 	}
 
 	.call-participant-avatar {
@@ -228,7 +228,7 @@
 
 	.call-rename-trigger {
 		padding: 0.25rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 	}
 
 	.call-rename-trigger:hover {
@@ -261,7 +261,7 @@
 		width: 100%;
 		padding: 0.375rem 0.5rem;
 		border: 1px solid rgba(255, 255, 255, 0.15);
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: #fff;
 		background: rgba(255, 255, 255, 0.06);
@@ -281,7 +281,7 @@
 	.call-rename-btn {
 		padding: 0.25rem 0.625rem;
 		border: none;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.75rem;
 		color: rgba(255, 255, 255, 0.8);
 		background: rgba(255, 255, 255, 0.08);

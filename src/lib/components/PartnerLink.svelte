@@ -60,7 +60,7 @@
 	.mark {
 		display: flex;
 		overflow: hidden;
-		border-radius: 0.775rem;
+		border-radius: calc(0.775rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-sm);
 		animation: mark-in 520ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 	}

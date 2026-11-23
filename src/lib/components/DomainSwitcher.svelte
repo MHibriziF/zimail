@@ -125,7 +125,7 @@
 		align-items: center;
 		gap: 0.375rem;
 		padding: 0.375rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		background: var(--color-surface-muted);
@@ -162,7 +162,7 @@
 		min-width: 13rem;
 		padding: 0.25rem;
 		background: var(--color-surface);
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-md);
 	}
 
@@ -173,7 +173,7 @@
 		gap: 0.5rem;
 		width: 100%;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		text-align: left;

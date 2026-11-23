@@ -336,7 +336,7 @@
 		gap: 0.375rem;
 		margin: 0.5rem 0 0;
 		padding: 0.25rem 0.5rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.75rem;
 		color: var(--color-text-secondary);
 	}
@@ -352,7 +352,7 @@
 		margin: 0.5rem 0;
 		padding: 0 0.5rem;
 		border: 0;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font: inherit;
 		font-size: 0.875rem;
 		line-height: 1.4;
@@ -369,7 +369,7 @@
 	/* A designed message sits on the white page it was built for, so give it a
 	   card to sit on. */
 	.frame.rich {
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: #ffffff;
 	}
 

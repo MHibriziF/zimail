@@ -64,7 +64,7 @@
 
 	.check:focus-visible {
 		outline: none;
-		border-radius: 0.25rem;
+		border-radius: calc(0.25rem * var(--radius-scale, 1));
 		box-shadow: 0 0 0 3px var(--color-focus-halo);
 	}
 
@@ -83,7 +83,7 @@
 		height: auto;
 		gap: 0.4rem;
 		padding: 0.375rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		box-shadow: inset 0 0 0 1px var(--color-line);

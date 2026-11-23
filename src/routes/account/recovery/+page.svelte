@@ -39,7 +39,7 @@
 	.brand-icon {
 		display: flex;
 		margin-bottom: 1rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-sm);
 	}
 

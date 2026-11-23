@@ -476,7 +476,7 @@
 		width: 2rem;
 		height: 2rem;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: transparent;
 		color: var(--ask-muted);
 		--icon-color: var(--ask-muted);
@@ -494,7 +494,7 @@
 		align-items: center;
 		gap: 0.25rem;
 		border: 1px solid var(--ask-line);
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 	}
 
 	.ask-saved.current {
@@ -522,7 +522,7 @@
 
 	.ask-saved-open:hover {
 		background: var(--ask-hover);
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 	}
 
 	.ask-icon:hover {
@@ -553,7 +553,7 @@
 		max-width: 85%;
 		margin: 0;
 		padding: 0.5rem 0.75rem;
-		border-radius: 0.875rem 0.875rem 0.25rem 0.875rem;
+		border-radius: calc(0.875rem * var(--radius-scale, 1)) calc(0.875rem * var(--radius-scale, 1)) calc(0.25rem * var(--radius-scale, 1)) calc(0.875rem * var(--radius-scale, 1));
 		background: var(--ask-accent);
 		color: var(--ask-on-accent);
 		white-space: pre-line;
@@ -577,7 +577,7 @@
 		gap: 0.125rem;
 		padding: 0.5rem 0.75rem;
 		border: 1px solid var(--ask-line);
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		color: inherit;
 		text-decoration: none;
 	}
@@ -639,7 +639,7 @@
 		justify-self: start;
 		margin-top: 0.25rem;
 		padding: 0.375rem 0.75rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		font-weight: 600;
 	}
@@ -681,7 +681,7 @@
 		resize: none;
 		padding: 0.5rem 0.625rem;
 		border: 1px solid var(--ask-line);
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		background: var(--ask-soft);
 		color: inherit;
 		font: inherit;
@@ -693,7 +693,7 @@
 		width: 2.25rem;
 		height: 2.25rem;
 		border: none;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		background: var(--ask-accent);
 		color: var(--ask-on-accent);
 		--icon-color: var(--ask-on-accent);

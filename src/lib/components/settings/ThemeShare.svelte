@@ -111,7 +111,7 @@
 		width: 100%;
 		padding: 0.625rem 0.75rem;
 		border: none;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		color: var(--color-text);
 		font-family: var(--font-geist-mono, ui-monospace, monospace);

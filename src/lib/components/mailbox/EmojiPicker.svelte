@@ -248,7 +248,7 @@
 		margin: 0;
 		padding: 0.5rem;
 		border: none;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		color: var(--color-text);
 		background: var(--color-surface);
 		box-shadow: 0 0 0 1px var(--color-line), 0 12px 32px rgba(0, 0, 0, 0.18);
@@ -262,7 +262,7 @@
 	.emoji-search {
 		height: 2.125rem;
 		padding: 0 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		color: var(--color-text);
 		background: var(--color-surface-muted);
@@ -284,7 +284,7 @@
 		place-items: center;
 		width: 1.75rem;
 		height: 1.75rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		color: var(--color-muted);
 	}
 
@@ -304,7 +304,7 @@
 
 	.emoji-cell {
 		height: 2.25rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 1.375rem;
 		line-height: 1;
 	}

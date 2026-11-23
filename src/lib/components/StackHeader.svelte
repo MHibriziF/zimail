@@ -77,7 +77,7 @@
 		width: 2.75rem;
 		height: 2.75rem;
 		margin-left: -0.5rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		color: var(--color-text);
 	}
 

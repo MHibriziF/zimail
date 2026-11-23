@@ -161,7 +161,7 @@
 		max-height: calc(100vh - 3rem);
 		overflow-y: auto;
 		padding: 1.125rem;
-		border-radius: 1.25rem;
+		border-radius: calc(1.25rem * var(--radius-scale, 1));
 		background: var(--color-surface);
 		box-shadow: var(--shadow-md);
 	}
@@ -195,7 +195,7 @@
 		gap: 0.75rem;
 		width: 100%;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		text-align: left;
 		transition: background 0.12s;
 	}
@@ -232,7 +232,7 @@
 	.text-input {
 		width: 100%;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		color: var(--color-text);
 		background: var(--color-surface-muted);

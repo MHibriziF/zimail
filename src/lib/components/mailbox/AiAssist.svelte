@@ -231,7 +231,7 @@
 		width: min(22rem, calc(100vw - 2rem));
 		padding: 0.75rem;
 		border: 1px solid var(--ai-line);
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--ai-bg);
 		color: var(--ai-text);
 		box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.12));
@@ -249,7 +249,7 @@
 		resize: vertical;
 		padding: 0.5rem 0.625rem;
 		border: 1px solid var(--ai-line);
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: transparent;
 		color: inherit;
 		font: inherit;

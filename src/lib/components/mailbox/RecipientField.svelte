@@ -271,7 +271,7 @@
 		max-height: 14rem;
 		overflow-y: auto;
 		padding: 0.25rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface);
 		box-shadow: var(--shadow-md);
 	}
@@ -280,7 +280,7 @@
 		display: block;
 		width: 100%;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		text-align: left;
 		color: var(--color-text);

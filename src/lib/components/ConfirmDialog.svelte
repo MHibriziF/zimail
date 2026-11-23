@@ -55,7 +55,7 @@
 		width: min(24rem, calc(100vw - 2rem));
 		padding: 0;
 		border: none;
-		border-radius: 0.875rem;
+		border-radius: calc(0.875rem * var(--radius-scale, 1));
 		color: var(--color-text);
 		background: var(--color-surface);
 		box-shadow: 0 0 0 1px var(--color-line), 0 16px 48px rgba(0, 0, 0, 0.24);
@@ -93,7 +93,7 @@
 	.btn {
 		min-height: 2.25rem;
 		padding: 0 1rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		font-weight: 500;
 		color: var(--color-text);

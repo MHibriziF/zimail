@@ -216,7 +216,7 @@
 		flex-direction: column;
 		width: 300px;
 		flex-shrink: 0;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: #17171a;
 		overflow: hidden;
 	}
@@ -305,7 +305,7 @@
 		gap: 0.5rem;
 		padding: 0.5rem 0.5rem;
 		font-size: 0.8125rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 	}
 
 	.call-admission-row:hover {

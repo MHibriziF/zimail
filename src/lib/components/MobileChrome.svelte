@@ -226,7 +226,7 @@
 			gap: 0.125rem;
 			min-height: 2.75rem;
 			border: 0;
-			border-radius: 0.75rem;
+			border-radius: calc(0.75rem * var(--radius-scale, 1));
 			color: var(--color-muted);
 			background: transparent;
 			-webkit-tap-highlight-color: transparent;
@@ -325,7 +325,7 @@
 			overscroll-behavior: contain;
 			padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
 			background: var(--color-surface);
-			border-radius: 1.25rem 1.25rem 0 0;
+			border-radius: calc(1.25rem * var(--radius-scale, 1)) calc(1.25rem * var(--radius-scale, 1)) 0 0;
 			box-shadow: var(--shadow-md);
 			animation: sheet-up 220ms cubic-bezier(0.32, 0.72, 0, 1);
 		}
@@ -350,7 +350,7 @@
 			gap: 0.75rem;
 			min-height: 2.75rem;
 			padding: 0 0.75rem;
-			border-radius: 0.75rem;
+			border-radius: calc(0.75rem * var(--radius-scale, 1));
 			font-size: 0.9375rem;
 			color: var(--color-text-secondary);
 		}

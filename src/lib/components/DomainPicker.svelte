@@ -84,7 +84,7 @@
 		padding: 0.875rem 1rem;
 		text-align: left;
 		background: var(--color-surface);
-		border-radius: 0.875rem;
+		border-radius: calc(0.875rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-sm);
 		transition: box-shadow 0.15s;
 	}
@@ -104,7 +104,7 @@
 		flex-shrink: 0;
 		width: 1.25rem;
 		height: 1.25rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		color: var(--color-on-accent);
 		background: var(--color-surface-muted);
 		box-shadow: inset 0 0 0 1px var(--color-line);
