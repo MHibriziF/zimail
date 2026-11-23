@@ -9,6 +9,7 @@
 	import { LABEL_SWATCH, type Label } from '$lib/mail/labels';
 	import type { CalendarEvent } from '$lib/calendar/events';
 	import UpcomingEvents from './calendar/UpcomingEvents.svelte';
+	import ResizeHandle from './ResizeHandle.svelte';
 
 	let {
 		counts,
@@ -61,9 +62,11 @@
 	function isActive(href: string): boolean {
 		return $page.url.pathname === href || $page.url.pathname.startsWith(`${href}/`);
 	}
+
+	let sidebarEl = $state<HTMLElement>();
 </script>
 
-<aside class="sidebar" class:collapsed data-part="sidebar">
+<aside class="sidebar" class:collapsed data-part="sidebar" bind:this={sidebarEl}>
 	<div class="sidebar-top">
 		<a href="/inbox" class="brand" title={APP_NAME}>
 			<Logo size={30} />
@@ -158,9 +161,20 @@
 			<Icon name={collapsed ? 'arrow-right-double-line' : 'arrow-left-double-line'} size={15} />
 		</button>
 	</div>
+	{#if !collapsed}
+		<ResizeHandle pane="sidebarPx" target={() => sidebarEl} label={t('nav.resizeSidebar')} class="classic-resize" />
+	{/if}
 </aside>
 
 <style>
+	/* Inside the edge: the sidebar clips what overflows it, which would hide half the handle. */
+	.sidebar > :global(.classic-resize) {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		right: 0;
+	}
+
 	.sidebar {
 		position: fixed;
 		top: 0;

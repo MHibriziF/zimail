@@ -7,11 +7,17 @@ export const PATCH: RequestHandler = async ({ request, locals, platform }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	let body: { appearance?: unknown };
+	let body: { appearance?: unknown; panes?: unknown };
 	try {
-		body = (await request.json()) as { appearance?: unknown };
+		body = (await request.json()) as { appearance?: unknown; panes?: unknown };
 	} catch {
 		return json({ error: 'Invalid request' }, { status: 400 });
+	}
+
+	// Dragged pane widths are merged in, not sent with the rest (see updatePanes).
+	if (body.panes && typeof body.panes === 'object') {
+		const appearance = await getPreferencesService(platform).updatePanes(locals.user.id, body.panes);
+		return json({ ok: true, appearance });
 	}
 
 	if (!body.appearance || typeof body.appearance !== 'object') {

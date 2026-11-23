@@ -1,5 +1,6 @@
 {
 	"common": {
+		"resizeHint": "Seret untuk mengubah ukuran. Klik dua kali untuk kembali ke lebar di Personalisasi.",
 		"back": "Kembali",
 		"close": "Tutup",
 		"cancel": "Batal",
@@ -39,6 +40,7 @@
 		"open": "Buka"
 	},
 	"nav": {
+		"resizeSidebar": "Ubah lebar bilah sisi",
 		"inbox": "Kotak masuk",
 		"archive": "Arsip",
 		"drafts": "Draf",
@@ -208,6 +210,7 @@
 		}
 	},
 	"mailbox": {
+		"resizeList": "Ubah lebar daftar pesan",
 		"empty": {
 			"inbox": "Kotak masuk Anda kosong",
 			"archive": "Tidak ada pesan yang diarsipkan",

@@ -7,6 +7,7 @@
 }
 
 [data-ui-theme='zero'] .z-sidebar {
+	position: relative;
 	width: var(--z-sidebar-width, 16rem);
 	flex-shrink: 0;
 	display: flex;
@@ -439,6 +440,29 @@
 [data-ui-theme='zero'][data-list='wide'] .z-list {
 	width: 45%;
 	max-width: 38rem;
+}
+
+/* A list width dragged by hand; phones always show the list full width. */
+@media (min-width: 768px) {
+	[data-ui-theme='zero'][data-sized-list] .z-list {
+		flex-shrink: 0;
+		width: var(--list-px);
+		min-width: 0;
+		max-width: none;
+	}
+}
+
+[data-ui-theme='zero'] .z-sidebar > .z-resize-sidebar {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	right: -0.3125rem;
+}
+
+/* Sits in the gap between list and reader without widening it. */
+[data-ui-theme='zero'] .z-mail > .z-resize-list {
+	flex-shrink: 0;
+	margin-inline: -0.3125rem;
 }
 
 [data-ui-theme='zero'] .z-read {

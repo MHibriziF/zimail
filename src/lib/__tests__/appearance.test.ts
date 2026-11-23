@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 import {
 	appearanceAttributes,
+	clampPane,
 	appearanceCss,
 	embeddableCss,
 	MAX_CUSTOM_CSS,
@@ -91,5 +92,23 @@ describe('custom CSS', () => {
 		assert.equal(appearanceCss(styled, { custom: false }), '');
 		assert.notEqual(serializeAppearance(styled), null);
 		assert.equal(serializeAppearance({ ...DEFAULT_APPEARANCE, customCss: '   ' }), null);
+	});
+});
+
+describe('dragged pane widths', () => {
+	test('are clamped to a readable range and dropped when not numbers', () => {
+		assert.equal(parseAppearance({ sidebarPx: 40 }).sidebarPx, 180);
+		assert.equal(parseAppearance({ listPx: 5000 }).listPx, 900);
+		assert.equal(parseAppearance({ listPx: 412.6 }).listPx, 413);
+		assert.equal(parseAppearance({ sidebarPx: '300px' }).sidebarPx, null);
+		assert.equal(clampPane('sidebarPx', 300), 300);
+	});
+
+	test('reach <html> as a flag and a variable, sharing the style with the accent', () => {
+		assert.equal(
+			appearanceAttributes({ ...DEFAULT_APPEARANCE, accent: '#7a9cc6', sidebarPx: 300, listPx: 420 }),
+			'data-sized-sidebar data-sized-list style="--color-accent: #7a9cc6; --sidebar-px: 300px; --list-px: 420px"'
+		);
+		assert.notEqual(serializeAppearance({ ...DEFAULT_APPEARANCE, listPx: 420 }), null);
 	});
 });

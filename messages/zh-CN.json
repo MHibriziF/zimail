@@ -1,5 +1,6 @@
 {
 	"common": {
+		"resizeHint": "拖动以调整宽度，双击恢复为个性化中设置的宽度。",
 		"back": "返回",
 		"close": "关闭",
 		"cancel": "取消",
@@ -39,6 +40,7 @@
 		"open": "打开"
 	},
 	"nav": {
+		"resizeSidebar": "调整侧栏宽度",
 		"inbox": "收件箱",
 		"archive": "归档",
 		"drafts": "草稿",
@@ -208,6 +210,7 @@
 		}
 	},
 	"mailbox": {
+		"resizeList": "调整邮件列表宽度",
 		"empty": {
 			"inbox": "收件箱是空的",
 			"archive": "没有已归档的邮件",

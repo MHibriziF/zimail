@@ -131,7 +131,11 @@
 	const zero = $derived(($page.data.uiTheme as string | undefined) === 'zero');
 
 	function choose(key: ChoiceKey, value: string) {
-		update({ [key]: value } as Partial<Appearance>);
+		const next = { [key]: value } as Partial<Appearance>;
+		// A preset width replaces one dragged by hand.
+		if (key === 'sidebar') next.sidebarPx = null;
+		if (key === 'listWidth') next.listPx = null;
+		update(next);
 	}
 
 	function update(next: Partial<Appearance>) {
