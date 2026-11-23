@@ -620,7 +620,7 @@
 		"changing": "修改中…",
 		"passwordChanged": "密码已修改",
 		"passwordsDoNotMatch": "两次输入的新密码不一致",
-		"fromNamePlaceholder": "发件人名称",
+		"fromNamePlaceholder": "添加发件人名称",
 		"signaturePlaceholder": "此地址的签名",
 		"addressPlaceholder": "support",
 		"namePlaceholder": "名称",

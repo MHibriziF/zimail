@@ -620,7 +620,7 @@
 		"changing": "Changing…",
 		"passwordChanged": "Password changed",
 		"passwordsDoNotMatch": "New passwords do not match",
-		"fromNamePlaceholder": "From name",
+		"fromNamePlaceholder": "Add a From name",
 		"signaturePlaceholder": "Signature for this address",
 		"addressPlaceholder": "Support",
 		"namePlaceholder": "Name",

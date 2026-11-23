@@ -620,7 +620,7 @@
 		"changing": "Changement…",
 		"passwordChanged": "Mot de passe changé",
 		"passwordsDoNotMatch": "Les nouveaux mots de passe ne correspondent pas",
-		"fromNamePlaceholder": "Nom d’expéditeur",
+		"fromNamePlaceholder": "Ajouter un nom d’expéditeur",
 		"signaturePlaceholder": "Signature pour cette adresse",
 		"addressPlaceholder": "Support",
 		"namePlaceholder": "Nom",
