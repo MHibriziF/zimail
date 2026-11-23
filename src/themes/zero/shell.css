@@ -748,7 +748,8 @@
 		box-shadow: none;
 	}
 
-	[data-ui-theme='zero'] .z-row-quick {
+	[data-ui-theme='zero'] .z-row-quick,
+	[data-ui-theme='zero'] .z-send-kbd {
 		display: none;
 	}
 
@@ -2045,19 +2046,32 @@
 	[data-ui-theme='zero'] .z-mobile-nav button {
 		flex: 1;
 		display: grid;
+		grid-template-rows: 1.25rem auto;
 		place-items: center;
+		align-content: center;
+		gap: 0.25rem;
 		background: none;
 		border: none;
 		color: var(--z-muted);
-		width: 100%;
+		--icon-color: var(--z-muted);
 		min-width: var(--touch-target);
 		min-height: var(--touch-target);
 		height: 3.5rem;
+		padding: 0;
+		font: inherit;
+		font-size: 0.75rem;
+		font-weight: 500;
+		line-height: 1;
+		text-decoration: none;
 	}
 
-	[data-ui-theme='zero'] .z-mobile-nav :global(.tip-wrap) {
-		flex: 1;
-		height: 100%;
+	[data-ui-theme='zero'] .z-mobile-nav [aria-current='page'] {
+		color: var(--z-fg);
+		--icon-color: var(--z-fg);
+	}
+
+	[data-ui-theme='zero'] .z-mobile-nav [aria-current='page'] span {
+		font-weight: 600;
 	}
 
 	[data-ui-theme='zero'] .z-root {
@@ -2078,7 +2092,32 @@
 	}
 
 	[data-ui-theme='zero'] .z-thread-bar {
-		padding-top: calc(0.75rem + env(safe-area-inset-top));
+		padding: calc(0.5rem + env(safe-area-inset-top)) 0.5rem 0.5rem;
+	}
+
+	[data-ui-theme='zero'] .z-thread-bar-right {
+		gap: 0.25rem;
+	}
+
+	/* Full-size targets as plain icons: seven filled squares in a row read as a keyboard. */
+	[data-ui-theme='zero'] .z-thread-bar .z-thread-icon,
+	[data-ui-theme='zero'] .z-thread-bar .z-thread-trash {
+		width: var(--touch-target);
+		height: var(--touch-target);
+		border: none;
+		border-radius: 0.75rem;
+		background: none;
+	}
+
+	[data-ui-theme='zero'] .z-thread-bar .z-thread-icon:active,
+	[data-ui-theme='zero'] .z-thread-bar .z-thread-trash:active {
+		background: var(--z-hover);
+	}
+
+	/* Reply all and Forward all are under More here: the reply row below the last message covers the rest. */
+	[data-ui-theme='zero'] .z-thread .z-wide,
+	[data-ui-theme='zero'] .z-thread .tip-wrap:has(> .z-wide) {
+		display: none;
 	}
 
 	[data-ui-theme='zero'] .z-list-tools .z-icon-btn,
@@ -2091,6 +2130,44 @@
 	[data-ui-theme='zero'] .z-search kbd,
 	[data-ui-theme='zero'] .z-views {
 		display: none;
+	}
+
+	/* The phone has no sidebar in view, so the header names the folder and search becomes a button. */
+	[data-ui-theme='zero'] .z-list-title {
+		flex: 1;
+		min-width: 0;
+		margin: 0;
+		overflow: hidden;
+		color: var(--z-fg);
+		font-size: 1.125rem;
+		font-weight: 600;
+		letter-spacing: -0.01em;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	[data-ui-theme='zero'] .z-list-tools .tip-wrap.grow:has(> .z-search) {
+		flex: 0 0 auto;
+	}
+
+	[data-ui-theme='zero'] .z-list-tools .z-search {
+		flex: 0 0 auto;
+		justify-content: center;
+		width: var(--touch-target);
+		height: var(--touch-target);
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--z-fg);
+	}
+
+	[data-ui-theme='zero'] .z-list-tools .z-search-label {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
 	}
 
 	/* The chips are the phone's filter control (Views is hidden), so they get a finger-sized target. */
@@ -2132,6 +2209,20 @@
 
 @media (min-width: 768px) {
 	[data-ui-theme='zero'] .z-mobile-nav {
+		display: none;
+	}
+
+	/* The sidebar names the folder here; the heading stays for screen readers. */
+	[data-ui-theme='zero'] .z-list-title {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+
+	[data-ui-theme='zero'] .z-thread .z-narrow {
 		display: none;
 	}
 

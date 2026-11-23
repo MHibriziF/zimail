@@ -427,19 +427,23 @@
 		{/if}
 	</div>
 
-	<nav class="z-mobile-nav">
-		<Tooltip text={t('nav.inbox')} side="top">
-			<a href="/inbox" aria-label={t('nav.inbox')}><Icon name="Inbox" size={18} /></a>
-		</Tooltip>
-		<Tooltip text={t('nav.compose')} side="top">
-			<button type="button" aria-label={t('nav.compose')} onclick={openCompose}><Icon name="PencilCompose" size={16} /></button>
-		</Tooltip>
-		<Tooltip text={t('nav.sent')} side="top">
-			<a href="/sent" aria-label={t('nav.sent')}><Icon name="Plane2" size={18} /></a>
-		</Tooltip>
-		<Tooltip text={t('nav.settings')} side="top">
-			<a href="/settings/general" aria-label={t('nav.settings')}><Icon name="SettingsGear" size={18} /></a>
-		</Tooltip>
+	<nav class="z-mobile-nav" aria-label={t('nav.mailNavigation')}>
+		<a href="/inbox" aria-current={isActive('/inbox') ? 'page' : undefined}>
+			<Icon name="Inbox" size={18} />
+			<span>{t('nav.inbox')}</span>
+		</a>
+		<button type="button" onclick={openCompose}>
+			<Icon name="PencilCompose" size={16} />
+			<span>{t('nav.compose')}</span>
+		</button>
+		<a href="/sent" aria-current={isActive('/sent') ? 'page' : undefined}>
+			<Icon name="Plane2" size={18} />
+			<span>{t('nav.sent')}</span>
+		</a>
+		<a href="/settings/general" aria-current={settings ? 'page' : undefined}>
+			<Icon name="SettingsGear" size={18} />
+			<span>{t('nav.settings')}</span>
+		</a>
 	</nav>
 </div>
 

@@ -51,6 +51,7 @@
 		"calendar": "Calendar",
 		"admin": "Admin",
 		"compose": "Compose",
+		"mailNavigation": "Mail",
 		"newEmail": "Compose",
 		"newMessage": "Compose",
 		"core": "Core",
