@@ -370,6 +370,6 @@
 	.book-foot {
 		margin: 0;
 		font-size: 0.75rem;
-		color: var(--color-muted);
+		color: var(--color-text-secondary);
 	}
 </style>

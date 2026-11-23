@@ -2277,7 +2277,9 @@
 		margin-inline: auto;
 	}
 
-	[data-ui-theme='zero'] .z-settings-toggle {
+	/* The bar only holds the phone's sidebar toggle; on a wider screen it would be an empty band. */
+	[data-ui-theme='zero'] .z-settings-toggle,
+	[data-ui-theme='zero'] .z-settings-bar {
 		display: none;
 	}
 

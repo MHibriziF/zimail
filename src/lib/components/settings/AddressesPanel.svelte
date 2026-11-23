@@ -280,13 +280,28 @@
 		gap: 0.625rem;
 	}
 
+	/* Edited in place, so it looks like a field: an underline at rest, a fill under the pointer. */
 	.name-input {
 		width: 100%;
+		margin-left: -0.375rem;
+		padding: 0.25rem 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		font-weight: 500;
 		color: var(--color-text);
 		background: transparent;
+		box-shadow: inset 0 -1px 0 var(--color-line);
 		outline: none;
+		transition: background 0.12s ease;
+	}
+
+	.name-input:hover:not(:disabled) {
+		background: var(--color-surface-muted);
+	}
+
+	.name-input:focus-visible {
+		background: var(--color-surface-muted);
+		box-shadow: inset 0 0 0 1px var(--color-accent-text);
 	}
 
 	.name-input::placeholder {

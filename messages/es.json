@@ -620,7 +620,7 @@
 		"changing": "Cambiando…",
 		"passwordChanged": "Contraseña cambiada",
 		"passwordsDoNotMatch": "Las nuevas contraseñas no coinciden",
-		"fromNamePlaceholder": "Nombre del remitente",
+		"fromNamePlaceholder": "Añadir nombre del remitente",
 		"signaturePlaceholder": "Firma para esta dirección",
 		"addressPlaceholder": "Soporte",
 		"namePlaceholder": "Nombre",
