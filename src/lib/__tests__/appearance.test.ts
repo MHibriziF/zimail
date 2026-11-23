@@ -15,7 +15,8 @@ describe('parseAppearance', () => {
 			accent: '#7a9cc6',
 			density: 'compact',
 			textSize: 'large',
-			font: 'serif'
+			font: 'serif',
+			palettes: { light: {}, dark: {} }
 		});
 	});
 
@@ -57,7 +58,7 @@ describe('appearanceAttributes', () => {
 	test('writes only what differs from the default', () => {
 		assert.equal(appearanceAttributes(DEFAULT_APPEARANCE), '');
 		assert.equal(
-			appearanceAttributes({ accent: '#c98ea4', density: 'compact', textSize: 'default', font: 'system' }),
+			appearanceAttributes({ ...DEFAULT_APPEARANCE, accent: '#c98ea4', density: 'compact', font: 'system' }),
 			'data-density="compact" data-font="system" style="--color-accent: #c98ea4"'
 		);
 	});

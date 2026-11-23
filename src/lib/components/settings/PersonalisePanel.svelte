@@ -3,6 +3,8 @@
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import Icon from '../Icon.svelte';
+	import PaletteEditor from './PaletteEditor.svelte';
+	import ThemeShare from './ThemeShare.svelte';
 	import { t } from '$lib/i18n';
 	import {
 		ACCENT_PRESETS,
@@ -122,6 +124,16 @@
 	</fieldset>
 
 	<fieldset class="group">
+		<legend>{t('settings.palette')}</legend>
+		<PaletteEditor
+			palettes={draft.palettes}
+			accent={draft.accent}
+			onpalettes={(palettes) => update({ palettes })}
+			onpreset={(accent, palettes) => update({ accent, palettes })}
+		/>
+	</fieldset>
+
+	<fieldset class="group">
 		<legend>{t('settings.density')}</legend>
 		<div class="segmented" role="radiogroup" aria-label={t('settings.density')}>
 			{#each DENSITY_OPTIONS as option (option.value)}
@@ -165,6 +177,11 @@
 				>
 			{/each}
 		</div>
+	</fieldset>
+
+	<fieldset class="group">
+		<legend>{t('settings.themeShare')}</legend>
+		<ThemeShare appearance={draft} onimport={(theme) => update(theme)} />
 	</fieldset>
 
 	<div class="actions">

@@ -1837,6 +1837,15 @@
 	font-size: 1.25rem;
 }
 
+/* The scroller's own padding would leave a strip above the sticky title for content to show through. */
+@media (max-width: 900px) {
+	[data-ui-theme='zero'] .z-settings-scroll .stack-header {
+		top: -1rem;
+		margin-inline: -1.25rem;
+		padding-inline: 0.75rem;
+	}
+}
+
 [data-ui-theme='zero'] .z-root.settings .stack-back {
 	display: none;
 }

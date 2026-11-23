@@ -1,7 +1,10 @@
+import { EMPTY_PALETTES, isEmptyPalettes, paletteCss, parsePalettes, type Palettes } from './palette';
+
 /**
- * How a user has tuned the look of either shell: an accent colour, row density, text size and
- * font. Stored as JSON on the user and rendered as attributes on <html>, so the first paint is
- * already right. The accent's hover, tint and text colours are derived from it in CSS.
+ * How a user has tuned the look of either shell: an accent colour, their own palette, row
+ * density, text size and font. Stored as JSON on the user and rendered on <html> and in a <style>
+ * in <head>, so the first paint is already right. The accent's hover, tint and text colours are
+ * derived from it in CSS.
  */
 export const DENSITIES = ['comfortable', 'compact'] as const;
 export const TEXT_SIZES = ['small', 'default', 'large'] as const;
@@ -17,13 +20,16 @@ export type Appearance = {
 	density: Density;
 	textSize: TextSize;
 	font: FontChoice;
+	/** Base colours per mode; an empty palette keeps the theme's own. */
+	palettes: Palettes;
 };
 
 export const DEFAULT_APPEARANCE: Appearance = {
 	accent: null,
 	density: 'comfortable',
 	textSize: 'default',
-	font: 'default'
+	font: 'default',
+	palettes: EMPTY_PALETTES
 };
 
 /** Picked to sit well on both light and dark surfaces; the first is the default sage. */
@@ -57,7 +63,8 @@ export function parseAppearance(value: unknown): Appearance {
 		accent: parseAccent(input.accent),
 		density: pick(DENSITIES, input.density, DEFAULT_APPEARANCE.density),
 		textSize: pick(TEXT_SIZES, input.textSize, DEFAULT_APPEARANCE.textSize),
-		font: pick(FONTS, input.font, DEFAULT_APPEARANCE.font)
+		font: pick(FONTS, input.font, DEFAULT_APPEARANCE.font),
+		palettes: parsePalettes(input.palettes)
 	};
 }
 
@@ -66,7 +73,8 @@ export function isDefaultAppearance(appearance: Appearance): boolean {
 		appearance.accent === DEFAULT_APPEARANCE.accent &&
 		appearance.density === DEFAULT_APPEARANCE.density &&
 		appearance.textSize === DEFAULT_APPEARANCE.textSize &&
-		appearance.font === DEFAULT_APPEARANCE.font
+		appearance.font === DEFAULT_APPEARANCE.font &&
+		isEmptyPalettes(appearance.palettes)
 	);
 }
 
@@ -99,4 +107,43 @@ export function applyAppearance(root: HTMLElement, appearance: Appearance): void
 	set('font', appearance.font, DEFAULT_APPEARANCE.font);
 	if (appearance.accent) root.style.setProperty('--color-accent', appearance.accent);
 	else root.style.removeProperty('--color-accent');
+	applyAppearanceCss(root.ownerDocument, appearance);
+}
+
+/** The palette's CSS, for the <style> the server puts in <head> and the editor's live preview. */
+export function appearanceCss(appearance: Appearance): string {
+	return paletteCss(appearance.palettes);
+}
+
+export const APPEARANCE_STYLE_ID = 'zimail-appearance';
+
+/** Puts the palette on a live page, replacing what the server rendered. */
+export function applyAppearanceCss(doc: Document, appearance: Appearance): void {
+	let style = doc.getElementById(APPEARANCE_STYLE_ID);
+	if (!style) {
+		style = doc.createElement('style');
+		style.id = APPEARANCE_STYLE_ID;
+		doc.head.append(style);
+	}
+	style.textContent = appearanceCss(appearance);
+}
+
+const SHARE_FORMAT = 'zimail-theme@1';
+
+/** A theme to share or back up: the colours and the look, not anything about the account. */
+export function exportTheme(appearance: Appearance): string {
+	const { accent, density, textSize, font, palettes } = appearance;
+	return JSON.stringify({ format: SHARE_FORMAT, accent, density, textSize, font, palettes }, null, 2);
+}
+
+/** Reads a shared theme; null when the text is not one. Unknown values fall back like stored ones. */
+export function importTheme(text: string): Appearance | null {
+	let raw: unknown;
+	try {
+		raw = JSON.parse(text);
+	} catch {
+		return null;
+	}
+	if (!raw || typeof raw !== 'object' || (raw as { format?: unknown }).format !== SHARE_FORMAT) return null;
+	return parseAppearance(raw);
 }

@@ -14,7 +14,7 @@ import { finishHead } from '$lib/server/page-head';
 import { APP_NAME } from '$lib/constants';
 import { translate } from '$lib/i18n/translate';
 import { BUILTIN_THEME_IDS, DEFAULT_UI_THEME, parseThemeId } from '$lib/ui-theme/ids';
-import { appearanceAttributes, DEFAULT_APPEARANCE } from '$lib/ui-theme/appearance';
+import { APPEARANCE_STYLE_ID, appearanceAttributes, appearanceCss, DEFAULT_APPEARANCE } from '$lib/ui-theme/appearance';
 import {
 	DEFAULT_LOCALE,
 	LOCALE_COOKIE,
@@ -51,6 +51,13 @@ function htmlOpenTag(locale: string, uiTheme: string, appearance = DEFAULT_APPEA
 	return `<html ${attributes.filter(Boolean).join(' ')}>`;
 }
 
+/** The user's palette as a <style> in <head>. Only checked hex values and fixed selectors go in. */
+function withAppearanceStyle(html: string, appearance = DEFAULT_APPEARANCE): string {
+	const css = appearanceCss(appearance);
+	if (!css || !html.includes('</head>')) return html;
+	return html.replace('</head>', '<style id="' + APPEARANCE_STYLE_ID + '">' + css + '</style></head>');
+}
+
 /**
  * Serves the page with the shell already named on `<html>`.
  *
@@ -72,7 +79,10 @@ function render(event: RequestEvent, resolve: Resolve): ReturnType<Handle> {
 	};
 	return resolve(event, {
 		transformPageChunk: ({ html }) =>
-			finishHead(html.replace('<html lang="en">', htmlOpenTag(locale, uiTheme, event.locals.appearance)), preview)
+			withAppearanceStyle(
+				finishHead(html.replace('<html lang="en">', htmlOpenTag(locale, uiTheme, event.locals.appearance)), preview),
+				event.locals.appearance
+			)
 	});
 }
 
