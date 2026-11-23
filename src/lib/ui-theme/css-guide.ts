@@ -1,4 +1,4 @@
-import { CHOICES } from './appearance';
+import { CHOICES, kebab } from './appearance';
 
 /**
  * What the custom CSS guide documents. Kept next to the appearance code so a renamed token or a
@@ -38,7 +38,7 @@ export const GUIDE_ATTRIBUTES: { name: string; values: readonly string[] }[] = [
 	{ name: 'data-ui-theme', values: ['zero', 'classic'] },
 	{ name: 'data-theme', values: ['light', 'dark'] },
 	...Object.values(CHOICES).map((choice) => ({
-		name: `data-${choice.attribute.replaceAll(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`,
+		name: 'data-' + kebab(choice.attribute),
 		values: choice.options.slice(1)
 	}))
 ];

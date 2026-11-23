@@ -107,7 +107,7 @@ export function serializeAppearance(appearance: Appearance): string | null {
 }
 
 /** `textSize` -> `text-size`, for the attribute name in HTML. */
-function kebab(name: string): string {
+export function kebab(name: string): string {
 	return name.replaceAll(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
