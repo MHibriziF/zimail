@@ -209,7 +209,8 @@ dialog:modal {
 		font-size: 16px;
 	}
 
-	.icon-btn {
+	/* `html` outranks the base .icon-btn rule further down, which otherwise always won. */
+	html .icon-btn {
 		width: var(--touch-target);
 		height: var(--touch-target);
 		border-radius: calc(0.75rem * var(--radius-scale, 1));

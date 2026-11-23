@@ -757,8 +757,8 @@
 		justify-content: center;
 		font-size: 1.75rem;
 		font-weight: 600;
-		color: rgba(255, 255, 255, 0.9);
-		background: var(--color-accent, #3b82f6);
+		color: var(--color-on-accent, #14231a);
+		background: var(--color-accent, #90ac9a);
 	}
 
 	.lobby-controls {
@@ -838,7 +838,8 @@
 		width: 80px;
 		height: 6px;
 		border-radius: 999px;
-		background: var(--color-surface-2, #26262b);
+		/* An empty track in the text colour, faint in either mode; it was always near-black. */
+		background: color-mix(in oklch, var(--color-text) 14%, transparent);
 		overflow: hidden;
 	}
 

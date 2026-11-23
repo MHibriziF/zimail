@@ -602,13 +602,13 @@
 	}
 
 	.meetings-btn-accent {
-		color: var(--color-accent-text);
-		background: var(--color-accent-soft);
+		color: var(--color-on-accent);
+		background: var(--color-accent);
 		box-shadow: none;
 	}
 
 	.meetings-btn-accent:hover:not(:disabled) {
-		background: color-mix(in srgb, var(--color-accent) 28%, transparent);
+		background: var(--color-accent-hover);
 	}
 
 	.meetings-error {
