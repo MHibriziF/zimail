@@ -63,7 +63,7 @@
 	}
 </script>
 
-<aside class="sidebar" class:collapsed>
+<aside class="sidebar" class:collapsed data-part="sidebar">
 	<div class="sidebar-top">
 		<a href="/inbox" class="brand" title={APP_NAME}>
 			<Logo size={30} />
@@ -71,7 +71,7 @@
 		</a>
 	</div>
 
-	<a href="/compose" class="new-message" title={t('nav.newMessage')}>
+	<a href="/compose" class="new-message" data-part="compose" title={t('nav.newMessage')}>
 		<Icon name="pencil-line" size={collapsed ? 18 : 16} />
 		{#if !collapsed}<span>{t('nav.newMessage')}</span>{/if}
 	</a>

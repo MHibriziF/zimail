@@ -259,12 +259,12 @@
 		></button>
 	{/if}
 
-	<aside class="z-sidebar">
+	<aside class="z-sidebar" data-part="sidebar">
 		<AccountHeader {data} collapsed={settings || mobileOpen ? false : collapsed} onLogout={logout} />
 
 		{#if !settings}
 			<Tooltip text={t('nav.compose')} shortcut="C" side="right" enabled={collapsed && !mobileOpen} stretch>
-				<button type="button" class="z-compose" aria-label={t('nav.compose')} onclick={openCompose}>
+				<button type="button" class="z-compose" data-part="compose" aria-label={t('nav.compose')} onclick={openCompose}>
 					{#if collapsed && !mobileOpen}
 						<Icon name="PencilCompose" size={14} />
 					{:else}
@@ -347,6 +347,7 @@
 					<button
 						type="button"
 						class="z-nav-link"
+						data-part="ask-ai"
 						class:active={askOpen}
 						aria-label={collapsed && !mobileOpen ? t('ai.askOpen') : undefined}
 						onclick={() => {

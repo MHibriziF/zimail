@@ -80,7 +80,7 @@
 
 	<div class="topbar-actions">
 		{#if $page.data.aiAvailable !== false}
-			<button type="button" class="ask-trigger" aria-expanded={askOpen} onclick={() => (askOpen = !askOpen)}>
+			<button type="button" class="ask-trigger" data-part="ask-ai" aria-expanded={askOpen} onclick={() => (askOpen = !askOpen)}>
 				<Icon name="sparkling-line" size={16} />
 				<span>{t('ai.askOpen')}</span>
 			</button>
