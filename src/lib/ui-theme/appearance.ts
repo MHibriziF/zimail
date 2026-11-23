@@ -148,7 +148,7 @@ export function appearanceCss(appearance: Appearance, { custom = true } = {}): s
  * character inside one, so the stylesheet keeps its meaning and cannot end early.
  */
 export function embeddableCss(css: string): string {
-	return css.trim().replaceAll('<', '\\3c ');
+	return css.trim().replaceAll('<', String.raw`\3c `);
 }
 
 export const APPEARANCE_STYLE_ID = 'zimail-appearance';
