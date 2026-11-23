@@ -568,14 +568,6 @@
 					<Icon name="Forward" size={14} />
 					<span>{t('thread.forwardAll')}</span>
 				</button>
-				<button
-					type="button"
-					class="z-thread-replyall z-wide"
-					onclick={() => startReply('replyAll', latest)}
-				>
-					<Icon name="Reply" size={14} />
-					<span>{t('thread.replyAll')}</span>
-				</button>
 				<Tooltip text={starred ? t('mailbox.unstar') : t('mailbox.star')}>
 					<button
 						type="button"
@@ -674,10 +666,6 @@
 					</Tooltip>
 					{#if menuFor === 'thread'}
 						<div class="z-pop" role="menu" tabindex="-1" onpointerdown={(event) => event.stopPropagation()}>
-							<button type="button" class="z-narrow" onclick={() => { menuFor = null; startReply('replyAll', latest); }}>
-								<Icon name="Reply" size={14} />
-								{t('thread.replyAll')}
-							</button>
 							<button type="button" class="z-narrow" onclick={() => { menuFor = null; startForwardAll(); }}>
 								<Icon name="Forward" size={14} />
 								{t('thread.forwardAll')}

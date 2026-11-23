@@ -75,6 +75,12 @@
 	padding: 0;
 }
 
+/* The focus ring is the accent's text tone: 3:1 or more on Zero's surfaces, unlike the browser's blue. */
+[data-ui-theme='zero'] :focus-visible {
+	outline: 2px solid var(--color-accent-text);
+	outline-offset: 2px;
+}
+
 [data-ui-theme='zero'] .z-tile.active {
 	outline: 2px solid var(--z-primary);
 	outline-offset: 0;
@@ -953,6 +959,7 @@
 	background: var(--z-hover);
 }
 
+/* Bin looks like its neighbours and turns red when it is about to be used, not all the time. */
 [data-ui-theme='zero'] .z-thread-trash {
 	display: inline-flex;
 	align-items: center;
@@ -961,14 +968,15 @@
 	height: 1.75rem;
 	padding: 0;
 	border-radius: 0.5rem;
-	border: 1px solid var(--z-danger-line);
-	background: var(--z-danger-soft);
+	border: none;
+	background: var(--z-chip);
 	cursor: pointer;
-	--icon-color: var(--z-danger-icon);
 }
 
-[data-ui-theme='zero'] .z-thread-trash:hover {
-	background: color-mix(in srgb, var(--z-danger-line) 70%, transparent);
+[data-ui-theme='zero'] .z-thread-trash:hover,
+[data-ui-theme='zero'] .z-thread-trash:focus-visible {
+	background: var(--z-danger-soft);
+	--icon-color: var(--z-danger-icon);
 }
 
 [data-ui-theme='zero'] .z-thread-menu {
@@ -1020,8 +1028,10 @@
 
 [data-ui-theme='zero'] .z-thread-subject {
 	margin: 0;
-	font-size: 1rem;
-	font-weight: 500;
+	font-size: 1.25rem;
+	font-weight: 600;
+	line-height: 1.3;
+	text-wrap: balance;
 	letter-spacing: -0.01em;
 	color: var(--z-fg);
 }
