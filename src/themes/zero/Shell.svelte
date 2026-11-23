@@ -6,6 +6,7 @@
 	import { LABEL_SWATCH } from '$lib/mail/labels';
 	import type { ThemeShellProps } from '$lib/ui-theme/types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import ResizeHandle from '$lib/components/ResizeHandle.svelte';
 	import UpcomingEvents from '$lib/components/calendar/UpcomingEvents.svelte';
 	import AccountHeader from './AccountHeader.svelte';
 	import Icon from './icons/Icon.svelte';
@@ -22,6 +23,7 @@
 	let mobileOpen = $state(false);
 	let paletteOpen = $state(false);
 	let askOpen = $state(false);
+	let sidebarEl = $state<HTMLElement>();
 	let shortcutsOpen = $state(false);
 	let chord = $state('');
 
@@ -259,7 +261,7 @@
 		></button>
 	{/if}
 
-	<aside class="z-sidebar" data-part="sidebar">
+	<aside class="z-sidebar" data-part="sidebar" bind:this={sidebarEl}>
 		<AccountHeader {data} collapsed={settings || mobileOpen ? false : collapsed} onLogout={logout} />
 
 		{#if !settings}
@@ -395,6 +397,9 @@
 				</Tooltip>
 			{/if}
 		</div>
+		{#if !collapsed}
+			<ResizeHandle pane="sidebarPx" target={() => sidebarEl} label={t('nav.resizeSidebar')} class="z-resize-sidebar" />
+		{/if}
 	</aside>
 
 	<div class="z-stage">

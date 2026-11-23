@@ -1,6 +1,6 @@
 import { DEFAULT_LOCALE, parseLocale, type Locale } from '$lib/i18n/locales';
 import { DEFAULT_UI_THEME, isThemeId } from '$lib/ui-theme/ids';
-import { parseAppearance, serializeAppearance, type Appearance } from '$lib/ui-theme/appearance';
+import { clampPane, PANE_LIMITS, parseAppearance, serializeAppearance, type Appearance, type PaneKey } from '$lib/ui-theme/appearance';
 import { cleanSignature } from '../util/signature-html';
 import type { PreferencesRepository } from './repository';
 
@@ -18,6 +18,11 @@ export type PreferencesService = {
 	getShellPreferences(userId: string): Promise<ShellPreferences>;
 	/** Saves what is valid of `value` (the rest falls back to the default) and returns it. */
 	setAppearance(userId: string, value: unknown): Promise<Appearance>;
+	/**
+	 * Changes only the dragged pane widths, on top of what is stored, so two quick drags (or a drag
+	 * while Personalise saves) cannot undo each other. A null width goes back to the chosen preset.
+	 */
+	updatePanes(userId: string, panes: unknown): Promise<Appearance>;
 };
 
 export type ShellPreferences = { uiTheme: string; locale: Locale; appearance: Appearance };
@@ -67,6 +72,19 @@ export function createPreferencesService(repo: PreferencesRepository): Preferenc
 		},
 		async setAppearance(userId, value) {
 			const appearance = parseAppearance(value);
+			await repo.setAppearance(userId, serializeAppearance(appearance));
+			return appearance;
+		},
+		async updatePanes(userId, panes) {
+			const row = await repo.getShellPreferences(userId);
+			const appearance = parseAppearance(row?.ui_appearance);
+			const input = (panes && typeof panes === 'object' ? panes : {}) as Record<string, unknown>;
+			for (const key of Object.keys(PANE_LIMITS) as PaneKey[]) {
+				if (!(key in input)) continue;
+				const value = input[key];
+				if (value === null) appearance[key] = null;
+				else if (typeof value === 'number' && Number.isFinite(value)) appearance[key] = clampPane(key, value);
+			}
 			await repo.setAppearance(userId, serializeAppearance(appearance));
 			return appearance;
 		}

@@ -37,7 +37,27 @@ export type Appearance = { [K in ChoiceKey]: ChoiceValue<K> } & {
 	palettes: Palettes;
 	/** The user's own CSS, applied after everything else. Empty for most people. */
 	customCss: string;
+	/** Widths dragged by hand, in CSS pixels; null keeps the sidebar and list width choices. */
+	sidebarPx: number | null;
+	listPx: number | null;
 };
+
+/** How far a dragged pane can go: never too narrow to read, never so wide it crowds out the rest. */
+export const PANE_LIMITS = {
+	sidebarPx: { min: 180, max: 480 },
+	listPx: { min: 260, max: 900 }
+} as const;
+
+export type PaneKey = keyof typeof PANE_LIMITS;
+
+export function clampPane(key: PaneKey, value: number): number {
+	const { min, max } = PANE_LIMITS[key];
+	return Math.round(Math.min(max, Math.max(min, value)));
+}
+
+function parsePane(key: PaneKey, value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? clampPane(key, value) : null;
+}
 
 /** Room for a real stylesheet, small enough that it never weighs down the page or the row. */
 export const MAX_CUSTOM_CSS = 20_000;
@@ -52,7 +72,9 @@ export const DEFAULT_APPEARANCE: Appearance = {
 	...defaultChoices(),
 	accent: null,
 	palettes: EMPTY_PALETTES,
-	customCss: ''
+	customCss: '',
+	sidebarPx: null,
+	listPx: null
 };
 
 /** Picked to sit well on both light and dark surfaces; the first is the default sage. */
@@ -88,7 +110,9 @@ export function parseAppearance(value: unknown): Appearance {
 		...(choices as { [K in ChoiceKey]: ChoiceValue<K> }),
 		accent: parseAccent(input.accent),
 		palettes: parsePalettes(input.palettes),
-		customCss: typeof input.customCss === 'string' ? input.customCss.slice(0, MAX_CUSTOM_CSS) : ''
+		customCss: typeof input.customCss === 'string' ? input.customCss.slice(0, MAX_CUSTOM_CSS) : '',
+		sidebarPx: parsePane('sidebarPx', input.sidebarPx),
+		listPx: parsePane('listPx', input.listPx)
 	};
 }
 
@@ -97,6 +121,8 @@ export function isDefaultAppearance(appearance: Appearance): boolean {
 		appearance.accent === null &&
 		isEmptyPalettes(appearance.palettes) &&
 		appearance.customCss.trim() === '' &&
+		appearance.sidebarPx === null &&
+		appearance.listPx === null &&
 		CHOICE_KEYS.every((key) => appearance[key] === CHOICES[key].options[0])
 	);
 }
@@ -119,7 +145,10 @@ export function appearanceAttributes(appearance: Appearance): string {
 	const parts = CHOICE_KEYS.filter((key) => appearance[key] !== CHOICES[key].options[0]).map(
 		(key) => `data-${kebab(CHOICES[key].attribute)}="${appearance[key]}"`
 	);
-	if (appearance.accent) parts.push(`style="--color-accent: ${appearance.accent}"`);
+	if (appearance.sidebarPx !== null) parts.push('data-sized-sidebar');
+	if (appearance.listPx !== null) parts.push('data-sized-list');
+	const style = inlineStyle(appearance);
+	if (style) parts.push(`style="${style}"`);
 	return parts.join(' ');
 }
 
@@ -132,7 +161,37 @@ export function applyAppearance(root: HTMLElement, appearance: Appearance): void
 	}
 	if (appearance.accent) root.style.setProperty('--color-accent', appearance.accent);
 	else root.style.removeProperty('--color-accent');
+	applyPanes(root, appearance);
 	applyAppearanceCss(root.ownerDocument, appearance);
+}
+
+/** Accent and dragged widths, as the inline style on <html>. Only checked values reach it. */
+function inlineStyle(appearance: Appearance): string {
+	const declarations: string[] = [];
+	if (appearance.accent) declarations.push(`--color-accent: ${appearance.accent}`);
+	if (appearance.sidebarPx !== null) declarations.push(`--sidebar-px: ${appearance.sidebarPx}px`);
+	if (appearance.listPx !== null) declarations.push(`--list-px: ${appearance.listPx}px`);
+	return declarations.join('; ');
+}
+
+/**
+ * Dragged widths on a live page; also how a drag shows itself before it is saved. Only the panes
+ * passed are touched, so one handle never rewrites the other's width from stale data.
+ */
+export function applyPanes(root: HTMLElement, panes: Partial<Pick<Appearance, PaneKey>>): void {
+	const set = (key: PaneKey, attribute: string, variable: string) => {
+		if (!(key in panes)) return;
+		const value = panes[key] ?? null;
+		if (value === null) {
+			root.removeAttribute(attribute);
+			root.style.removeProperty(variable);
+		} else {
+			root.setAttribute(attribute, '');
+			root.style.setProperty(variable, `${value}px`);
+		}
+	};
+	set('sidebarPx', 'data-sized-sidebar', '--sidebar-px');
+	set('listPx', 'data-sized-list', '--list-px');
 }
 
 /** Palette, then the user's CSS: the <style> the server puts in <head> and the editor's live preview. */

@@ -8,6 +8,7 @@
 	import { folderTitle, initials, participantName } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import ResizeHandle from '$lib/components/ResizeHandle.svelte';
 	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
 	import LabelPicker from '$lib/components/mailbox/LabelPicker.svelte';
 	import type { Label } from '$lib/mail/labels';
@@ -79,6 +80,7 @@
 	let labelOpen = $state(false);
 	/** A row shows two labels and a count of the rest, so the subject keeps most of the line. */
 	const ROW_LABELS = 2;
+	let listEl = $state<HTMLElement>();
 	/** Kept while the list is shown, because a phone hides the list to read and that resets its scroll. */
 	let listScroll = 0;
 	/** The row a conversation was opened from, to land on again when it closes. */
@@ -263,7 +265,7 @@
 <svelte:window onkeydown={onListKey} />
 
 <div class="z-mail" class:reading={Boolean(threadId)}>
-	<section class="z-panel z-list">
+	<section class="z-panel z-list" bind:this={listEl}>
 		<div class="z-list-head">
 			<div class="z-list-tools">
 				<Tooltip text={t('nav.toggleSidebar')}>
@@ -484,6 +486,7 @@
 			{/if}
 		</div>
 	</section>
+	<ResizeHandle pane="listPx" target={() => listEl} label={t('mailbox.resizeList')} class="z-resize-list" />
 
 	<section class="z-panel z-read">
 		<ThreadPane

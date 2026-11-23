@@ -1,5 +1,6 @@
 {
 	"common": {
+		"resizeHint": "Faites glisser pour redimensionner. Double-cliquez pour revenir à la largeur de Personnaliser.",
 		"back": "Retour",
 		"close": "Fermer",
 		"cancel": "Annuler",
@@ -39,6 +40,7 @@
 		"open": "Ouvrir"
 	},
 	"nav": {
+		"resizeSidebar": "Redimensionner le menu",
 		"inbox": "Boîte de réception",
 		"archive": "Archives",
 		"drafts": "Brouillons",
@@ -208,6 +210,7 @@
 		}
 	},
 	"mailbox": {
+		"resizeList": "Redimensionner la liste",
 		"empty": {
 			"inbox": "Votre boîte de réception est vide",
 			"archive": "Aucun message archivé",

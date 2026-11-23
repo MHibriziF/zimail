@@ -1,5 +1,6 @@
 {
 	"common": {
+		"resizeHint": "Arrastra para cambiar el tamaño. Doble clic para volver al ancho de Personalizar.",
 		"back": "Atrás",
 		"close": "Cerrar",
 		"cancel": "Cancelar",
@@ -39,6 +40,7 @@
 		"open": "Abrir"
 	},
 	"nav": {
+		"resizeSidebar": "Cambiar el ancho de la barra lateral",
 		"inbox": "Bandeja de entrada",
 		"archive": "Archivo",
 		"drafts": "Borradores",
@@ -208,6 +210,7 @@
 		}
 	},
 	"mailbox": {
+		"resizeList": "Cambiar el ancho de la lista",
 		"empty": {
 			"inbox": "Tu bandeja de entrada está vacía",
 			"archive": "No hay mensajes archivados",

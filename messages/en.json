@@ -1,5 +1,6 @@
 {
 	"common": {
+		"resizeHint": "Drag to resize. Double-click to go back to your Personalise width.",
 		"back": "Back",
 		"close": "Close",
 		"cancel": "Cancel",
@@ -39,6 +40,7 @@
 		"open": "Open"
 	},
 	"nav": {
+		"resizeSidebar": "Resize sidebar",
 		"inbox": "Inbox",
 		"archive": "Archive",
 		"drafts": "Drafts",
@@ -208,6 +210,7 @@
 		}
 	},
 	"mailbox": {
+		"resizeList": "Resize message list",
 		"empty": {
 			"inbox": "Your inbox is empty",
 			"archive": "No archived messages",

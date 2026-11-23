@@ -151,6 +151,20 @@
 	--z-sidebar-width: 19rem;
 }
 
+/* A width dragged by hand (ResizeHandle) wins over the narrow and wide choices above. */
+:root[data-sized-sidebar] {
+	--sidebar-width: var(--sidebar-px);
+	--z-sidebar-width: var(--sidebar-px);
+}
+
+/* While a pane is dragged, nothing animates behind the pointer and no text gets selected. */
+:root[data-resizing],
+:root[data-resizing] * {
+	cursor: col-resize !important;
+	user-select: none;
+	transition: none !important;
+}
+
 /* Classic shows the preview on the subject's line; "none" drops it. */
 :root[data-preview='none'] .row-link .preview {
 	display: none;

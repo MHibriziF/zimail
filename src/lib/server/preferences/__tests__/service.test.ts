@@ -100,6 +100,21 @@ describe('preferences service', () => {
 		assert.equal(stored.appearance, null);
 	});
 
+	test('updatePanes changes only the pane widths, clamped, and clears them with null', async () => {
+		const { repo, stored } = fakeRepo();
+		const service = createPreferencesService(repo);
+		await service.setAppearance('user-1', { accent: '#c98ea4', sidebarPx: 300 });
+		const widened = await service.updatePanes('user-1', { listPx: 5000 });
+		assert.equal(widened.accent, '#c98ea4');
+		assert.equal(widened.sidebarPx, 300);
+		assert.equal(widened.listPx, 900);
+
+		const cleared = await service.updatePanes('user-1', { sidebarPx: null, listPx: 'wide' });
+		assert.equal(cleared.sidebarPx, null);
+		assert.equal(cleared.listPx, 900);
+		assert.equal(JSON.parse(stored.appearance ?? '{}').accent, '#c98ea4');
+	});
+
 	test('setLocale resolves and saves the locale', async () => {
 		const { repo } = fakeRepo();
 		const service = createPreferencesService(repo);
