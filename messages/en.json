@@ -451,9 +451,12 @@
 		"noMatches": "No matches"
 	},
 	"settings": {
+		"personaliseRetry": "Retry",
+		"personaliseUndo": "Undo",
+		"personaliseResetDone": "Back to default.",
 		"customCss": "Custom CSS",
 		"customCssHint": "Your own rules, applied after everything else on every page. It previews as you type. If a rule hides something you need, add ?nocss to any address to load that page without it.",
-		"themeImportedCss": "Theme loaded. It includes custom CSS: read it under Custom CSS before you save.",
+		"themeImportedCss": "Theme applied. It includes custom CSS: check it under Custom CSS, and clear it there if you don’t want it.",
 		"groupText": "Text",
 		"groupLayout": "Layout",
 		"preview": "Message preview",
@@ -494,7 +497,7 @@
 		"themeApply": "Apply",
 		"themeCopied": "Copied. Paste it anywhere to share or keep it.",
 		"themeCopyFailed": "Couldn’t copy. Use Download instead.",
-		"themeImported": "Theme loaded. Save to keep it.",
+		"themeImported": "Theme applied.",
 		"themeImportInvalid": "That isn’t a Zimail theme. Copy one from Share or back up and try again.",
 		"personalise": "Personalise",
 		"personaliseHint": "Your colour, spacing, text size and font. They follow your account to every device.",

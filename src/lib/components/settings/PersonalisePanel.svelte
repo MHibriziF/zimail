@@ -17,12 +17,20 @@
 		type ChoiceKey
 	} from '$lib/ui-theme/appearance';
 
-	/** What the server has; the draft is what the screen shows while you try things. */
+	/**
+	 * Every change shows at once and saves itself shortly after, like the theme and language
+	 * pickers above: nothing to remember to press, and nothing lost by leaving the page.
+	 */
+	const SAVE_DELAY_MS = 700;
+
 	const saved = $derived(parseAppearance($page.data.appearance));
 	let draft = $state<Appearance>({ ...DEFAULT_APPEARANCE });
-	let saving = $state(false);
-	let error = $state('');
-	let justSaved = $state(false);
+	let status = $state<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+	/** What Reset replaced, so it can be put back. */
+	let undoTo = $state<Appearance | null>(null);
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	/** The last value sent, so the page data echoing it back does not overwrite newer edits. */
+	let sentKey = '';
 
 	// Page data refreshes as mail syncs; only a different saved value should replace the draft.
 	let savedKey = '';
@@ -30,10 +38,10 @@
 		const key = JSON.stringify(saved);
 		if (key === savedKey) return;
 		savedKey = key;
+		if (key === sentKey || timer) return;
 		draft = { ...saved };
 	});
 
-	const dirty = $derived(JSON.stringify(draft) !== JSON.stringify(saved));
 	const isDefault = $derived(JSON.stringify(draft) === JSON.stringify(DEFAULT_APPEARANCE));
 	/** The preset that matches, so the custom swatch only lights up for a colour of your own. */
 	const accentValue = $derived(draft.accent ?? ACCENT_PRESETS[0]);
@@ -128,9 +136,22 @@
 
 	function update(next: Partial<Appearance>) {
 		draft = { ...draft, ...next };
-		justSaved = false;
-		error = '';
+		undoTo = null;
 		applyAppearance(document.documentElement, draft);
+		status = 'saving';
+		clearTimeout(timer);
+		timer = setTimeout(save, SAVE_DELAY_MS);
+	}
+
+	function reset() {
+		const before = draft;
+		update({ ...DEFAULT_APPEARANCE });
+		undoTo = before;
+	}
+
+	function undo() {
+		if (!undoTo) return;
+		update(undoTo);
 	}
 
 	function chooseAccent(value: string) {
@@ -139,33 +160,58 @@
 		update({ accent: accent === ACCENT_PRESETS[0] ? null : accent });
 	}
 
+	function send(keepalive = false) {
+		sentKey = JSON.stringify(draft);
+		return fetch('/api/settings/appearance', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ appearance: draft }),
+			keepalive
+		});
+	}
+
 	async function save() {
-		saving = true;
-		error = '';
+		timer = undefined;
+		status = 'saving';
 		try {
-			const response = await fetch('/api/settings/appearance', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ appearance: draft })
-			});
+			const response = await send();
 			if (!response.ok) throw new Error(String(response.status));
+			// Other pages read the saved look from the layout data, so it must not go stale.
 			await invalidateAll();
-			justSaved = true;
+			if (!timer) status = 'saved';
 		} catch {
-			error = t('settings.personaliseFailed');
-		} finally {
-			saving = false;
+			status = 'failed';
 		}
 	}
 
-	// Leaving without saving puts the saved look back, so a preview never sticks by accident.
+	// Leaving while a change waits to be saved sends it now, rather than dropping it.
 	onDestroy(() => {
-		if (typeof document !== 'undefined' && dirty) applyAppearance(document.documentElement, saved);
+		if (!timer) return;
+		clearTimeout(timer);
+		void send(true);
 	});
 </script>
 
 <section class="surface-lg card">
-	<h2><Icon name="palette-line" size={18} /> {t('settings.personalise')}</h2>
+	<div class="head">
+		<h2><Icon name="palette-line" size={18} /> {t('settings.personalise')}</h2>
+		<span class="status" role="status">
+			{#if status === 'saving'}
+				{t('common.saving')}
+			{:else if status === 'failed'}
+				<span class="error">{t('settings.personaliseFailed')}</span>
+				<button type="button" class="link" onclick={save}>{t('settings.personaliseRetry')}</button>
+			{:else if undoTo}
+				{t('settings.personaliseResetDone')}
+				<button type="button" class="link" onclick={undo}>{t('settings.personaliseUndo')}</button>
+			{:else if status === 'saved'}
+				<Icon name="check-line" size={14} /> {t('common.saved')}
+			{/if}
+		</span>
+		<button type="button" class="btn-ghost reset" disabled={isDefault} onclick={reset}>
+			{t('settings.personaliseReset')}
+		</button>
+	</div>
 	<p class="card-hint">{t('settings.personaliseHint')}</p>
 
 	<fieldset class="group">
@@ -246,17 +292,6 @@
 		<ThemeShare appearance={draft} onimport={(theme) => update(theme)} />
 	</fieldset>
 
-	<div class="actions">
-		<button type="button" class="btn-primary" disabled={!dirty || saving} onclick={save}>
-			{saving ? t('common.saving') : t('common.save')}
-		</button>
-		<button type="button" class="btn-ghost" disabled={isDefault || saving} onclick={() => update({ ...DEFAULT_APPEARANCE })}>
-			{t('settings.personaliseReset')}
-		</button>
-		<span class="status" role="status">
-			{#if error}<span class="error">{error}</span>{:else if justSaved}{t('common.saved')}{/if}
-		</span>
-	</div>
 </section>
 
 <style>
@@ -443,17 +478,35 @@
 		pointer-events: none;
 	}
 
-	.actions {
+	.head {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.5rem;
-		margin-top: 1.5rem;
+		gap: 0.5rem 0.75rem;
+	}
+
+	.head h2 {
+		margin-right: auto;
 	}
 
 	.status {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
+	}
+
+	.link {
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--color-accent-text);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 2px;
+		cursor: pointer;
 	}
 
 	.error {

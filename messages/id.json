@@ -451,9 +451,12 @@
 		"noMatches": "Tidak ada yang cocok"
 	},
 	"settings": {
+		"personaliseRetry": "Coba lagi",
+		"personaliseUndo": "Urungkan",
+		"personaliseResetDone": "Kembali ke bawaan.",
 		"customCss": "CSS kustom",
 		"customCssHint": "Aturan Anda sendiri, diterapkan setelah semua gaya lain di setiap halaman. Pratinjau langsung saat mengetik. Jika ada aturan yang menyembunyikan sesuatu, tambahkan ?nocss di alamat mana pun untuk memuat halaman tanpa CSS ini.",
-		"themeImportedCss": "Tema dimuat. Tema ini berisi CSS kustom: periksa di bagian CSS kustom sebelum menyimpan.",
+		"themeImportedCss": "Tema diterapkan. Tema ini berisi CSS kustom: periksa di bagian CSS kustom dan hapus di sana jika tidak diinginkan.",
 		"groupText": "Teks",
 		"groupLayout": "Tata letak",
 		"preview": "Pratinjau pesan",
@@ -494,7 +497,7 @@
 		"themeApply": "Terapkan",
 		"themeCopied": "Tersalin. Tempel di mana saja untuk dibagikan atau disimpan.",
 		"themeCopyFailed": "Gagal menyalin. Gunakan Unduh.",
-		"themeImported": "Tema dimuat. Simpan agar tetap dipakai.",
+		"themeImported": "Tema diterapkan.",
 		"themeImportInvalid": "Itu bukan tema Zimail. Salin dari Bagikan atau cadangkan, lalu coba lagi.",
 		"personalise": "Personalisasi",
 		"personaliseHint": "Warna, jarak, ukuran teks, dan font Anda. Mengikuti akun Anda di setiap perangkat.",

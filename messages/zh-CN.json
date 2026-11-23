@@ -451,9 +451,12 @@
 		"noMatches": "无匹配结果"
 	},
 	"settings": {
+		"personaliseRetry": "重试",
+		"personaliseUndo": "撤销",
+		"personaliseResetDone": "已恢复默认。",
 		"customCss": "自定义 CSS",
 		"customCssHint": "你自己的样式规则，在每个页面上最后生效，输入时即可预览。如果某条规则隐藏了需要的内容，在任意网址后加上 ?nocss 即可不带它打开该页面。",
-		"themeImportedCss": "主题已载入，其中包含自定义 CSS，保存前请在“自定义 CSS”中查看。",
+		"themeImportedCss": "主题已应用，其中包含自定义 CSS，请在“自定义 CSS”中查看，不需要可在那里清除。",
 		"groupText": "文字",
 		"groupLayout": "布局",
 		"preview": "邮件预览",
@@ -494,7 +497,7 @@
 		"themeApply": "应用",
 		"themeCopied": "已复制，可粘贴到任何地方分享或保存。",
 		"themeCopyFailed": "复制失败，请改用下载。",
-		"themeImported": "主题已载入，保存后生效。",
+		"themeImported": "主题已应用。",
 		"themeImportInvalid": "这不是 Zimail 主题。请从“分享或备份”复制后重试。",
 		"personalise": "个性化",
 		"personaliseHint": "你的颜色、间距、文字大小和字体，会随账号同步到每台设备。",

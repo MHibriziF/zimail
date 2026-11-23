@@ -451,9 +451,12 @@
 		"noMatches": "Sin coincidencias"
 	},
 	"settings": {
+		"personaliseRetry": "Reintentar",
+		"personaliseUndo": "Deshacer",
+		"personaliseResetDone": "Restablecido.",
 		"customCss": "CSS personalizado",
 		"customCssHint": "Tus propias reglas, aplicadas después de todo lo demás en cada página, con vista previa mientras escribes. Si una regla oculta algo que necesitas, añade ?nocss a cualquier dirección para cargar la página sin ellas.",
-		"themeImportedCss": "Tema cargado. Incluye CSS personalizado: revísalo en CSS personalizado antes de guardar.",
+		"themeImportedCss": "Tema aplicado. Incluye CSS personalizado: revísalo en CSS personalizado y bórralo allí si no lo quieres.",
 		"groupText": "Texto",
 		"groupLayout": "Diseño",
 		"preview": "Vista previa",
@@ -494,7 +497,7 @@
 		"themeApply": "Aplicar",
 		"themeCopied": "Copiado. Pégalo donde quieras para compartirlo o guardarlo.",
 		"themeCopyFailed": "No se pudo copiar. Usa Descargar.",
-		"themeImported": "Tema cargado. Guarda para conservarlo.",
+		"themeImported": "Tema aplicado.",
 		"themeImportInvalid": "Eso no es un tema de Zimail. Copia uno desde Compartir o guardar e inténtalo de nuevo.",
 		"personalise": "Personalizar",
 		"personaliseHint": "Tu color, espaciado, tamaño de texto y fuente. Te siguen en todos tus dispositivos.",
