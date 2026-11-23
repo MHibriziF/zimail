@@ -362,6 +362,18 @@
 		}
 	}
 
+	/* A narrow phone has no room for the words: the sparkle alone, still named for screen readers. */
+	@media (max-width: 480px) {
+		.ask-trigger span {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
+	}
+
 	@media (max-width: 900px) {
 		.topbar {
 			height: calc(var(--topbar-height) + env(safe-area-inset-top));

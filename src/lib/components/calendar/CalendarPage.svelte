@@ -409,8 +409,7 @@
 		text-transform: capitalize;
 	}
 
-	.cal-today,
-	.cal-views button {
+	.cal-today {
 		padding: 0.375rem 0.75rem;
 		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
@@ -420,15 +419,34 @@
 		box-shadow: inset 0 0 0 1px var(--color-focus-line);
 	}
 
+	/* One track with the chosen view raised out of it, so the selection reads at a glance. */
 	.cal-views {
 		display: flex;
-		gap: 0.25rem;
+		gap: 0.125rem;
+		padding: 0.1875rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
+		background: var(--color-surface-muted);
+	}
+
+	.cal-views button {
+		padding: 0.3125rem 0.75rem;
+		border-radius: calc(0.5625rem * var(--radius-scale, 1));
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+		background: transparent;
+	}
+
+	.cal-views button:hover {
+		color: var(--color-text);
 	}
 
 	.cal-views button[aria-selected='true'] {
-		color: var(--color-accent-text);
-		background: var(--color-accent-soft);
-		box-shadow: none;
+		color: var(--color-text);
+		background: var(--color-surface);
+		box-shadow:
+			0 1px 2px rgba(0, 0, 0, 0.08),
+			inset 0 0 0 1px var(--color-line);
 	}
 
 	.cal-loading {
@@ -531,9 +549,10 @@
 		display: flex;
 		gap: 0.25rem;
 		width: 100%;
+		align-items: center;
 		padding: 0.0625rem 0.375rem;
 		border-radius: calc(0.375rem * var(--radius-scale, 1));
-		font-size: 0.6875rem;
+		font-size: 0.75rem;
 		line-height: 1.4;
 		text-align: left;
 		color: var(--color-text);
@@ -546,15 +565,20 @@
 		background: var(--color-surface-hover);
 	}
 
-	.cal-chip,
-	.cal-row {
-		box-shadow: inset 3px 0 0 var(--event-color);
+	/* The calendar's colour as a dot before the text, rather than a stripe down the side. */
+	.cal-chip:not(.allday)::before,
+	.cal-row-time::before {
+		content: '';
+		flex-shrink: 0;
+		width: 0.4375rem;
+		height: 0.4375rem;
+		border-radius: 999px;
+		background: var(--event-color);
 	}
 
 	/* Free time (a feed's TRANSP:TRANSPARENT) is shown but doesn't block reservations. */
 	.cal-chip.free,
 	.cal-row.free {
-		box-shadow: inset 3px 0 0 color-mix(in srgb, var(--event-color) 45%, transparent);
 		opacity: 0.7;
 	}
 
@@ -642,6 +666,9 @@
 
 
 	.cal-row-time {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
 		color: var(--color-text-secondary);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;

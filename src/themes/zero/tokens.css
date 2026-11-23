@@ -36,7 +36,7 @@
 	--z-sidebar-fg: hsl(240 5.3% 26.1%);
 	--z-panel: var(--panelLight);
 	--z-border: #e7e7e7;
-	--z-muted: hsl(240 3.8% 46.1%);
+	--z-muted: #696972;
 	--z-hover: var(--offsetLight);
 	--z-chip: #ffffff;
 	--z-chip-border: hsl(240 5.9% 90%);

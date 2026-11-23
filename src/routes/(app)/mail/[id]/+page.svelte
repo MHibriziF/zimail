@@ -633,6 +633,17 @@
 		gap: 0.375rem;
 	}
 
+	/* Nine buttons fit a phone's width only without gaps and a little under the 44px target. */
+	@media (max-width: 480px) {
+		.toolbar-actions {
+			gap: 0;
+		}
+
+		.mail-toolbar :global(.icon-btn) {
+			width: 2.375rem;
+		}
+	}
+
 	.toolbar-actions :global(.icon-btn.starred) {
 		color: var(--color-star);
 	}
