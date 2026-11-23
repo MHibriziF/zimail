@@ -451,6 +451,9 @@
 		"noMatches": "Sin coincidencias"
 	},
 	"settings": {
+		"customCss": "CSS personalizado",
+		"customCssHint": "Tus propias reglas, aplicadas después de todo lo demás en cada página, con vista previa mientras escribes. Si una regla oculta algo que necesitas, añade ?nocss a cualquier dirección para cargar la página sin ellas.",
+		"themeImportedCss": "Tema cargado. Incluye CSS personalizado: revísalo en CSS personalizado antes de guardar.",
 		"groupText": "Texto",
 		"groupLayout": "Diseño",
 		"preview": "Vista previa",

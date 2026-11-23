@@ -451,6 +451,9 @@
 		"noMatches": "Aucun résultat"
 	},
 	"settings": {
+		"customCss": "CSS personnalisé",
+		"customCssHint": "Vos propres règles, appliquées après tout le reste sur chaque page, avec aperçu pendant la saisie. Si une règle masque quelque chose d’utile, ajoutez ?nocss à n’importe quelle adresse pour charger la page sans elles.",
+		"themeImportedCss": "Thème chargé. Il contient du CSS personnalisé : lisez-le sous CSS personnalisé avant d’enregistrer.",
 		"groupText": "Texte",
 		"groupLayout": "Disposition",
 		"preview": "Aperçu du message",

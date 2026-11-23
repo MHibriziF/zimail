@@ -35,7 +35,12 @@ export type Appearance = { [K in ChoiceKey]: ChoiceValue<K> } & {
 	accent: string | null;
 	/** Base colours per mode; an empty palette keeps the theme's own. */
 	palettes: Palettes;
+	/** The user's own CSS, applied after everything else. Empty for most people. */
+	customCss: string;
 };
+
+/** Room for a real stylesheet, small enough that it never weighs down the page or the row. */
+export const MAX_CUSTOM_CSS = 20_000;
 
 function defaultChoices(): { [K in ChoiceKey]: ChoiceValue<K> } {
 	return Object.fromEntries(CHOICE_KEYS.map((key) => [key, CHOICES[key].options[0]])) as {
@@ -43,7 +48,12 @@ function defaultChoices(): { [K in ChoiceKey]: ChoiceValue<K> } {
 	};
 }
 
-export const DEFAULT_APPEARANCE: Appearance = { ...defaultChoices(), accent: null, palettes: EMPTY_PALETTES };
+export const DEFAULT_APPEARANCE: Appearance = {
+	...defaultChoices(),
+	accent: null,
+	palettes: EMPTY_PALETTES,
+	customCss: ''
+};
 
 /** Picked to sit well on both light and dark surfaces; the first is the default sage. */
 export const ACCENT_PRESETS = ['#90ac9a', '#7a9cc6', '#a38ec9', '#c98ea4', '#d39a6a', '#c2b26b'] as const;
@@ -77,7 +87,8 @@ export function parseAppearance(value: unknown): Appearance {
 	return {
 		...(choices as { [K in ChoiceKey]: ChoiceValue<K> }),
 		accent: parseAccent(input.accent),
-		palettes: parsePalettes(input.palettes)
+		palettes: parsePalettes(input.palettes),
+		customCss: typeof input.customCss === 'string' ? input.customCss.slice(0, MAX_CUSTOM_CSS) : ''
 	};
 }
 
@@ -85,6 +96,7 @@ export function isDefaultAppearance(appearance: Appearance): boolean {
 	return (
 		appearance.accent === null &&
 		isEmptyPalettes(appearance.palettes) &&
+		appearance.customCss.trim() === '' &&
 		CHOICE_KEYS.every((key) => appearance[key] === CHOICES[key].options[0])
 	);
 }
@@ -123,9 +135,20 @@ export function applyAppearance(root: HTMLElement, appearance: Appearance): void
 	applyAppearanceCss(root.ownerDocument, appearance);
 }
 
-/** The palette's CSS, for the <style> the server puts in <head> and the editor's live preview. */
-export function appearanceCss(appearance: Appearance): string {
-	return paletteCss(appearance.palettes);
+/** Palette, then the user's CSS: the <style> the server puts in <head> and the editor's live preview. */
+export function appearanceCss(appearance: Appearance, { custom = true } = {}): string {
+	const parts = [paletteCss(appearance.palettes)];
+	if (custom) parts.push(embeddableCss(appearance.customCss));
+	return parts.filter(Boolean).join('\n');
+}
+
+/**
+ * The user's CSS, safe to put inside a <style> element. A literal `<` can only matter by closing
+ * the element (`</style>`); CSS has no other use for it outside strings, and `\3c ` is the same
+ * character inside one, so the stylesheet keeps its meaning and cannot end early.
+ */
+export function embeddableCss(css: string): string {
+	return css.trim().replaceAll('<', String.raw`\3c `);
 }
 
 export const APPEARANCE_STYLE_ID = 'zimail-appearance';

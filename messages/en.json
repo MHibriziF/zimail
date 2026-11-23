@@ -451,6 +451,9 @@
 		"noMatches": "No matches"
 	},
 	"settings": {
+		"customCss": "Custom CSS",
+		"customCssHint": "Your own rules, applied after everything else on every page. It previews as you type. If a rule hides something you need, add ?nocss to any address to load that page without it.",
+		"themeImportedCss": "Theme loaded. It includes custom CSS: read it under Custom CSS before you save.",
 		"groupText": "Text",
 		"groupLayout": "Layout",
 		"preview": "Message preview",

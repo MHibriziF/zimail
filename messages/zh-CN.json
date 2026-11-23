@@ -451,6 +451,9 @@
 		"noMatches": "无匹配结果"
 	},
 	"settings": {
+		"customCss": "自定义 CSS",
+		"customCssHint": "你自己的样式规则，在每个页面上最后生效，输入时即可预览。如果某条规则隐藏了需要的内容，在任意网址后加上 ?nocss 即可不带它打开该页面。",
+		"themeImportedCss": "主题已载入，其中包含自定义 CSS，保存前请在“自定义 CSS”中查看。",
 		"groupText": "文字",
 		"groupLayout": "布局",
 		"preview": "邮件预览",
