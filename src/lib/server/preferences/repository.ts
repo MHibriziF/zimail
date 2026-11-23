@@ -8,6 +8,15 @@ export type PreferencesRepository = {
 	setUiTheme(userId: string, theme: string): Promise<void>;
 	getLocale(userId: string): Promise<string | null>;
 	setLocale(userId: string, locale: string): Promise<void>;
+	/** Theme, language and appearance together: every page needs all three, so one query. */
+	getShellPreferences(userId: string): Promise<StoredShellPreferences | null>;
+	setAppearance(userId: string, value: string | null): Promise<void>;
+};
+
+export type StoredShellPreferences = {
+	ui_theme: string | null;
+	locale: string | null;
+	ui_appearance: string | null;
 };
 
 export function createD1PreferencesRepository(db: D1Database): PreferencesRepository {
@@ -46,6 +55,17 @@ export function createD1PreferencesRepository(db: D1Database): PreferencesReposi
 
 		async setLocale(userId, locale) {
 			await db.prepare('UPDATE users SET locale = ? WHERE id = ?').bind(locale, userId).run();
+		},
+
+		async getShellPreferences(userId) {
+			return db
+				.prepare('SELECT ui_theme, locale, ui_appearance FROM users WHERE id = ?')
+				.bind(userId)
+				.first<StoredShellPreferences>();
+		},
+
+		async setAppearance(userId, value) {
+			await db.prepare('UPDATE users SET ui_appearance = ? WHERE id = ?').bind(value, userId).run();
 		}
 	};
 }

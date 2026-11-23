@@ -111,6 +111,7 @@ export const load: LayoutServerLoad = async ({ locals, platform, depends }) => {
 		/** Hides Ask AI and the writing assistant on installs with no AI set up. */
 		aiAvailable: aiFromEnv(platform?.env) !== null,
 		uiTheme: locals.uiTheme ?? DEFAULT_UI_THEME,
-		locale: locals.locale ?? DEFAULT_LOCALE
+		locale: locals.locale ?? DEFAULT_LOCALE,
+		appearance: locals.appearance
 	};
 };
