@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { t } from '$lib/i18n';
 
+	const mod = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl ';
+
 	const groups = $derived([
 		{
 			title: t('shortcuts.groupGeneral'),
 			rows: [
-				{ keys: '⌘K', label: t('shortcuts.search') },
+				{ keys: `${mod}K`, label: t('shortcuts.search') },
 				{ keys: 'C', label: t('shortcuts.compose') },
 				{ keys: '?', label: t('shortcuts.shortcuts') },
 				{ keys: 'Esc', label: t('shortcuts.close') }
@@ -21,7 +23,7 @@
 				{ keys: 'R', label: t('shortcuts.reply') },
 				{ keys: 'A', label: t('shortcuts.replyAll') },
 				{ keys: 'F', label: t('shortcuts.forward') },
-				{ keys: '⌘↵', label: t('shortcuts.send') }
+				{ keys: `${mod}↵`, label: t('shortcuts.send') }
 			]
 		},
 		{

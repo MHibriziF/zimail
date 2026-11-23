@@ -223,7 +223,35 @@
 		onClose();
 	}
 
+	let overlay = $state<HTMLDivElement | undefined>();
+
+	const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select, textarea, [contenteditable="true"], a[href]';
+
+	/** Start in the first field, as a dialog should, rather than leaving focus on the page behind. */
+	$effect(() => {
+		if (!overlay) return;
+		const first = overlay.querySelector<HTMLElement>('.z-composer input');
+		first?.focus();
+	});
+
+	/** Tab stays in the dialog: past the last control it comes back to the first. */
+	function wrapTab(event: KeyboardEvent) {
+		if (!overlay) return;
+		const items = Array.from(overlay.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null);
+		if (items.length === 0) return;
+		const first = items[0];
+		const last = items.at(-1) as HTMLElement;
+		if (event.shiftKey && document.activeElement === first) {
+			event.preventDefault();
+			last.focus();
+		} else if (!event.shiftKey && document.activeElement === last) {
+			event.preventDefault();
+			first.focus();
+		}
+	}
+
 	function onKey(event: KeyboardEvent) {
+		if (event.key === 'Tab') wrapTab(event);
 		if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
 			event.preventDefault();
 			(event.target as HTMLElement | null)?.closest('form')?.requestSubmit();
@@ -235,7 +263,7 @@
 	}
 </script>
 
-<div class="z-overlay" onkeydown={onKey} role="dialog" aria-modal="true" tabindex="-1">
+<div class="z-overlay" bind:this={overlay} onkeydown={onKey} role="dialog" aria-modal="true" tabindex="-1">
 	<div class="z-compose-stage">
 		<button type="button" class="z-esc" aria-label={t('common.close')} onclick={close}>
 			<Icon name="X" size={14} />
