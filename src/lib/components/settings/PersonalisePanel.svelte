@@ -272,7 +272,10 @@
 	{/each}
 
 	<h3 class="group-heading">{t('settings.customCss')}</h3>
-	<p class="card-hint">{t('settings.customCssHint')}</p>
+	<p class="card-hint">
+		{t('settings.customCssHint')}
+		<a class="guide-link" href="/settings/css-guide">{t('settings.customCssGuide')}</a>
+	</p>
 	<div class="css-editor">
 		<textarea
 			value={draft.customCss}
@@ -495,6 +498,12 @@
 		gap: 0.35rem;
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
+	}
+
+	.guide-link {
+		color: var(--color-accent-text);
+		font-weight: 600;
+		text-underline-offset: 2px;
 	}
 
 	.link {
