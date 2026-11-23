@@ -412,6 +412,8 @@
 			</div>
 		{:else if mailbox}
 			{@render children()}
+		{:else if pathname === '/compose'}
+			<!-- Zero writes in its compose dialog, open on this route; the Classic page would run a second composer behind it. -->
 		{:else}
 			<!--
 				Any route Zero has no pane for — /compose reached by recalling a

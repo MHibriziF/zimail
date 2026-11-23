@@ -4,7 +4,6 @@
 	import RichTextEditor from '$lib/components/mailbox/RichTextEditor.svelte';
 	import AiAssist from '$lib/components/mailbox/AiAssist.svelte';
 	import RecipientField from '$lib/components/mailbox/RecipientField.svelte';
-	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { untrack } from 'svelte';
 	import { htmlToPlainText, isHtmlEmpty } from '$lib/utils/html';
 	import { composerBody, hasSignatureBlock } from '$lib/email-signature';
@@ -240,7 +239,7 @@
 	<div class="z-compose-stage">
 		<button type="button" class="z-esc" aria-label={t('common.close')} onclick={close}>
 			<Icon name="X" size={14} />
-			<span>esc</span>
+			<span class="z-esc-key">esc</span>
 		</button>
 
 		<form class="z-composer" onsubmit={send}>
@@ -257,11 +256,6 @@
 						<div class="z-composer-row-actions">
 							<button type="button" class="z-composer-link" onclick={() => (showCc = !showCc)}>{t('compose.cc')}</button>
 							<button type="button" class="z-composer-link" onclick={() => (showBcc = !showBcc)}>{t('compose.bcc')}</button>
-							<Tooltip text={t('common.close')}>
-								<button type="button" class="z-composer-link" aria-label={t('common.close')} onclick={close}>
-									<Icon name="X" size={14} />
-								</button>
-							</Tooltip>
 						</div>
 					{/snippet}
 				</RecipientField>
@@ -306,7 +300,7 @@
 			</div>
 
 			<div class="z-composer-body">
-				<RichTextEditor bind:html embedded minHeight={120} placeholder={t('compose.writeMessagePlaceholder')} />
+				<RichTextEditor bind:html embedded minHeight={200} placeholder={t('compose.writeMessagePlaceholder')} />
 			</div>
 
 			<ComposerActions
