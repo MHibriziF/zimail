@@ -1,5 +1,6 @@
 import { DEFAULT_LOCALE, parseLocale, type Locale } from '$lib/i18n/locales';
 import { DEFAULT_UI_THEME, isThemeId } from '$lib/ui-theme/ids';
+import { parseAppearance, serializeAppearance, type Appearance } from '$lib/ui-theme/appearance';
 import { cleanSignature } from '../util/signature-html';
 import type { PreferencesRepository } from './repository';
 
@@ -13,7 +14,13 @@ export type PreferencesService = {
 	getLocale(userId: string): Promise<Locale>;
 	/** Returns the locale as resolved: an unknown value falls back to the default. */
 	setLocale(userId: string, locale: string): Promise<Locale>;
+	/** What the shell needs for the first paint, each falling back like the single getters. */
+	getShellPreferences(userId: string): Promise<ShellPreferences>;
+	/** Saves what is valid of `value` (the rest falls back to the default) and returns it. */
+	setAppearance(userId: string, value: unknown): Promise<Appearance>;
 };
+
+export type ShellPreferences = { uiTheme: string; locale: Locale; appearance: Appearance };
 
 export function createPreferencesService(repo: PreferencesRepository): PreferencesService {
 	return {
@@ -47,6 +54,21 @@ export function createPreferencesService(repo: PreferencesRepository): Preferenc
 			const resolved = parseLocale(locale);
 			await repo.setLocale(userId, resolved);
 			return resolved;
+		},
+
+		async getShellPreferences(userId) {
+			const row = await repo.getShellPreferences(userId);
+			const theme = row?.ui_theme;
+			return {
+				uiTheme: isThemeId(theme) ? theme : DEFAULT_UI_THEME,
+				locale: parseLocale(row?.locale ?? DEFAULT_LOCALE),
+				appearance: parseAppearance(row?.ui_appearance)
+			};
+		},
+		async setAppearance(userId, value) {
+			const appearance = parseAppearance(value);
+			await repo.setAppearance(userId, serializeAppearance(appearance));
+			return appearance;
 		}
 	};
 }

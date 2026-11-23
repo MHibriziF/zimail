@@ -3,6 +3,7 @@ import type { ApiScope, AuthMethod } from '$lib/server/api-access';
 import type { AiBinding } from '$lib/server/ai/service';
 import type { CloudflareSendEmailBinding } from '$lib/server/providers/cloudflare-provider';
 import type { Domain, MailAddress, User } from '$lib/types';
+import type { Appearance } from '$lib/ui-theme/appearance';
 
 declare global {
 	namespace App {
@@ -84,6 +85,8 @@ declare global {
 			uiTheme: string;
 			/** UI language — saved choice, else the cookie, else Accept-Language. */
 			locale: string;
+			/** Accent, density, text size and font the user picked; the defaults when signed out. */
+			appearance: Appearance;
 		}
 		interface PageState {
 			/** This history entry opened a conversation from the list, so closing it can go Back to that list. */

@@ -580,6 +580,19 @@
 	cursor: pointer;
 }
 
+/* Compact: one line less (no preview) and tighter rows, so more conversations fit. */
+[data-ui-theme='zero'][data-density='compact'] .z-row {
+	margin-block: 0.0625rem;
+}
+
+[data-ui-theme='zero'][data-density='compact'] .z-row-open {
+	padding-block: 0.3rem;
+}
+
+[data-ui-theme='zero'][data-density='compact'] .z-row-preview {
+	display: none;
+}
+
 [data-ui-theme='zero'] .z-row-open:focus-visible {
 	outline: 2px solid var(--color-focus-line);
 	outline-offset: -2px;

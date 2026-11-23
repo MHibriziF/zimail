@@ -31,6 +31,15 @@ describe('PreferencesRepository', () => {
 		assert.equal(await repo.getLocale('u1'), 'fr');
 	});
 
+	test('shell preferences come back in one row, appearance empty until set', async () => {
+		const { repo } = setup();
+		assert.deepEqual(await repo.getShellPreferences('u1'), { ui_theme: 'classic', locale: 'en', ui_appearance: null });
+
+		await repo.setAppearance('u1', '{"density":"compact"}');
+		assert.equal((await repo.getShellPreferences('u1'))?.ui_appearance, '{"density":"compact"}');
+		assert.equal(await repo.getShellPreferences('nobody'), null);
+	});
+
 	test('an unknown user reads as unset and is not created by a write', async () => {
 		const { repo, sqlite } = setup();
 		assert.equal(await repo.getEmailSignature('nobody'), '');

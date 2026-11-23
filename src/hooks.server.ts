@@ -14,6 +14,7 @@ import { finishHead } from '$lib/server/page-head';
 import { APP_NAME } from '$lib/constants';
 import { translate } from '$lib/i18n/translate';
 import { BUILTIN_THEME_IDS, DEFAULT_UI_THEME, parseThemeId } from '$lib/ui-theme/ids';
+import { appearanceAttributes, DEFAULT_APPEARANCE } from '$lib/ui-theme/appearance';
 import {
 	DEFAULT_LOCALE,
 	LOCALE_COOKIE,
@@ -44,6 +45,12 @@ function jsonError(error: string, status: number): Response {
 	});
 }
 
+/** The appearance attributes ride on the same tag, so the first paint already has them. */
+function htmlOpenTag(locale: string, uiTheme: string, appearance = DEFAULT_APPEARANCE): string {
+	const tuned = appearanceAttributes(appearance);
+	return `<html lang="${locale}" data-ui-theme="${uiTheme}"${tuned ? ` ${tuned}` : ''}>`;
+}
+
 /**
  * Serves the page with the shell already named on `<html>`.
  *
@@ -65,7 +72,7 @@ function render(event: RequestEvent, resolve: Resolve): ReturnType<Handle> {
 	};
 	return resolve(event, {
 		transformPageChunk: ({ html }) =>
-			finishHead(html.replace('<html lang="en">', `<html lang="${locale}" data-ui-theme="${uiTheme}">`), preview)
+			finishHead(html.replace('<html lang="en">', htmlOpenTag(locale, uiTheme, event.locals.appearance)), preview)
 	});
 }
 
@@ -81,6 +88,7 @@ function resetLocals(event: RequestEvent) {
 	event.locals.domains = [];
 	event.locals.addresses = [];
 	event.locals.activeDomainId = null;
+	event.locals.appearance = DEFAULT_APPEARANCE;
 	event.locals.uiTheme = parseThemeId(event.cookies.get(UI_THEME_COOKIE), BUILTIN_THEME_IDS);
 	// The cookie is the returning visitor; Accept-Language is the first one.
 	event.locals.locale =
@@ -174,10 +182,11 @@ function mirrorCookie(event: RequestEvent, name: string, value: string, maxAge: 
 }
 
 async function loadPreferences(event: RequestEvent, userId: string) {
-	const preferences = getPreferencesService(event.platform);
-	const [storedTheme, storedLocale] = await Promise.all([preferences.getUiTheme(userId), preferences.getLocale(userId)]);
+	const { uiTheme: storedTheme, locale: storedLocale, appearance } =
+		await getPreferencesService(event.platform).getShellPreferences(userId);
 	event.locals.uiTheme = storedTheme;
 	event.locals.locale = storedLocale;
+	event.locals.appearance = appearance;
 	mirrorCookie(event, UI_THEME_COOKIE, storedTheme, UI_THEME_COOKIE_MAX_AGE);
 	mirrorCookie(event, LOCALE_COOKIE, storedLocale, LOCALE_COOKIE_MAX_AGE);
 }

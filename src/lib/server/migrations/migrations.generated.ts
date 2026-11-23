@@ -39,6 +39,10 @@ export const MIGRATIONS: PlannedMigration[] = [
 		sql: "-- Signatures are stored as HTML from now on. Until now they were plain text, escaped when shown,\n-- so escape the existing ones and turn their line breaks into <br> to keep them looking the same.\nUPDATE users\nSET email_signature = replace(replace(replace(replace(replace(email_signature, char(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), char(10), '<br>')\nWHERE email_signature <> '';\n\nUPDATE addresses\nSET signature = replace(replace(replace(replace(replace(signature, char(13), ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), char(10), '<br>')\nWHERE signature IS NOT NULL AND signature <> '';\n"
 	},
 	{
+		name: "0060_ui_appearance.sql",
+		sql: "-- How the user has tuned the look: accent, density, text size and font, as JSON.\n-- NULL means the defaults, which is what most rows keep.\nALTER TABLE users ADD COLUMN ui_appearance TEXT;\n"
+	},
+	{
 		name: "0001_init.sql",
 		archived: true,
 		sql: "CREATE TABLE users (\n\tid TEXT PRIMARY KEY,\n\temail TEXT NOT NULL UNIQUE COLLATE NOCASE,\n\tname TEXT NOT NULL,\n\tpassword_hash TEXT NOT NULL,\n\tis_admin INTEGER NOT NULL DEFAULT 0,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE sessions (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\ttoken_hash TEXT NOT NULL UNIQUE,\n\texpires_at TEXT NOT NULL,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE TABLE emails (\n\tid TEXT PRIMARY KEY,\n\tuser_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n\tdirection TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),\n\tfrom_addr TEXT NOT NULL,\n\tto_addr TEXT NOT NULL,\n\tsubject TEXT NOT NULL,\n\tbody_text TEXT,\n\tbody_html TEXT,\n\tmessage_id TEXT,\n\tin_reply_to TEXT,\n\tis_read INTEGER NOT NULL DEFAULT 0,\n\tcreated_at TEXT NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE INDEX idx_emails_user_created ON emails(user_id, created_at DESC);\nCREATE INDEX idx_sessions_token ON sessions(token_hash);\n"

@@ -4,6 +4,7 @@
 	import StackHeader from '../StackHeader.svelte';
 	import AccountSettingsPanel from './AccountSettingsPanel.svelte';
 	import AppearanceThemePanel from './AppearanceThemePanel.svelte';
+	import PersonalisePanel from './PersonalisePanel.svelte';
 	import SignaturePanel from './SignaturePanel.svelte';
 	import AddressesPanel from './AddressesPanel.svelte';
 	import ConnectedDomainsPanel from './ConnectedDomainsPanel.svelte';
@@ -84,6 +85,7 @@
 
 	{#if show('appearance')}
 		<AppearanceThemePanel />
+		<PersonalisePanel />
 	{/if}
 
 	{#if show('appearance')}
