@@ -206,7 +206,7 @@
 		gap: 0.875rem;
 		margin: 0 0 1rem;
 		padding: 0.875rem 1rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		box-shadow: inset 0 0 0 1px var(--color-line);
 	}
@@ -217,7 +217,7 @@
 		flex-shrink: 0;
 		width: 2.5rem;
 		height: 2.5rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		color: var(--color-accent-text);
 		background: var(--color-accent-soft);
 	}
@@ -316,7 +316,7 @@
 	.invite-clash {
 		margin-top: 0.375rem;
 		padding: 0.5rem 0.75rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-danger);
 		background: color-mix(in srgb, var(--color-danger) 10%, transparent);

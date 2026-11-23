@@ -12,6 +12,7 @@ describe('parseAppearance', () => {
 	test('reads stored JSON', () => {
 		const stored = '{"accent":"#7A9CC6","density":"compact","textSize":"large","font":"serif"}';
 		assert.deepEqual(parseAppearance(stored), {
+			...DEFAULT_APPEARANCE,
 			accent: '#7a9cc6',
 			density: 'compact',
 			textSize: 'large',
@@ -60,6 +61,13 @@ describe('appearanceAttributes', () => {
 		assert.equal(
 			appearanceAttributes({ ...DEFAULT_APPEARANCE, accent: '#c98ea4', density: 'compact', font: 'system' }),
 			'data-density="compact" data-font="system" style="--color-accent: #c98ea4"'
+		);
+	});
+
+	test('names multi-word settings in kebab case, and covers the layout choices', () => {
+		assert.equal(
+			appearanceAttributes({ ...DEFAULT_APPEARANCE, textSize: 'large', radius: 'round', listWidth: 'wide', preview: 'none' }),
+			'data-text-size="large" data-radius="round" data-list="wide" data-preview="none"'
 		);
 	});
 });

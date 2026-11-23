@@ -584,7 +584,7 @@
 	.brand-icon {
 		display: flex;
 		margin-bottom: 1rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-sm);
 	}
 
@@ -659,7 +659,7 @@
 		gap: 0.75rem;
 		margin-top: 2rem;
 		padding: 0.75rem 1rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 	}
 
@@ -737,7 +737,7 @@
 		position: relative;
 		width: 100%;
 		aspect-ratio: 4 / 3;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		overflow: hidden;
 		background: #1c1c1f;
 	}
@@ -868,7 +868,7 @@
 		gap: 0.375rem;
 		padding: 0.5rem 1rem;
 		border: 1px solid var(--color-line, rgba(255, 255, 255, 0.15));
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		font-weight: 500;
 		color: var(--color-text-primary, #fff);

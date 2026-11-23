@@ -244,7 +244,7 @@
 	.text-input {
 		width: 100%;
 		padding: 0.625rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		color: var(--color-text);
 		background: var(--color-surface-muted);
@@ -306,7 +306,7 @@
 		height: 11rem;
 		flex-shrink: 0;
 		padding: 0.5rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		/* The pattern must stay dark-on-light in both themes or scanners fail. */
 		background: #ffffff;
 	}
@@ -331,7 +331,7 @@
 	.secret {
 		display: inline-block;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-family: ui-monospace, SFMono-Regular, monospace;
 		font-size: 0.875rem;
 		letter-spacing: 0.05em;
@@ -347,7 +347,7 @@
 		gap: 0.375rem;
 		margin: 0.875rem 0 0;
 		padding: 0.75rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		font-family: ui-monospace, SFMono-Regular, monospace;
 		font-size: 0.875rem;

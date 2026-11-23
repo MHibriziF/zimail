@@ -251,7 +251,7 @@
 		width: 100%;
 		max-width: 360px;
 		padding: 1rem;
-		border-radius: 0.875rem;
+		border-radius: calc(0.875rem * var(--radius-scale, 1));
 		background: #1c1c1f;
 		color: #fff;
 		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
@@ -279,7 +279,7 @@
 		width: 1.75rem;
 		height: 1.75rem;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: transparent;
 		color: rgba(255, 255, 255, 0.7);
 		cursor: pointer;
@@ -293,7 +293,7 @@
 	.bgp-preview {
 		position: relative;
 		aspect-ratio: 4 / 3;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		overflow: hidden;
 		background: #0b0b0d;
 	}
@@ -333,7 +333,7 @@
 		width: 100%;
 		padding: 0.375rem 0.5rem;
 		border: none;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		background: transparent;
 		color: #fff;
 		font-size: 0.8125rem;
@@ -361,7 +361,7 @@
 		position: relative;
 		aspect-ratio: 1;
 		border: 2px solid transparent;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background-size: cover;
 		background-position: center;
 		cursor: pointer;
@@ -417,7 +417,7 @@
 	.bgp-btn {
 		padding: 0.4375rem 0.875rem;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: rgba(255, 255, 255, 0.1);
 		color: #fff;
 		font-size: 0.8125rem;

@@ -72,7 +72,7 @@
 		flex-direction: column;
 		gap: 0.625rem;
 		padding: 0.625rem;
-		border-radius: 0.875rem;
+		border-radius: calc(0.875rem * var(--radius-scale, 1));
 		text-align: left;
 		box-shadow: inset 0 0 0 1px var(--color-line);
 		transition: box-shadow 0.15s, background 0.15s;
@@ -94,7 +94,7 @@
 		gap: 0.3125rem;
 		height: 3.25rem;
 		padding: 0.5rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		overflow: hidden;
 	}
 

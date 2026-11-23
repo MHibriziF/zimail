@@ -147,7 +147,7 @@
 		gap: 0.375rem;
 		height: 2.25rem;
 		padding: 0 0.75rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		background: var(--color-surface-muted);
@@ -183,7 +183,7 @@
 		max-width: 34rem;
 		height: 2.25rem;
 		padding: 0 0.75rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		color: var(--color-muted);
 		transition: box-shadow 0.15s, background 0.15s;
@@ -238,7 +238,7 @@
 		width: 2rem;
 		height: 2rem;
 		min-width: 2rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.6875rem;
 	}
 
@@ -313,7 +313,7 @@
 		min-width: 13rem;
 		padding: 0.375rem;
 		background: var(--color-surface);
-		border-radius: 0.875rem;
+		border-radius: calc(0.875rem * var(--radius-scale, 1));
 		box-shadow: var(--shadow-md);
 	}
 
@@ -344,7 +344,7 @@
 		width: 100%;
 		margin-top: 0.125rem;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		text-align: left;
@@ -408,7 +408,7 @@
 			left: 0;
 			min-width: 0;
 			padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
-			border-radius: 1.25rem 1.25rem 0 0;
+			border-radius: calc(1.25rem * var(--radius-scale, 1)) calc(1.25rem * var(--radius-scale, 1)) 0 0;
 			animation: sheet-up 220ms cubic-bezier(0.32, 0.72, 0, 1);
 		}
 

@@ -131,6 +131,31 @@
 	--font-geist-sans: var(--font-sans);
 }
 
+/* Corners: every length radius in the app is written as calc(<len> * var(--radius-scale, 1)). */
+:root[data-radius='sharp'] {
+	--radius-scale: 0.35;
+}
+
+:root[data-radius='round'] {
+	--radius-scale: 1.6;
+}
+
+/* Sidebar width, for both shells (Zero reads --z-sidebar-width). */
+:root[data-sidebar='narrow'] {
+	--sidebar-width: 13.5rem;
+	--z-sidebar-width: 14rem;
+}
+
+:root[data-sidebar='wide'] {
+	--sidebar-width: 18rem;
+	--z-sidebar-width: 19rem;
+}
+
+/* Classic shows the preview on the subject's line; "none" drops it. */
+:root[data-preview='none'] .row-link .preview {
+	display: none;
+}
+
 /* Classic's compact list: the same rows, less air. Zero's lives in its shell.css. */
 :root[data-density='compact'] .row-link {
 	padding-block: 0.375rem;
@@ -173,7 +198,7 @@ dialog:modal {
 	.icon-btn {
 		width: var(--touch-target);
 		height: var(--touch-target);
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 	}
 
 	.btn-primary,
@@ -219,13 +244,13 @@ html[data-standalone='true'] .mail-body {
 
 .surface {
 	background: var(--color-surface);
-	border-radius: 1rem;
+	border-radius: calc(1rem * var(--radius-scale, 1));
 	box-shadow: var(--shadow-sm);
 }
 
 .surface-lg {
 	background: var(--color-surface);
-	border-radius: 1.25rem;
+	border-radius: calc(1.25rem * var(--radius-scale, 1));
 	box-shadow: var(--shadow-sm);
 }
 
@@ -267,7 +292,7 @@ html[data-standalone='true'] .mail-body {
 	justify-content: center;
 	gap: 0.375rem;
 	padding: 0.5rem 1rem;
-	border-radius: 0.625rem;
+	border-radius: calc(0.625rem * var(--radius-scale, 1));
 	font-size: 0.875rem;
 	font-weight: 500;
 	color: var(--color-on-accent);
@@ -290,7 +315,7 @@ html[data-standalone='true'] .mail-body {
 	justify-content: center;
 	gap: 0.375rem;
 	padding: 0.5rem 0.75rem;
-	border-radius: 0.625rem;
+	border-radius: calc(0.625rem * var(--radius-scale, 1));
 	font-size: 0.875rem;
 	color: var(--color-text-secondary);
 	transition: background 0.15s, color 0.15s;
@@ -307,7 +332,7 @@ html[data-standalone='true'] .mail-body {
 	justify-content: center;
 	width: 2rem;
 	height: 2rem;
-	border-radius: 0.5rem;
+	border-radius: calc(0.5rem * var(--radius-scale, 1));
 	color: var(--color-muted);
 	transition: background 0.15s, color 0.15s;
 }
@@ -369,7 +394,7 @@ html[data-standalone='true'] .mail-body {
 	max-width: 24rem;
 	padding: 2rem;
 	background: var(--color-surface);
-	border-radius: 1.25rem;
+	border-radius: calc(1.25rem * var(--radius-scale, 1));
 	box-shadow: var(--shadow-sm);
 }
 
@@ -403,7 +428,7 @@ html[data-standalone='true'] .mail-body {
 	width: 100%;
 	margin-top: 0.375rem;
 	padding: 0.625rem 0.875rem;
-	border-radius: 0.625rem;
+	border-radius: calc(0.625rem * var(--radius-scale, 1));
 	font-size: 0.9375rem;
 	background: var(--color-surface-muted);
 	box-shadow: inset 0 0 0 1px var(--color-line);

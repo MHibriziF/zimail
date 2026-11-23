@@ -161,7 +161,7 @@
 		width: var(--touch-target);
 		height: var(--touch-target);
 		padding: 0;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: transparent;
 		justify-content: center;
 	}

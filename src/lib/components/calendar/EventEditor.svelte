@@ -435,7 +435,7 @@
 		flex: 1;
 		min-width: 0;
 		padding: 0.5rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font: inherit;
 		font-size: 0.875rem;
 		color: var(--color-text);
@@ -475,7 +475,7 @@
 		flex-wrap: wrap;
 		gap: 0.375rem;
 		padding: 0.375rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		box-shadow: inset 0 0 0 1px var(--color-line);
 	}
@@ -554,7 +554,7 @@
 		overflow-y: auto;
 		padding: 0.25rem;
 		list-style: none;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface);
 		box-shadow: var(--shadow-md);
 	}
@@ -563,7 +563,7 @@
 		display: block;
 		width: 100%;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		text-align: left;
 		color: var(--color-text);
@@ -630,7 +630,7 @@
 
 	.cal-danger {
 		padding: 0.4375rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		font-weight: 500;
 		color: var(--color-on-danger);

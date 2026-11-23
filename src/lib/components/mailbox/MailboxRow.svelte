@@ -395,7 +395,7 @@
 		justify-content: center;
 		width: 1.875rem;
 		height: 1.875rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		color: var(--color-text-secondary);
 		transition: background 0.15s, color 0.15s;
 	}

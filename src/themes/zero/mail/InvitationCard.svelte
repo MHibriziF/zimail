@@ -199,7 +199,7 @@
 		gap: 0.75rem;
 		margin: 0 0 0.875rem;
 		padding: 0.75rem 0.875rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		border: 1px solid var(--z-border);
 		background: var(--z-panel);
 		color: var(--z-fg);
@@ -211,7 +211,7 @@
 		flex-shrink: 0;
 		width: 2.25rem;
 		height: 2.25rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		background: var(--z-chip);
 	}
 
@@ -276,7 +276,7 @@
 		gap: 0.25rem;
 		height: 1.75rem;
 		padding: 0 0.625rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		border: 1px solid var(--z-chip-border);
 		font-size: 0.8125rem;
 		color: var(--z-fg);
@@ -312,7 +312,7 @@
 	.z-invite-clash {
 		margin-top: 0.375rem;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: #dc2626;
 		background: color-mix(in srgb, #dc2626 10%, transparent);

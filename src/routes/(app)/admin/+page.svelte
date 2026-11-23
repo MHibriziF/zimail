@@ -555,7 +555,7 @@
 	.control select {
 		max-width: 100%;
 		padding: 0.4375rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		background: var(--color-surface-muted);
@@ -605,7 +605,7 @@
 	.admin-input {
 		width: 100%;
 		padding: 0.625rem 0.875rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		background: var(--color-surface-muted);
 		box-shadow: inset 0 0 0 1px var(--color-line);
@@ -693,7 +693,7 @@
 		height: 2rem;
 		padding: 0;
 		border: none;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		color: var(--color-muted);
 		background: transparent;
 		cursor: pointer;

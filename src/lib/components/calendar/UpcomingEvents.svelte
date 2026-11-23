@@ -73,7 +73,7 @@
 		gap: 0.0625rem;
 		padding: 0.375rem 0.625rem;
 		border-left: 2px solid var(--color-accent);
-		border-radius: 0 0.5rem 0.5rem 0;
+		border-radius: 0 calc(0.5rem * var(--radius-scale, 1)) calc(0.5rem * var(--radius-scale, 1)) 0;
 		text-decoration: none;
 		color: var(--color-text);
 	}

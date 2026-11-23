@@ -127,7 +127,7 @@
 
 	.attachment-image {
 		overflow: hidden;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		box-shadow: var(--shadow-xs);
 	}
@@ -185,7 +185,7 @@
 		align-items: center;
 		gap: 0.75rem;
 		padding: 0.75rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		box-shadow: var(--shadow-xs);
 	}
@@ -197,7 +197,7 @@
 		flex-shrink: 0;
 		width: 2.5rem;
 		height: 2.5rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		color: var(--color-text-secondary);
 		background: var(--color-surface);
 	}

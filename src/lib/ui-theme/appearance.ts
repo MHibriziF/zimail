@@ -1,36 +1,49 @@
 import { EMPTY_PALETTES, isEmptyPalettes, paletteCss, parsePalettes, type Palettes } from './palette';
 
 /**
- * How a user has tuned the look of either shell: an accent colour, their own palette, row
- * density, text size and font. Stored as JSON on the user and rendered on <html> and in a <style>
- * in <head>, so the first paint is already right. The accent's hover, tint and text colours are
- * derived from it in CSS.
+ * How a user has tuned the look of either shell: an accent colour, their own palette, and a set
+ * of fixed choices (density, text size, font, corners, widths, preview lines). Stored as JSON on
+ * the user and rendered on <html> and in a <style> in <head>, so the first paint is already right.
+ * The accent's hover, tint and text colours are derived from it in CSS.
  */
-export const DENSITIES = ['comfortable', 'compact'] as const;
-export const TEXT_SIZES = ['small', 'default', 'large'] as const;
-export const FONTS = ['default', 'system', 'serif'] as const;
 
-export type Density = (typeof DENSITIES)[number];
-export type TextSize = (typeof TEXT_SIZES)[number];
-export type FontChoice = (typeof FONTS)[number];
+/**
+ * Every fixed choice: its options (the first is the default) and the `data-*` attribute on <html>
+ * that the CSS reads. A new setting is a row here plus the CSS for its attribute.
+ */
+export const CHOICES = {
+	density: { attribute: 'density', options: ['comfortable', 'compact'] },
+	textSize: { attribute: 'textSize', options: ['default', 'small', 'large'] },
+	font: { attribute: 'font', options: ['default', 'system', 'serif'] },
+	radius: { attribute: 'radius', options: ['default', 'sharp', 'round'] },
+	sidebar: { attribute: 'sidebar', options: ['default', 'narrow', 'wide'] },
+	listWidth: { attribute: 'list', options: ['default', 'narrow', 'wide'] },
+	preview: { attribute: 'preview', options: ['auto', 'none', 'one', 'two'] }
+} as const;
 
-export type Appearance = {
+type Choices = typeof CHOICES;
+export type ChoiceKey = keyof Choices;
+export type ChoiceValue<K extends ChoiceKey> = Choices[K]['options'][number];
+export type Density = ChoiceValue<'density'>;
+export type TextSize = ChoiceValue<'textSize'>;
+export type FontChoice = ChoiceValue<'font'>;
+
+const CHOICE_KEYS = Object.keys(CHOICES) as ChoiceKey[];
+
+export type Appearance = { [K in ChoiceKey]: ChoiceValue<K> } & {
 	/** `#rrggbb`, or null for the theme's own accent. */
 	accent: string | null;
-	density: Density;
-	textSize: TextSize;
-	font: FontChoice;
 	/** Base colours per mode; an empty palette keeps the theme's own. */
 	palettes: Palettes;
 };
 
-export const DEFAULT_APPEARANCE: Appearance = {
-	accent: null,
-	density: 'comfortable',
-	textSize: 'default',
-	font: 'default',
-	palettes: EMPTY_PALETTES
-};
+function defaultChoices(): { [K in ChoiceKey]: ChoiceValue<K> } {
+	return Object.fromEntries(CHOICE_KEYS.map((key) => [key, CHOICES[key].options[0]])) as {
+		[K in ChoiceKey]: ChoiceValue<K>;
+	};
+}
+
+export const DEFAULT_APPEARANCE: Appearance = { ...defaultChoices(), accent: null, palettes: EMPTY_PALETTES };
 
 /** Picked to sit well on both light and dark surfaces; the first is the default sage. */
 export const ACCENT_PRESETS = ['#90ac9a', '#7a9cc6', '#a38ec9', '#c98ea4', '#d39a6a', '#c2b26b'] as const;
@@ -43,8 +56,9 @@ export function parseAccent(value: unknown): string | null {
 	return HEX.test(lower) ? lower : null;
 }
 
-function pick<T extends string>(options: readonly T[], value: unknown, fallback: T): T {
-	return options.includes(value as T) ? (value as T) : fallback;
+function pickChoice<K extends ChoiceKey>(key: K, value: unknown): ChoiceValue<K> {
+	const options = CHOICES[key].options as readonly string[];
+	return (options.includes(value as string) ? value : options[0]) as ChoiceValue<K>;
 }
 
 /** Reads stored or posted appearance; anything missing or unknown falls back to the default. */
@@ -59,22 +73,19 @@ export function parseAppearance(value: unknown): Appearance {
 	}
 	if (!raw || typeof raw !== 'object') return { ...DEFAULT_APPEARANCE };
 	const input = raw as Record<string, unknown>;
+	const choices = Object.fromEntries(CHOICE_KEYS.map((key) => [key, pickChoice(key, input[key])]));
 	return {
+		...(choices as { [K in ChoiceKey]: ChoiceValue<K> }),
 		accent: parseAccent(input.accent),
-		density: pick(DENSITIES, input.density, DEFAULT_APPEARANCE.density),
-		textSize: pick(TEXT_SIZES, input.textSize, DEFAULT_APPEARANCE.textSize),
-		font: pick(FONTS, input.font, DEFAULT_APPEARANCE.font),
 		palettes: parsePalettes(input.palettes)
 	};
 }
 
 export function isDefaultAppearance(appearance: Appearance): boolean {
 	return (
-		appearance.accent === DEFAULT_APPEARANCE.accent &&
-		appearance.density === DEFAULT_APPEARANCE.density &&
-		appearance.textSize === DEFAULT_APPEARANCE.textSize &&
-		appearance.font === DEFAULT_APPEARANCE.font &&
-		isEmptyPalettes(appearance.palettes)
+		appearance.accent === null &&
+		isEmptyPalettes(appearance.palettes) &&
+		CHOICE_KEYS.every((key) => appearance[key] === CHOICES[key].options[0])
 	);
 }
 
@@ -83,28 +94,30 @@ export function serializeAppearance(appearance: Appearance): string | null {
 	return isDefaultAppearance(appearance) ? null : JSON.stringify(appearance);
 }
 
+/** `textSize` -> `text-size`, for the attribute name in HTML. */
+function kebab(name: string): string {
+	return name.replaceAll(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+}
+
 /**
  * The attributes the server adds to <html>. Only non-default values are written; every value
  * has already been checked against a fixed list or the hex pattern, so none needs escaping.
  */
 export function appearanceAttributes(appearance: Appearance): string {
-	const parts: string[] = [];
-	if (appearance.density !== DEFAULT_APPEARANCE.density) parts.push(`data-density="${appearance.density}"`);
-	if (appearance.textSize !== DEFAULT_APPEARANCE.textSize) parts.push(`data-text-size="${appearance.textSize}"`);
-	if (appearance.font !== DEFAULT_APPEARANCE.font) parts.push(`data-font="${appearance.font}"`);
+	const parts = CHOICE_KEYS.filter((key) => appearance[key] !== CHOICES[key].options[0]).map(
+		(key) => `data-${kebab(CHOICES[key].attribute)}="${appearance[key]}"`
+	);
 	if (appearance.accent) parts.push(`style="--color-accent: ${appearance.accent}"`);
 	return parts.join(' ');
 }
 
 /** The same, on a live document: used to preview a change before it is saved. */
 export function applyAppearance(root: HTMLElement, appearance: Appearance): void {
-	const set = (name: string, value: string, fallback: string) => {
-		if (value === fallback) delete root.dataset[name];
-		else root.dataset[name] = value;
-	};
-	set('density', appearance.density, DEFAULT_APPEARANCE.density);
-	set('textSize', appearance.textSize, DEFAULT_APPEARANCE.textSize);
-	set('font', appearance.font, DEFAULT_APPEARANCE.font);
+	for (const key of CHOICE_KEYS) {
+		const name = CHOICES[key].attribute;
+		if (appearance[key] === CHOICES[key].options[0]) delete root.dataset[name];
+		else root.dataset[name] = appearance[key];
+	}
 	if (appearance.accent) root.style.setProperty('--color-accent', appearance.accent);
 	else root.style.removeProperty('--color-accent');
 	applyAppearanceCss(root.ownerDocument, appearance);
@@ -132,8 +145,7 @@ const SHARE_FORMAT = 'zimail-theme@1';
 
 /** A theme to share or back up: the colours and the look, not anything about the account. */
 export function exportTheme(appearance: Appearance): string {
-	const { accent, density, textSize, font, palettes } = appearance;
-	return JSON.stringify({ format: SHARE_FORMAT, accent, density, textSize, font, palettes }, null, 2);
+	return JSON.stringify({ format: SHARE_FORMAT, ...appearance }, null, 2);
 }
 
 /** Reads a shared theme; null when the text is not one. Unknown values fall back like stored ones. */

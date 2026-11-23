@@ -310,7 +310,7 @@
 		min-width: 0;
 		max-width: 100%;
 		padding: 0.25rem 0.375rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font: inherit;
 		color: var(--color-text);
 		background: var(--color-surface-muted);
@@ -347,7 +347,7 @@
 
 	.slot {
 		padding: 0.625rem 0.5rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		font-weight: 500;
 		font-variant-numeric: tabular-nums;

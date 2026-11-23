@@ -280,7 +280,7 @@
 		width: 1.25rem;
 		height: 1.25rem;
 		margin-left: 0.25rem;
-		border-radius: 0.25rem;
+		border-radius: calc(0.25rem * var(--radius-scale, 1));
 		color: var(--color-muted);
 		opacity: 0;
 	}
@@ -337,7 +337,7 @@
 		gap: 0.375rem 0.5rem;
 		margin-bottom: 0.75rem;
 		padding: 0.5rem 0.75rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
 		background: var(--color-surface-muted);
@@ -421,7 +421,7 @@
 		gap: 0.125rem;
 		margin: 0.5rem 0;
 		padding: 0 0.5rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		line-height: 1.2;
 		letter-spacing: 0.08em;

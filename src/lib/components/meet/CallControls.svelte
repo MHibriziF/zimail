@@ -651,7 +651,7 @@
 		max-height: calc(100dvh - 8rem);
 		overflow-y: auto;
 		padding: 0.375rem;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: #1f1f23;
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 		transform: translateX(-50%);
@@ -674,7 +674,7 @@
 		align-items: flex-start;
 		gap: 0.625rem;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		text-align: left;
 		color: #fff;
@@ -892,7 +892,7 @@
 		width: 100%;
 		padding: 0.375rem 0.5rem;
 		border: none;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		background: transparent;
 		color: #fff;
 		font-size: 0.8125rem;
@@ -916,7 +916,7 @@
 		width: 1rem;
 		height: 1rem;
 		flex-shrink: 0;
-		border-radius: 0.25rem;
+		border-radius: calc(0.25rem * var(--radius-scale, 1));
 		background-size: cover;
 		background-position: center;
 		background-color: rgba(255, 255, 255, 0.15);

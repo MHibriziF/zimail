@@ -52,7 +52,7 @@
 		gap: 0.375rem;
 		margin-top: 0.5rem;
 		padding: 0.625rem 0.875rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);
 		box-shadow: inset 0 0 0 1px var(--color-line);
 	}

@@ -221,7 +221,7 @@
 		width: max-content;
 		max-width: min(18rem, calc(100vw - 16px));
 		padding: 0.35rem 0.6rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		border: 1px solid var(--color-line, #e5e5e5);
 		background: var(--color-surface, #fff);
 		color: var(--color-text, #111);
@@ -246,7 +246,7 @@
 	.tip-kbd {
 		flex-shrink: 0;
 		padding: 0.05rem 0.28rem;
-		border-radius: 0.25rem;
+		border-radius: calc(0.25rem * var(--radius-scale, 1));
 		border: 1px solid var(--color-line, #e5e5e5);
 		background: color-mix(in srgb, var(--color-text, #111) 6%, transparent);
 		color: var(--color-muted, #737373);

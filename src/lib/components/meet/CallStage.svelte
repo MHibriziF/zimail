@@ -1835,7 +1835,7 @@
 		max-width: 48rem;
 		margin: 0;
 		padding: 0.25rem 0.75rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 1rem;
 		line-height: 1.4;
 		text-align: center;
@@ -2176,7 +2176,7 @@
 	:global(.call-tile) {
 		position: absolute;
 		box-sizing: border-box;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: #1c1c1f;
 		overflow: hidden;
 		transition:

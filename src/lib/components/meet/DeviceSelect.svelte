@@ -156,7 +156,7 @@
 		min-width: 200px;
 		max-width: 280px;
 		padding: 0.375rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		background: #1c1c1f;
 		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 	}
@@ -197,7 +197,7 @@
 		width: 100%;
 		padding: 0.375rem 0.5rem;
 		border: none;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		background: transparent;
 		color: #fff;
 		font-size: 0.75rem;

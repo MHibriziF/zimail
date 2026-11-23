@@ -412,7 +412,7 @@
 	.cal-today,
 	.cal-views button {
 		padding: 0.375rem 0.75rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 		font-weight: 500;
 		color: var(--color-text);
@@ -532,7 +532,7 @@
 		gap: 0.25rem;
 		width: 100%;
 		padding: 0.0625rem 0.375rem;
-		border-radius: 0.375rem;
+		border-radius: calc(0.375rem * var(--radius-scale, 1));
 		font-size: 0.6875rem;
 		line-height: 1.4;
 		text-align: left;
@@ -629,7 +629,7 @@
 		column-gap: 0.75rem;
 		width: 100%;
 		padding: 0.5rem 0.625rem;
-		border-radius: 0.625rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
 		font-size: 0.875rem;
 		text-align: left;
 		color: var(--color-text);

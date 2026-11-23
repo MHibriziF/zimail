@@ -189,14 +189,14 @@
 
 <style>
 	.signature-editor {
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		box-shadow: inset 0 0 0 1px var(--color-line);
 	}
 
 	.signature-editor :global(.editor-shell) {
 		background: var(--color-surface-muted);
 		box-shadow: none;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 	}
 
 	.signature-editor :global(.editor img) {
@@ -223,7 +223,7 @@
 		margin: 0;
 		padding: 0.375rem;
 		border: none;
-		border-radius: 0.75rem;
+		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		color: var(--color-text);
 		background: var(--color-surface);
 		box-shadow: 0 0 0 1px var(--color-line), 0 12px 32px rgba(0, 0, 0, 0.18);
@@ -239,7 +239,7 @@
 	.size-btn {
 		height: 2rem;
 		padding: 0 0.625rem;
-		border-radius: 0.5rem;
+		border-radius: calc(0.5rem * var(--radius-scale, 1));
 		font-size: 0.8125rem;
 	}
 
