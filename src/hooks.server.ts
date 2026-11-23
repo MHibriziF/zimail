@@ -47,8 +47,8 @@ function jsonError(error: string, status: number): Response {
 
 /** The appearance attributes ride on the same tag, so the first paint already has them. */
 function htmlOpenTag(locale: string, uiTheme: string, appearance = DEFAULT_APPEARANCE): string {
-	const tuned = appearanceAttributes(appearance);
-	return `<html lang="${locale}" data-ui-theme="${uiTheme}"${tuned ? ` ${tuned}` : ''}>`;
+	const attributes = [`lang="${locale}"`, `data-ui-theme="${uiTheme}"`, appearanceAttributes(appearance)];
+	return `<html ${attributes.filter(Boolean).join(' ')}>`;
 }
 
 /**
