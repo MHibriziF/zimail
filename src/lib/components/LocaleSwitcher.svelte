@@ -116,7 +116,7 @@
 		border-radius: 0.4rem;
 		background: none;
 		color: var(--color-muted, var(--z-muted, #8c8c8c));
-		font-size: 0.625rem;
+		font-size: 0.6875rem;
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		cursor: pointer;
