@@ -19,6 +19,7 @@
 				{ keys: 'E', label: t('shortcuts.archive') },
 				{ keys: 'D', label: t('shortcuts.moveToBin') },
 				{ keys: 'S', label: t('shortcuts.star') },
+				{ keys: 'L', label: t('shortcuts.label') },
 				{ keys: 'U', label: t('shortcuts.markUnread') },
 				{ keys: 'R', label: t('shortcuts.reply') },
 				{ keys: 'A', label: t('shortcuts.replyAll') },

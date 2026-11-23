@@ -9,6 +9,8 @@
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
+	import LabelPicker from '$lib/components/mailbox/LabelPicker.svelte';
+	import type { Label } from '$lib/mail/labels';
 	import InboxTabs from '$lib/components/mailbox/InboxTabs.svelte';
 	import type { MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 	import Icon from '../icons/Icon.svelte';
@@ -71,6 +73,12 @@
 	let rows = $state<HTMLDivElement | null>(null);
 	let actionsMenu = $state<ReturnType<typeof RowActionsMenu> | null>(null);
 	let menuFor = $state<string | null>(null);
+	/** The ⋯ button the actions menu opened from, so Label can open in the same spot. */
+	let menuAnchor: HTMLElement | null = null;
+	let labelling = $state<{ thread: ThreadSummary; anchor: DOMRect } | null>(null);
+	let labelOpen = $state(false);
+	/** A row shows two labels and a count of the rest, so the subject keeps most of the line. */
+	const ROW_LABELS = 2;
 	/** Kept while the list is shown, because a phone hides the list to read and that resets its scroll. */
 	let listScroll = 0;
 	/** The row a conversation was opened from, to land on again when it closes. */
@@ -109,6 +117,13 @@
 
 	/** After an action takes a row out of this list, focus moves on to the row that took its place. */
 	async function onRowAction(action: RowAction, thread: ThreadSummary) {
+		if (action === 'label') {
+			const anchor = menuAnchor?.isConnected ? menuAnchor.getBoundingClientRect() : null;
+			if (!anchor) return;
+			labelling = { thread, anchor };
+			labelOpen = true;
+			return;
+		}
 		if (action === 'delete') {
 			deleting = thread.latest_id;
 			return;
@@ -363,12 +378,27 @@
 									<span class="z-row-date">{formatRelativeDate(thread.created_at, $page.data.locale, $page.data.timeZone ?? undefined)}</span>
 								</span>
 								<span class="z-row-subject">
-									{thread.subject || t('mailbox.noSubject')}
-									{#each thread.labels as label (label.id)}
-										<LabelChip {label} />
-									{/each}
-									{#if thread.has_attachments}
-										<Icon name="Paper" size={12} />
+									<span class="z-row-subject-text">{thread.subject || t('mailbox.noSubject')}</span>
+									{#if thread.labels.length > 0 || thread.has_attachments}
+										<span class="z-row-tags">
+											{#each thread.labels.slice(0, ROW_LABELS) as label, index (label.id)}
+												<span class="z-row-tag" class:extra={index > 0}><LabelChip {label} /></span>
+											{/each}
+											<!-- Two counts, for the two widths a row can show: two labels, or one when narrow. -->
+											{#if thread.labels.length > ROW_LABELS}
+												<span class="z-row-tags-more wide" title={thread.labels.slice(ROW_LABELS).map((label) => label.name).join(', ')}
+													>+{thread.labels.length - ROW_LABELS}</span
+												>
+											{/if}
+											{#if thread.labels.length > 1}
+												<span class="z-row-tags-more narrow" title={thread.labels.slice(1).map((label) => label.name).join(', ')}
+													>+{thread.labels.length - 1}</span
+												>
+											{/if}
+											{#if thread.has_attachments}
+												<Icon name="Paper" size={12} />
+											{/if}
+										</span>
 									{/if}
 								</span>
 								{#if thread.preview}
@@ -441,7 +471,10 @@
 								aria-haspopup="menu"
 								aria-expanded={menuFor === thread.thread_id}
 								aria-label={t('mailbox.actionsFor', { subject: thread.subject || t('mailbox.noSubject') })}
-								onclick={(event) => actionsMenu?.toggle(thread, event.currentTarget)}
+								onclick={(event) => {
+									menuAnchor = event.currentTarget;
+									actionsMenu?.toggle(thread, event.currentTarget);
+								}}
 							>
 								<Icon name="ThreeDots" size={14} />
 							</button>
@@ -464,6 +497,21 @@
 </div>
 
 <RowActionsMenu bind:this={actionsMenu} bind:openFor={menuFor} {view} onAction={onRowAction} />
+
+{#if labelling}
+	<LabelPicker
+		emailId={labelling.thread.latest_id}
+		labels={($page.data.labels ?? []) as Label[]}
+		applied={labelling.thread.labels}
+		trigger={false}
+		bind:open={labelOpen}
+		anchor={labelling.anchor}
+		onchange={(next) => {
+			if (labelling) labelling = { ...labelling, thread: { ...labelling.thread, labels: next } };
+			void invalidateAll();
+		}}
+	/>
+{/if}
 
 <ConfirmDialog
 	open={deleting !== null}

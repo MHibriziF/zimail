@@ -1,13 +1,23 @@
 import type { MailboxView } from '$lib/types';
 
 /** What a conversation's actions menu offers, by the list it is in. */
-export type RowAction = 'star' | 'unstar' | 'archive' | 'unarchive' | 'read' | 'unread' | 'trash' | 'restore' | 'delete';
+export type RowAction =
+	| 'star'
+	| 'unstar'
+	| 'label'
+	| 'archive'
+	| 'unarchive'
+	| 'read'
+	| 'unread'
+	| 'trash'
+	| 'restore'
+	| 'delete';
 
 export function rowActions(
 	view: MailboxView,
 	thread: { is_starred: boolean; is_read: boolean; is_draft: boolean }
 ): RowAction[] {
-	const actions: RowAction[] = [thread.is_starred ? 'unstar' : 'star'];
+	const actions: RowAction[] = [thread.is_starred ? 'unstar' : 'star', 'label'];
 	actions.push(view === 'archive' ? 'unarchive' : 'archive');
 	// Your own sent mail and drafts have no unread state to change.
 	if (view !== 'sent' && !thread.is_draft) actions.push(thread.is_read ? 'unread' : 'read');

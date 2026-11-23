@@ -25,6 +25,7 @@
 	const LABELS: Record<RowAction, () => string> = {
 		star: () => t('mailbox.star'),
 		unstar: () => t('mailbox.unstar'),
+		label: () => t('labels.apply'),
 		archive: () => t('nav.archive'),
 		unarchive: () => t('mailbox.moveToInbox'),
 		read: () => t('mailbox.markRead'),
@@ -36,6 +37,7 @@
 	const ICONS: Record<RowAction, ZeroIconName> = {
 		star: 'Star2',
 		unstar: 'Star2',
+		label: 'Tag',
 		archive: 'Archive2',
 		unarchive: 'Inbox',
 		read: 'OpenMail',

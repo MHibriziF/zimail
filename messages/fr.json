@@ -755,6 +755,7 @@
 		"daysAgo": "Actif il y a {count} j"
 	},
 	"shortcuts": {
+		"label": "Étiqueter",
 		"title": "Raccourcis clavier",
 		"groupGeneral": "Général",
 		"groupMail": "Courrier",

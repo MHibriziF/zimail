@@ -859,6 +859,61 @@
 	display: flex;
 	align-items: center;
 	gap: 0.35rem;
+	container: z-row-subject / inline-size;
+}
+
+/* The subject gives way, not the labels: a long subject truncates and its labels stay in view. */
+[data-ui-theme='zero'] .z-row-subject-text {
+	flex: 0 1 auto;
+	min-width: 3rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+[data-ui-theme='zero'] .z-row-tags {
+	display: inline-flex;
+	flex: 0 1 auto;
+	align-items: center;
+	gap: 0.25rem;
+	min-width: 0;
+}
+
+[data-ui-theme='zero'] .z-row-tag {
+	display: inline-flex;
+	min-width: 2.25rem;
+	flex: 0 1 auto;
+}
+
+/* Chips shrink to an ellipsis rather than being cut off mid-letter. */
+[data-ui-theme='zero'] .z-row-tags .label-chip {
+	display: inline-block;
+	flex-shrink: 1;
+	min-width: 0;
+	max-width: 7rem;
+}
+
+[data-ui-theme='zero'] .z-row-tags-more.narrow {
+	display: none;
+}
+
+/* A narrow row keeps one label and counts the rest, so the subject still has room. */
+@container z-row-subject (max-width: 15rem) {
+	[data-ui-theme='zero'] .z-row-tag.extra,
+	[data-ui-theme='zero'] .z-row-tags-more.wide {
+		display: none;
+	}
+
+	[data-ui-theme='zero'] .z-row-tags-more.narrow {
+		display: inline;
+	}
+}
+
+[data-ui-theme='zero'] .z-row-tags-more {
+	flex-shrink: 0;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	color: var(--z-muted);
 }
 
 [data-ui-theme='zero'] .z-row-preview {

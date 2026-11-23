@@ -755,6 +755,7 @@
 		"daysAgo": "Aktif {count} hr lalu"
 	},
 	"shortcuts": {
+		"label": "Beri label",
 		"title": "Pintasan papan ketik",
 		"groupGeneral": "Umum",
 		"groupMail": "Surel",
