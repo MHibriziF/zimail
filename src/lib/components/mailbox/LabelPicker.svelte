@@ -4,13 +4,17 @@
 	import Icon from '../Icon.svelte';
 	import { LABEL_SWATCH, MAX_LABEL_NAME_LENGTH, normalizeLabelName, type Label } from '$lib/mail/labels';
 	import { createLabel, describeMailError, setConversationLabels } from '$lib/mail/client';
+	import { placeMenu } from '$lib/mail/row-actions';
 
 	let {
 		emailId,
 		labels,
 		applied,
 		onchange,
-		buttonClass = 'icon-btn'
+		buttonClass = 'icon-btn',
+		trigger = true,
+		open = $bindable(false),
+		anchor = null
 	}: {
 		/** Any message in the conversation — labels apply to the whole conversation. */
 		emailId: string;
@@ -20,9 +24,31 @@
 		onchange?: (applied: Label[]) => void;
 		/** Lets each theme's toolbar style the trigger like its own buttons. */
 		buttonClass?: string;
+		/** False when something else opens it, such as a row's actions menu. */
+		trigger?: boolean;
+		open?: boolean;
+		/** Where to show it when there is no button: fixed on screen, so a scrolling list cannot clip it. */
+		anchor?: { top: number; bottom: number; right: number } | null;
 	} = $props();
 
-	let open = $state(false);
+	let menu = $state<HTMLDivElement>();
+	let placed = $state<{ left: number; top: number } | null>(null);
+
+	// Opening goes straight to the search field, so a label can be found or made by typing.
+	$effect(() => {
+		if (!open || !menu) {
+			placed = null;
+			return;
+		}
+		if (anchor) {
+			placed = placeMenu(
+				anchor,
+				{ width: menu.offsetWidth, height: menu.offsetHeight },
+				{ width: window.innerWidth, height: window.innerHeight }
+			);
+		}
+		menu.querySelector('input')?.focus();
+	});
 	let busy = $state(false);
 	let error = $state('');
 	let query = $state('');
@@ -79,24 +105,42 @@
 	function onDocumentPointer(event: PointerEvent) {
 		if (open && root && !root.contains(event.target as Node)) open = false;
 	}
+
+	function onKey(event: KeyboardEvent) {
+		if (event.key !== 'Escape') return;
+		event.stopPropagation();
+		open = false;
+	}
 </script>
 
 <svelte:document onpointerdown={onDocumentPointer} />
 
 <div class="label-picker" bind:this={root}>
-	<button
-		type="button"
-		class={buttonClass}
-		aria-label={t('labels.apply')}
-		title={t('labels.apply')}
-		aria-expanded={open}
-		onclick={() => (open = !open)}
-	>
-		<Icon name="price-tag-3-line" size={16} />
-	</button>
+	{#if trigger}
+		<button
+			type="button"
+			class={buttonClass}
+			aria-label={t('labels.apply')}
+			title={t('labels.apply')}
+			aria-expanded={open}
+			onclick={() => (open = !open)}
+		>
+			<Icon name="price-tag-3-line" size={16} />
+		</button>
+	{/if}
 
 	{#if open}
-		<div class="label-menu" role="dialog" aria-label={t('labels.apply')}>
+		<div
+			bind:this={menu}
+			class="label-menu"
+			class:fixed={anchor}
+			style:left={placed ? `${placed.left}px` : undefined}
+			style:top={placed ? `${placed.top}px` : undefined}
+			role="dialog"
+			tabindex="-1"
+			aria-label={t('labels.apply')}
+			onkeydown={onKey}
+		>
 			<form class="label-search" onsubmit={createAndApply}>
 				<input
 					type="text"
@@ -154,6 +198,11 @@
 		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface);
 		box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.15)), inset 0 0 0 1px var(--color-line);
+	}
+
+	.label-menu.fixed {
+		position: fixed;
+		right: auto;
 	}
 
 	.label-search input {

@@ -755,6 +755,7 @@
 		"daysAgo": "Activo hace {count} d"
 	},
 	"shortcuts": {
+		"label": "Etiquetar",
 		"title": "Atajos de teclado",
 		"groupGeneral": "General",
 		"groupMail": "Correo",

@@ -755,6 +755,7 @@
 		"daysAgo": "Active {count} d ago"
 	},
 	"shortcuts": {
+		"label": "Label",
 		"title": "Keyboard shortcuts",
 		"groupGeneral": "General",
 		"groupMail": "Mail",

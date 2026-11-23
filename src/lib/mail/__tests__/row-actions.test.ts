@@ -5,13 +5,14 @@ import { menuStep, placeMenu, rowActions } from '../row-actions';
 const thread = { is_starred: false, is_read: true, is_draft: false };
 
 describe('rowActions', () => {
-	it('offers star, archive, unread and bin in the inbox', () => {
-		assert.deepEqual(rowActions('inbox', thread), ['star', 'archive', 'unread', 'trash']);
+	it('offers star, label, archive, unread and bin in the inbox', () => {
+		assert.deepEqual(rowActions('inbox', thread), ['star', 'label', 'archive', 'unread', 'trash']);
 	});
 
 	it('flips to the opposite of the conversation’s state', () => {
 		assert.deepEqual(rowActions('inbox', { ...thread, is_starred: true, is_read: false }), [
 			'unstar',
+			'label',
 			'archive',
 			'read',
 			'trash'
@@ -19,16 +20,16 @@ describe('rowActions', () => {
 	});
 
 	it('moves archived mail back to the inbox', () => {
-		assert.deepEqual(rowActions('archive', thread), ['star', 'unarchive', 'unread', 'trash']);
+		assert.deepEqual(rowActions('archive', thread), ['star', 'label', 'unarchive', 'unread', 'trash']);
 	});
 
 	it('restores or deletes for good from the bin', () => {
-		assert.deepEqual(rowActions('trash', thread), ['star', 'archive', 'unread', 'restore', 'delete']);
+		assert.deepEqual(rowActions('trash', thread), ['star', 'label', 'archive', 'unread', 'restore', 'delete']);
 	});
 
 	it('has no read state to change for sent mail or drafts', () => {
-		assert.deepEqual(rowActions('sent', thread), ['star', 'archive', 'trash']);
-		assert.deepEqual(rowActions('drafts', { ...thread, is_draft: true }), ['star', 'archive', 'trash']);
+		assert.deepEqual(rowActions('sent', thread), ['star', 'label', 'archive', 'trash']);
+		assert.deepEqual(rowActions('drafts', { ...thread, is_draft: true }), ['star', 'label', 'archive', 'trash']);
 	});
 });
 

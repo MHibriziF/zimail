@@ -755,6 +755,7 @@
 		"daysAgo": "{count} 天前活跃"
 	},
 	"shortcuts": {
+		"label": "添加标签",
 		"title": "键盘快捷键",
 		"groupGeneral": "通用",
 		"groupMail": "邮件",

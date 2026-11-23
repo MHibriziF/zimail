@@ -94,6 +94,8 @@
 	let dark = $state(false);
 	/** On a phone the reader is the whole screen, so leaving it goes back to the list. */
 	const phone = new MediaQuery('max-width: 767px');
+	/** The bar's label picker, which L opens from the keyboard. */
+	let labelsOpen = $state(false);
 	let detailsFor = $state<string | null>(null);
 	let menuFor = $state<string | null>(null);
 	let confirmingDelete = $state(false);
@@ -388,6 +390,10 @@
 			}
 			return;
 		}
+		if (event.key === 'l' && !event.metaKey && !event.ctrlKey && !event.altKey) {
+			event.preventDefault();
+			labelsOpen = true;
+		}
 		if (event.key === 'r') startReply('reply', latest);
 		if (event.key === 'a') startReply('replyAll', latest);
 		if (event.key === 'f') startReply('forward', latest);
@@ -641,6 +647,7 @@
 						emailId={thread.messages[thread.messages.length - 1].id}
 						labels={($page.data.labels ?? []) as Label[]}
 						applied={thread.labels}
+						bind:open={labelsOpen}
 						buttonClass="z-thread-icon"
 						onchange={(next) => {
 							if (thread) thread = { ...thread, labels: next };
