@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { MediaQuery } from 'svelte/reactivity';
 	import { page } from '$app/stores';
 	import { goto, invalidateAll } from '$app/navigation';
 	import EmailBody from '$lib/components/mailbox/EmailBody.svelte';
@@ -91,6 +92,8 @@
 	let sending = $state(false);
 	let sendError = $state('');
 	let dark = $state(false);
+	/** On a phone the reader is the whole screen, so leaving it goes back to the list. */
+	const phone = new MediaQuery('max-width: 767px');
 	let detailsFor = $state<string | null>(null);
 	let menuFor = $state<string | null>(null);
 	let confirmingDelete = $state(false);
@@ -549,19 +552,25 @@
 {:else if thread && latest}
 	<div class="z-thread">
 		<div class="z-thread-bar">
-			<Tooltip text={t('thread.close')}>
-				<button type="button" class="z-thread-icon" aria-label={t('thread.close')} onclick={onClose}>
-					<Icon name="X" size={14} />
+			<Tooltip text={phone.current ? t('common.back') : t('thread.close')}>
+				<button
+					type="button"
+					class="z-thread-icon z-thread-close"
+					aria-label={phone.current ? t('common.back') : t('thread.close')}
+					onclick={onClose}
+				>
+					<Icon name="X" class="z-wide" size={14} />
+					<Icon name="ArrowLeft" class="z-narrow" size={16} />
 				</button>
 			</Tooltip>
 			<div class="z-thread-bar-right">
-				<button type="button" class="z-thread-replyall" onclick={startForwardAll}>
+				<button type="button" class="z-thread-replyall z-wide" onclick={startForwardAll}>
 					<Icon name="Forward" size={14} />
 					<span>{t('thread.forwardAll')}</span>
 				</button>
 				<button
 					type="button"
-					class="z-thread-replyall"
+					class="z-thread-replyall z-wide"
 					onclick={() => startReply('replyAll', latest)}
 				>
 					<Icon name="Reply" size={14} />
@@ -589,13 +598,13 @@
 				</Tooltip>
 				{#if view === 'spam'}
 					<Tooltip text={t('thread.notSpam')}>
-						<button type="button" class="z-thread-icon" aria-label={t('thread.notSpam')} onclick={() => act('notspam')}>
+						<button type="button" class="z-thread-icon z-wide" aria-label={t('thread.notSpam')} onclick={() => act('notspam')}>
 							<Icon name="Inbox" size={16} />
 						</button>
 					</Tooltip>
 				{:else if view !== 'trash' && view !== 'sent' && view !== 'drafts'}
 					<Tooltip text={t('thread.reportSpam')}>
-						<button type="button" class="z-thread-icon" aria-label={t('thread.reportSpam')} onclick={() => act('spam')}>
+						<button type="button" class="z-thread-icon z-wide" aria-label={t('thread.reportSpam')} onclick={() => act('spam')}>
 							<Icon name="ExclamationTriangle" size={16} />
 						</button>
 					</Tooltip>
@@ -665,6 +674,25 @@
 					</Tooltip>
 					{#if menuFor === 'thread'}
 						<div class="z-pop" role="menu" tabindex="-1" onpointerdown={(event) => event.stopPropagation()}>
+							<button type="button" class="z-narrow" onclick={() => { menuFor = null; startReply('replyAll', latest); }}>
+								<Icon name="Reply" size={14} />
+								{t('thread.replyAll')}
+							</button>
+							<button type="button" class="z-narrow" onclick={() => { menuFor = null; startForwardAll(); }}>
+								<Icon name="Forward" size={14} />
+								{t('thread.forwardAll')}
+							</button>
+							{#if view === 'spam'}
+								<button type="button" class="z-narrow" onclick={() => act('notspam')}>
+									<Icon name="Inbox" size={14} />
+									{t('thread.notSpam')}
+								</button>
+							{:else if view !== 'trash' && view !== 'sent' && view !== 'drafts'}
+								<button type="button" class="z-narrow" onclick={() => act('spam')}>
+									<Icon name="ExclamationTriangle" size={14} />
+									{t('thread.reportSpam')}
+								</button>
+							{/if}
 							{#if view === 'archive' || view === 'trash'}
 								<button type="button" onclick={() => act(view === 'trash' ? 'restore' : 'unarchive')}>
 									<Icon name="Inbox" size={14} />
@@ -684,12 +712,12 @@
 
 		<div class="z-thread-body">
 			<div class="z-thread-hero">
-				<h1 class="z-thread-subject">
+				<h2 class="z-thread-subject">
 					{thread.subject || t('mailbox.noSubject')}
 					{#if thread.messages.length > 1}
 						<span class="z-thread-count">[{thread.messages.length}]</span>
 					{/if}
-				</h1>
+				</h2>
 				{#if thread.labels.length > 0}
 					<div class="z-thread-labels">
 						{#each thread.labels as label (label.id)}

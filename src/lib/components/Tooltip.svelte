@@ -28,6 +28,8 @@
 	let top = $state(0);
 	let left = $state(0);
 	let showTimer: ReturnType<typeof setTimeout> | undefined;
+	/** A tap focuses the button too; that focus should not leave a tooltip standing over the screen. */
+	let pressedByTouch = false;
 
 	function portal(node: HTMLElement) {
 		document.body.appendChild(node);
@@ -61,7 +63,7 @@
 	}
 
 	function onFocus() {
-		if (!enabled || !text.trim()) return;
+		if (!enabled || !text.trim() || pressedByTouch) return;
 		open = true;
 	}
 
@@ -128,7 +130,8 @@
 		function onLeave() {
 			hide();
 		}
-		function onDown() {
+		function onDown(event: PointerEvent) {
+			pressedByTouch = event.pointerType !== 'mouse';
 			hide();
 		}
 		node.addEventListener('pointerenter', onEnter);
@@ -154,7 +157,10 @@
 		class:grow
 		use:bindHover
 		onfocusin={onFocus}
-		onfocusout={hide}
+		onfocusout={() => {
+			pressedByTouch = false;
+			hide();
+		}}
 	>
 		{@render children()}
 	</span>

@@ -5,7 +5,7 @@
 	import { formatRelativeDate } from '$lib/utils/date';
 	import { runMailAction } from '$lib/mail/client';
 	import { markThreadReadInSnapshots } from '$lib/mail/mailbox-cache';
-	import { initials, participantName } from '$lib/mail/folders';
+	import { folderTitle, initials, participantName } from '$lib/mail/folders';
 	import { t } from '$lib/i18n';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import LabelChip from '$lib/components/mailbox/LabelChip.svelte';
@@ -271,6 +271,7 @@
 						<Icon name="PanelLeftOpen" size={16} />
 					</button>
 				</Tooltip>
+				<h1 class="z-list-title">{folderTitle(view, $page.data.locale)}</h1>
 				<Tooltip text={t('common.search')} shortcut={isMac ? '⌘K' : 'Ctrl+K'} grow>
 					<button type="button" class="z-search" onclick={openPalette}>
 						<Icon name="Search" size={16} />
