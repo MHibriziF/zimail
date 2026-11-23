@@ -38,7 +38,6 @@
 	let isMac = $state(true);
 	/** The server can't tell the platform, so the shortcut hint waits rather than flipping from ⌘ to Ctrl. */
 	let platformKnown = $state(false);
-	let viewsOpen = $state(false);
 
 	$effect(() => {
 		const next = mailbox.threads;
@@ -137,7 +136,6 @@
 		url.searchParams.delete('starred');
 		if (next === 'unread') url.searchParams.set('unread', '1');
 		if (next === 'starred') url.searchParams.set('starred', '1');
-		viewsOpen = false;
 		void goto(`${url.pathname}?${url.searchParams.toString()}`.replace(/\?$/, ''));
 	}
 
@@ -159,19 +157,6 @@
 	function openCompose() {
 		window.dispatchEvent(new Event('zero:compose'));
 	}
-
-	function closeViews() {
-		viewsOpen = false;
-	}
-
-	function onDocPointer(event: PointerEvent) {
-		const target = event.target as HTMLElement | null;
-		if (!target?.closest('.z-views')) closeViews();
-	}
-
-	const viewLabel = $derived(
-		chip === 'unread' ? t('mailbox.unread') : chip === 'starred' ? t('nav.starred') : t('mailbox.views')
-	);
 
 	async function refresh() {
 		refreshing = true;
@@ -260,7 +245,7 @@
 	}
 </script>
 
-<svelte:window onkeydown={onListKey} onpointerdown={onDocPointer} />
+<svelte:window onkeydown={onListKey} />
 
 <div class="z-mail" class:reading={Boolean(threadId)}>
 	<section class="z-panel z-list">
@@ -284,34 +269,6 @@
 						{/if}
 					</button>
 				</Tooltip>
-				<div class="z-views">
-					<button
-						type="button"
-						class="z-views-btn"
-						aria-expanded={viewsOpen}
-						aria-haspopup="menu"
-						onclick={() => (viewsOpen = !viewsOpen)}
-					>
-						<span>{viewLabel}</span>
-						<Icon name="ChevronDown" size={12} />
-					</button>
-					{#if viewsOpen}
-						<div class="z-views-menu" role="menu">
-							<button type="button" role="menuitemcheckbox" aria-checked={chip === 'all'} onclick={() => setChip('all')}>
-								{t('mailbox.allMail')}
-								{#if chip === 'all'}<Icon name="Check" size={14} />{/if}
-							</button>
-							<button type="button" role="menuitemcheckbox" aria-checked={chip === 'unread'} onclick={() => setChip('unread')}>
-								{t('mailbox.unread')}
-								{#if chip === 'unread'}<Icon name="Check" size={14} />{/if}
-							</button>
-							<button type="button" role="menuitemcheckbox" aria-checked={chip === 'starred'} onclick={() => setChip('starred')}>
-								{t('nav.starred')}
-								{#if chip === 'starred'}<Icon name="Check" size={14} />{/if}
-							</button>
-						</div>
-					{/if}
-				</div>
 				<Tooltip text={t('common.refresh')}>
 					<button
 						type="button"
