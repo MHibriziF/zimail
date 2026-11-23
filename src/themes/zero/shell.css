@@ -441,14 +441,6 @@
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
-	container: z-list-tools / inline-size;
-}
-
-/* Views offers the same filters as the chips below, so a narrow list gives its room to the search. */
-@container z-list-tools (max-width: 20rem) {
-	[data-ui-theme='zero'] .z-views {
-		display: none;
-	}
 }
 
 [data-ui-theme='zero'] .z-list-tools .z-icon-btn {
@@ -519,68 +511,6 @@
 	}
 }
 
-[data-ui-theme='zero'] .z-views {
-	position: relative;
-	flex-shrink: 0;
-}
-
-[data-ui-theme='zero'] .z-views-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.35rem;
-	height: 2rem;
-	padding: 0 0.625rem;
-	border-radius: 0.5rem;
-	border: 1px solid color-mix(in srgb, var(--z-border) 70%, transparent);
-	background: color-mix(in srgb, var(--z-bg) 40%, transparent);
-	color: var(--z-fg);
-	font-size: 0.875rem;
-	font-weight: 500;
-	cursor: pointer;
-}
-
-[data-ui-theme='zero'] .z-views-btn:hover {
-	background: var(--z-hover);
-}
-
-[data-ui-theme='zero'] .z-views-menu {
-	position: absolute;
-	right: 0;
-	top: calc(100% + 0.35rem);
-	z-index: 20;
-	min-width: 12rem;
-	padding: 0.5rem;
-	border-radius: 0.75rem;
-	border: 1px solid var(--z-border);
-	background: var(--z-chip);
-	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
-}
-
-[data-ui-theme='zero'][data-theme='dark'] .z-views-menu {
-	background: #232323;
-}
-
-[data-ui-theme='zero'] .z-views-menu button {
-	display: flex;
-	width: 100%;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.75rem;
-	padding: 0.55rem 0.65rem;
-	border: none;
-	background: none;
-	border-radius: 0.5rem;
-	color: inherit;
-	font-size: 0.875rem;
-	font-weight: 500;
-	cursor: pointer;
-	text-align: left;
-}
-
-[data-ui-theme='zero'] .z-views-menu button:hover {
-	background: var(--z-hover);
-}
-
 [data-ui-theme='zero'] .z-load-bar {
 	height: 2px;
 	margin-top: 0.5rem;
@@ -611,22 +541,14 @@
 	cursor: pointer;
 }
 
+[data-ui-theme='zero'] .z-chip:hover {
+	color: var(--z-fg);
+}
+
+/* One filter, one colour: the active chip is the theme accent whichever it is. */
 [data-ui-theme='zero'] .z-chip.active {
-	color: var(--z-on-primary);
-}
-
-[data-ui-theme='zero'] .z-chip[data-chip='all'].active {
 	background: var(--z-primary);
-}
-
-[data-ui-theme='zero'] .z-chip[data-chip='unread'].active {
-	background: #ff4800;
-	color: #141414;
-}
-
-[data-ui-theme='zero'] .z-chip[data-chip='starred'].active {
-	background: #eab308;
-	color: #141414;
+	color: var(--z-on-primary);
 }
 
 [data-ui-theme='zero'] .z-rows {
@@ -2133,8 +2055,7 @@
 		height: var(--touch-target);
 	}
 
-	[data-ui-theme='zero'] .z-search kbd,
-	[data-ui-theme='zero'] .z-views {
+	[data-ui-theme='zero'] .z-search kbd {
 		display: none;
 	}
 
@@ -2350,4 +2271,54 @@
 [data-ui-theme='zero'] .z-tabs {
 	flex-shrink: 0;
 	padding: 0 0.5rem;
+}
+
+/*
+ * The tab strip scrolls sideways when the list is narrow. Its edges fade so a cut-off tab reads as
+ * "more this way"; where scroll-driven animations exist, each fade only shows while there is more
+ * to scroll on that side.
+ */
+@property --z-tabs-fade-start {
+	syntax: '<length>';
+	inherits: false;
+	initial-value: 0px;
+}
+
+@property --z-tabs-fade-end {
+	syntax: '<length>';
+	inherits: false;
+	initial-value: 32px;
+}
+
+[data-ui-theme='zero'] .z-tabs .inbox-tabs {
+	mask-image: linear-gradient(
+		to right,
+		transparent,
+		#000 var(--z-tabs-fade-start),
+		#000 calc(100% - var(--z-tabs-fade-end)),
+		transparent
+	);
+}
+
+@supports (animation-timeline: scroll()) {
+	[data-ui-theme='zero'] .z-tabs .inbox-tabs {
+		animation: z-tabs-fade linear both;
+		animation-timeline: scroll(self inline);
+	}
+}
+
+@keyframes z-tabs-fade {
+	from {
+		--z-tabs-fade-start: 0px;
+	}
+	8% {
+		--z-tabs-fade-start: 32px;
+	}
+	92% {
+		--z-tabs-fade-end: 32px;
+	}
+	to {
+		--z-tabs-fade-start: 32px;
+		--z-tabs-fade-end: 0px;
+	}
 }
