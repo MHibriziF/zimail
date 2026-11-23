@@ -63,7 +63,7 @@
 	border-radius: 5px;
 	display: grid;
 	place-items: center;
-	font-size: 0.625rem;
+	font-size: 0.6875rem;
 	font-weight: 600;
 	letter-spacing: 0.02em;
 	background: color-mix(in srgb, var(--z-fg) 8%, var(--z-sidebar));
@@ -1189,7 +1189,6 @@
 
 [data-ui-theme='zero'] .z-msg-time {
 	font-size: 0.75rem;
-	opacity: 0.75;
 }
 
 [data-ui-theme='zero'] .z-msg-to {
