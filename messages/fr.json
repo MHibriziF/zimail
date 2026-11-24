@@ -355,6 +355,8 @@
 		"ccPlaceholder": "Saisir une adresse en copie",
 		"bccPlaceholder": "Saisir une adresse en copie cachée",
 		"couldNotSaveDraft": "Impossible d’enregistrer le brouillon",
+		"unsavedOnClose": "Votre brouillon n’a pas pu être enregistré, il reste donc ouvert. Réessayez, ou fermez et perdez vos modifications.",
+		"closeWithoutSaving": "Fermer sans enregistrer",
 		"couldNotLoadDraft": "Impossible de charger le brouillon",
 		"failedToSend": "Échec de l’envoi",
 		"attachmentsNotSaved": "Les pièces jointes ne sont pas enregistrées avec les brouillons. Envoyez le message ou retirez-les d’abord.",

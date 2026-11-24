@@ -355,6 +355,8 @@
 		"ccPlaceholder": "Masukkan email untuk Cc",
 		"bccPlaceholder": "Masukkan email untuk Bcc",
 		"couldNotSaveDraft": "Tidak bisa menyimpan draf",
+		"unsavedOnClose": "Draf Anda tidak dapat disimpan, jadi masih terbuka. Coba lagi, atau tutup dan perubahan Anda hilang.",
+		"closeWithoutSaving": "Tutup tanpa menyimpan",
 		"couldNotLoadDraft": "Tidak bisa memuat draf",
 		"failedToSend": "Gagal mengirim",
 		"attachmentsNotSaved": "Lampiran tidak ikut tersimpan di draf. Kirim pesannya atau hapus lampirannya dulu.",
