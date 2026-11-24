@@ -28,6 +28,8 @@
 	let status = $state<'idle' | 'saving' | 'saved' | 'failed'>('idle');
 	/** What Reset replaced, so it can be put back. */
 	let undoTo = $state<Appearance | null>(null);
+	/** What the last wholesale change was, shown beside its Undo. */
+	let undoText = $state('');
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	/** The last value sent, so the page data echoing it back does not overwrite newer edits. */
 	let sentKey = '';
@@ -147,10 +149,16 @@
 		timer = setTimeout(save, SAVE_DELAY_MS);
 	}
 
-	function reset() {
+	/** Replaces everything at once (reset, an imported theme), keeping the old look one Undo away. */
+	function replaceWith(next: Appearance, text: string) {
 		const before = draft;
-		update({ ...DEFAULT_APPEARANCE });
+		update(next);
 		undoTo = before;
+		undoText = text;
+	}
+
+	function reset() {
+		replaceWith({ ...DEFAULT_APPEARANCE }, t('settings.personaliseResetDone'));
 	}
 
 	function undo() {
@@ -206,7 +214,7 @@
 				<span class="error">{t('settings.personaliseFailed')}</span>
 				<button type="button" class="link" onclick={save}>{t('settings.personaliseRetry')}</button>
 			{:else if undoTo}
-				{t('settings.personaliseResetDone')}
+				{undoText}
 				<button type="button" class="link" onclick={undo}>{t('settings.personaliseUndo')}</button>
 			{:else if status === 'saved'}
 				<Icon name="check-line" size={14} /> {t('common.saved')}
@@ -296,7 +304,11 @@
 
 	<fieldset class="group">
 		<legend>{t('settings.themeShare')}</legend>
-		<ThemeShare appearance={draft} onimport={(theme) => update(theme)} />
+		<ThemeShare
+			appearance={draft}
+			onimport={(theme) => replaceWith(theme, t('settings.themeImported'))}
+			undo={undoTo ? undo : null}
+		/>
 	</fieldset>
 
 </section>

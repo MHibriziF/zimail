@@ -28,7 +28,8 @@
 
 	const isColour = (value: string) => /^(#|rgb|hsl|oklch|color-mix)/.test(value);
 
-	let notice = $state<{ id: string; text: string; failed?: boolean } | null>(null);
+	/** `before` is the CSS from before an add, so the add can be undone from its own example. */
+	let notice = $state<{ id: string; text: string; failed?: boolean; before?: string } | null>(null);
 
 	async function copy(id: string, css: string) {
 		try {
@@ -39,20 +40,33 @@
 		}
 	}
 
-	/** Appends to the saved CSS through the same route Personalise uses, and shows it at once. */
+	/** Saves custom CSS through the same route Personalise uses, and shows it at once. */
+	async function saveCss(customCss: string) {
+		const next = { ...parseAppearance($page.data.appearance), customCss };
+		const response = await fetch('/api/settings/appearance', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ appearance: next })
+		});
+		if (!response.ok) throw new Error(String(response.status));
+		applyAppearance(document.documentElement, next);
+		await invalidateAll();
+	}
+
 	async function add(id: string, css: string) {
-		const appearance = parseAppearance($page.data.appearance);
-		const next = { ...appearance, customCss: addExample(appearance.customCss, css) };
+		const before = parseAppearance($page.data.appearance).customCss;
 		try {
-			const response = await fetch('/api/settings/appearance', {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ appearance: next })
-			});
-			if (!response.ok) throw new Error(String(response.status));
-			applyAppearance(document.documentElement, next);
-			await invalidateAll();
-			notice = { id, text: t('cssGuide.added') };
+			await saveCss(addExample(before, css));
+			notice = { id, text: t('cssGuide.added'), before };
+		} catch {
+			notice = { id, text: t('cssGuide.addFailed'), failed: true };
+		}
+	}
+
+	async function undoAdd(id: string, before: string) {
+		try {
+			await saveCss(before);
+			notice = { id, text: t('cssGuide.removed') };
 		} catch {
 			notice = { id, text: t('cssGuide.addFailed'), failed: true };
 		}
@@ -101,7 +115,13 @@
 						{t('cssGuide.add')}
 					</button>
 					{#if notice?.id === example.id}
-						<span class="notice" class:failed={notice.failed} role="status">{notice.text}</span>
+						<span class="notice" class:failed={notice.failed} role="status"
+							>{notice.text}
+							{#if notice.before !== undefined}
+								{@const before = notice.before}
+								<button type="button" class="undo" onclick={() => undoAdd(example.id, before)}>{t('settings.personaliseUndo')}</button>
+							{/if}</span
+						>
 					{/if}
 				</div>
 			</article>
@@ -270,6 +290,19 @@
 	.notice {
 		font-size: 0.8125rem;
 		color: var(--color-text-secondary);
+	}
+
+	.undo {
+		margin-left: 0.35rem;
+		padding: 0;
+		border: none;
+		background: none;
+		color: var(--color-accent-text);
+		font: inherit;
+		font-weight: 600;
+		text-decoration: underline;
+		text-underline-offset: 0.15em;
+		cursor: pointer;
 	}
 
 	.notice.failed {
