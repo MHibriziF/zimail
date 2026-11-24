@@ -56,8 +56,8 @@
 	}
 
 	.locale-option.selected {
-		border-color: var(--color-accent, var(--z-primary, #90ac9a));
-		box-shadow: inset 0 0 0 1px var(--color-accent, var(--z-primary, #90ac9a));
+		border-color: var(--color-accent-text);
+		box-shadow: inset 0 0 0 1px var(--color-accent-text);
 	}
 
 	.locale-name {

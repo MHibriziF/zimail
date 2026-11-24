@@ -16,7 +16,7 @@
 </script>
 
 <section class="surface-lg card">
-	<h2><Icon name="contrast-2-line" size={18} /> Appearance</h2>
+	<h2><Icon name="contrast-2-line" size={18} /> {t('settings.colourMode')}</h2>
 
 	<div class="theme-options" role="radiogroup" aria-label={t('settings.theme')}>
 		{#each THEME_OPTIONS as option (option.value)}
@@ -37,9 +37,6 @@
 					<Icon name={option.icon} size={15} />
 					{option.label}
 				</span>
-				{#if theme === option.value}
-					<span class="theme-check"><Icon name="check-line" size={14} /></span>
-				{/if}
 			</button>
 		{/each}
 	</div>
@@ -83,7 +80,7 @@
 	}
 
 	.theme-option.selected {
-		box-shadow: inset 0 0 0 2px var(--color-accent);
+		box-shadow: inset 0 0 0 2px var(--color-accent-text);
 	}
 
 	/* A miniature of the app in that theme — fixed colours, not theme tokens. */
@@ -158,19 +155,6 @@
 		color: var(--color-text);
 	}
 
-	.theme-check {
-		position: absolute;
-		top: 0.5rem;
-		right: 0.5rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.125rem;
-		height: 1.125rem;
-		border-radius: 9999px;
-		color: var(--color-on-accent);
-		background: var(--color-accent);
-	}
 
 	@media (max-width: 900px) {
 		.card {

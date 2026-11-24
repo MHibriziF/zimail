@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { t } from '$lib/i18n';
 	import Icon from '../Icon.svelte';
@@ -36,6 +36,14 @@
 		original = document.documentElement.dataset.theme;
 		mode = original === 'dark' ? 'dark' : 'light';
 	});
+
+	/** The six raw colours are for fine-tuning; they start folded away unless some are already your own. */
+	let customising = $state(untrack(() => Object.keys(palettes.light).length + Object.keys(palettes.dark).length > 0));
+
+	function onToggle() {
+		// Folding the editor away also ends its preview of the other mode.
+		if (!customising && original) showMode(original === 'dark' ? 'dark' : 'light');
+	}
 
 	function showMode(next: Mode) {
 		mode = next;
@@ -127,7 +135,12 @@
 	{/each}
 </div>
 
-<div class="modes" role="tablist" aria-label={t('settings.paletteMode')}>
+<details class="customise" bind:open={customising} ontoggle={onToggle}>
+	<summary>{t('settings.paletteCustomise')}</summary>
+
+<div class="mode-row">
+<span class="mode-label" id="palette-mode-label">{t('settings.paletteMode')}</span>
+<div class="modes" role="tablist" aria-labelledby="palette-mode-label">
 	{#each ['light', 'dark'] as const as option (option)}
 		<button
 			type="button"
@@ -139,6 +152,7 @@
 			{option === 'light' ? t('settings.paletteLight') : t('settings.paletteDark')}
 		</button>
 	{/each}
+</div>
 </div>
 
 <ul class="slots">
@@ -174,6 +188,7 @@
 		</li>
 	{/each}
 </ul>
+</details>
 
 {#if warnings.length > 0}
 	<ul class="warnings" role="status">
@@ -239,10 +254,36 @@
 		font-weight: 500;
 	}
 
+	.customise {
+		margin-top: 1rem;
+	}
+
+	.customise summary {
+		width: fit-content;
+		min-height: 2.25rem;
+		padding: 0.375rem 0;
+		font-size: 0.875rem;
+		font-weight: 500;
+		color: var(--color-text);
+		cursor: pointer;
+	}
+
+	.mode-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem 0.75rem;
+		margin-top: 0.5rem;
+	}
+
+	.mode-label {
+		font-size: 0.8125rem;
+		color: var(--color-text-secondary);
+	}
+
 	.modes {
 		display: inline-flex;
 		gap: 0.25rem;
-		margin-top: 1rem;
 		padding: 0.25rem;
 		border-radius: calc(0.75rem * var(--radius-scale, 1));
 		background: var(--color-surface-muted);

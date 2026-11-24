@@ -137,6 +137,11 @@
 		gap: 0.5rem;
 	}
 
+	/* Outlined, so a row of them reads as buttons rather than a line of text. */
+	.share .btn-ghost {
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text) 18%, transparent);
+	}
+
 	.file {
 		position: relative;
 		cursor: pointer;

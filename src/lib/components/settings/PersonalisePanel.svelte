@@ -49,7 +49,8 @@
 	const accentValue = $derived(draft.accent ?? ACCENT_PRESETS[0]);
 	const custom = $derived(!(ACCENT_PRESETS as readonly string[]).includes(accentValue));
 
-	type Segment = { key: ChoiceKey; label: string; zeroOnly?: boolean; options: { value: string; label: string }[] };
+	/** `wideOnly`: pane widths, which a phone (one pane at a time) has no use for. */
+	type Segment = { key: ChoiceKey; label: string; zeroOnly?: boolean; wideOnly?: boolean; options: { value: string; label: string }[] };
 
 	/** Each fixed choice as a row of buttons, in the order the panel shows them. */
 	const SEGMENTS = $derived<{ heading: string; rows: Segment[] }[]>([
@@ -109,6 +110,7 @@
 				{
 					key: 'sidebar',
 					label: t('settings.sidebarWidth'),
+					wideOnly: true,
 					options: [
 						{ value: 'narrow', label: t('settings.widthNarrow') },
 						{ value: 'default', label: t('settings.textDefault') },
@@ -119,6 +121,7 @@
 					key: 'listWidth',
 					label: t('settings.listWidth'),
 					zeroOnly: true,
+					wideOnly: true,
 					options: [
 						{ value: 'narrow', label: t('settings.widthNarrow') },
 						{ value: 'default', label: t('settings.textDefault') },
@@ -265,7 +268,7 @@
 	{#each SEGMENTS as group (group.heading)}
 		<h3 class="group-heading">{group.heading}</h3>
 		{#each group.rows.filter((row) => zero || !row.zeroOnly) as row (row.key)}
-			<fieldset class="group row">
+			<fieldset class="group row" class:wide-only={row.wideOnly}>
 				<legend>{row.label}</legend>
 				<div class="segmented" role="radiogroup" aria-label={row.label}>
 					{#each row.options as option (option.value)}
@@ -506,6 +509,24 @@
 
 	.head h2 {
 		margin-right: auto;
+	}
+
+	/* Zero scrolls each settings pane on its own, so the save status can stay in view while you work further down. */
+	@media (min-width: 901px) {
+		:global([data-ui-theme='zero']) .head {
+			position: sticky;
+			top: -1rem;
+			z-index: 3;
+			margin-inline: -0.5rem;
+			padding: 0.75rem 0.5rem;
+			background: var(--color-surface);
+		}
+	}
+
+	@media (max-width: 767px) {
+		.group.row.wide-only {
+			display: none;
+		}
 	}
 
 	.status {

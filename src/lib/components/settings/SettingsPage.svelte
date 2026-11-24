@@ -30,6 +30,13 @@
 	let { data, section = 'all' }: { data: LayoutData; section?: SettingsSection } = $props();
 
 	const show = $derived((name: SettingsSection) => section === 'all' || section === name);
+
+	/** One pane at a time is titled after that pane, the way the sidebar names it. */
+	const title = $derived.by(() => {
+		if (section === 'all') return t('nav.settings');
+		if (section === 'labels') return t('labels.navTitle');
+		return t(`nav.${section}`);
+	});
 </script>
 
 <svelte:head>
@@ -37,7 +44,7 @@
 </svelte:head>
 
 <div class="settings-page">
-	<StackHeader title={t('nav.settings')} back={false} />
+	<StackHeader {title} back={false} />
 
 	{#if show('general')}
 		<AccountSettingsPanel name={data.user?.name ?? ''} email={data.user?.email ?? ''} />
@@ -69,7 +76,7 @@
 
 	{#if show('appearance')}
 		<section class="surface-lg card">
-			<h2><Icon name="layout-4-line" size={18} /> Interface</h2>
+			<h2><Icon name="layout-4-line" size={18} /> {t('settings.interface')}</h2>
 			<p class="card-hint">{t('settings.interfaceHint')}</p>
 			<UiThemePicker />
 		</section>
@@ -77,7 +84,7 @@
 
 	{#if show('appearance')}
 		<section class="surface-lg card">
-			<h2><Icon name="translate-2" size={18} /> Language</h2>
+			<h2><Icon name="translate-2" size={18} /> {t('settings.language')}</h2>
 			<p class="card-hint">{t('settings.languageAccountHint')}</p>
 			<LocalePicker />
 		</section>
