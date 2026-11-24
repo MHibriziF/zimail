@@ -348,6 +348,8 @@
 		"ccPlaceholder": "Enter email for Cc",
 		"bccPlaceholder": "Enter email for Bcc",
 		"couldNotSaveDraft": "Could not save draft",
+		"unsavedOnClose": "Your draft couldn’t be saved, so it’s still open. Try again, or close and lose your changes.",
+		"closeWithoutSaving": "Close without saving",
 		"couldNotLoadDraft": "Could not load draft",
 		"failedToSend": "Failed to send",
 		"attachmentsNotSaved": "Attachments are not saved with drafts. Send the message or remove them first.",

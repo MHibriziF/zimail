@@ -1508,6 +1508,33 @@
 	background: var(--z-key-hover);
 }
 
+[data-ui-theme='zero'] .z-unsaved {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.25rem 0.5rem;
+	padding: 0.6rem 0.75rem;
+	border: 1px solid var(--z-danger-line);
+	border-radius: calc(0.75rem * var(--radius-scale, 1));
+	background: var(--z-panel);
+	font-size: 0.875rem;
+}
+
+[data-ui-theme='zero'] .z-unsaved p {
+	flex: 1 1 18rem;
+	margin: 0;
+	color: var(--z-fg);
+}
+
+[data-ui-theme='zero'] .z-unsaved .z-text-btn {
+	color: var(--z-fg);
+	font-weight: 500;
+}
+
+[data-ui-theme='zero'] .z-unsaved .z-text-btn.danger {
+	color: var(--z-danger);
+}
+
 [data-ui-theme='zero'] .z-composer {
 	width: 100%;
 	display: flex;

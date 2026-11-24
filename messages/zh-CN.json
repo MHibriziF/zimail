@@ -348,6 +348,8 @@
 		"ccPlaceholder": "输入抄送邮箱",
 		"bccPlaceholder": "输入密送邮箱",
 		"couldNotSaveDraft": "无法保存草稿",
+		"unsavedOnClose": "草稿无法保存，因此仍保持打开。请重试，或关闭并放弃更改。",
+		"closeWithoutSaving": "关闭且不保存",
 		"couldNotLoadDraft": "无法加载草稿",
 		"failedToSend": "发送失败",
 		"attachmentsNotSaved": "附件不会随草稿保存。请先发送邮件或移除附件。",

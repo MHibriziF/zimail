@@ -157,6 +157,7 @@
 				return false;
 			}
 			activeDraft = body.id ?? activeDraft;
+			unsavedOnClose = false;
 			return true;
 		} catch {
 			error = t('common.networkError');
@@ -218,8 +219,14 @@
 		}
 	}
 
+	/** Set when closing could not save the draft, so the dialog stays open instead of losing what was typed. */
+	let unsavedOnClose = $state(false);
+
 	async function close() {
-		if (hasDraftText) await saveDraft();
+		if (hasDraftText && !(await saveDraft()) && error) {
+			unsavedOnClose = true;
+			return;
+		}
 		onClose();
 	}
 
@@ -269,6 +276,14 @@
 			<Icon name="X" size={14} />
 			<span class="z-esc-key">esc</span>
 		</button>
+
+		{#if unsavedOnClose}
+			<div class="z-unsaved" role="alert">
+				<p>{t('compose.unsavedOnClose')}</p>
+				<button type="button" class="z-text-btn" onclick={() => void close()}>{t('common.tryAgain')}</button>
+				<button type="button" class="z-text-btn danger" onclick={onClose}>{t('compose.closeWithoutSaving')}</button>
+			</div>
+		{/if}
 
 		<form class="z-composer" onsubmit={send}>
 			<div class="z-composer-fields">
