@@ -1,8 +1,22 @@
+<div align="center">
+
+<img src="static/favicon.svg" width="72" height="72" alt="">
+
 # Zimail
+
+**Email on your own domain, running on Cloudflare's free tier.**<br>
+`you@yourdomain.com` with a fast web client, calendar and video meetings. No mailbox provider, no servers to maintain.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
 [![Deploy this fork](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/MHibriziF/zimail)
+
+</div>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/inbox-dark.webp">
+  <img src="docs/screenshots/inbox-light.webp" alt="Zimail's inbox: folders and labels on the left, conversations in the middle, an open message on the right">
+</picture>
 
 [![Set up syncing](https://img.shields.io/badge/Set%20up%20syncing-once-0969da)](../../new/main/.github/workflows?filename=sync-upstream.yml&value=name%3A%20Sync%20from%20upstream%0Aon%3A%0A%20%20schedule%3A%0A%20%20%20%20-%20cron%3A%20'23%204%20*%20*%201'%0A%20%20workflow_dispatch%3A%0Apermissions%3A%0A%20%20contents%3A%20write%0A%20%20pull-requests%3A%20write%0Ajobs%3A%0A%20%20sync%3A%0A%20%20%20%20if%3A%20github.repository%20!%3D%20'MHibriziF%2Fzimail'%20%26%26%20github.event.repository.fork%20!%3D%20true%0A%20%20%20%20runs-on%3A%20ubuntu-latest%0A%20%20%20%20steps%3A%0A%20%20%20%20%20%20-%20uses%3A%20actions%2Fcheckout%40v5%0A%20%20%20%20%20%20%20%20with%3A%0A%20%20%20%20%20%20%20%20%20%20fetch-depth%3A%200%0A%20%20%20%20%20%20-%20run%3A%20curl%20-fsSL%20https%3A%2F%2Fraw.githubusercontent.com%2FMHibriziF%2Fzimail%2Fmain%2Fscripts%2Fsync-upstream.sh%20%7C%20bash%0A%20%20%20%20%20%20%20%20env%3A%0A%20%20%20%20%20%20%20%20%20%20SYNC_PUBLISH%3A%20'1'%0A%20%20%20%20%20%20%20%20%20%20BASE%3A%20%24%7B%7B%20github.event.repository.default_branch%20%7D%7D%0A%20%20%20%20%20%20%20%20%20%20GH_TOKEN%3A%20%24%7B%7B%20github.token%20%7D%7D%0A)
 
@@ -11,16 +25,60 @@
 Installed with the Deploy button? Press **Set up syncing** once, then **Sync
 now** whenever you want the latest ([how it works](#staying-up-to-date)).
 
-Self-hosted email for your own domain, running on Cloudflare Workers.
-Get `you@yourdomain.com` with a full web client — no third-party mailbox,
-no servers to maintain.
-
 > **This is a fork of [DivinPrince/quickinbox](https://github.com/DivinPrince/quickinbox)**,
 > the original project by [Irasubiza Divin Prince](https://github.com/DivinPrince).
 > Everything below that is not marked as an addition came from there, and the
 > credit for it goes there. This fork adds the features listed under
 > [What this fork adds](#what-this-fork-adds).
 
+## A quick tour
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/context-menu.webp" alt="Right-click menu on a conversation, with open, reply, label, archive and spam actions">
+      <p><b>Every action a right-click away.</b> Reply, label, archive, report spam or find everything from a sender, from the list, without opening the mail. Or never touch the mouse: <kbd>r</kbd> <kbd>a</kbd> <kbd>f</kbd> <kbd>e</kbd> <kbd>l</kbd> and <kbd>Ctrl</kbd> <kbd>K</kbd>.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/compose.webp" alt="The composer, with recipient chips, formatting and a Send button with schedule options">
+      <p><b>A composer that keeps up.</b> Recipient chips, your signature in place, <a href="#scheduled-send">scheduled send</a>, a 10-second undo, and <a href="#ai-assistant">Write with AI</a> on Cloudflare's free models.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/calendar.webp" alt="Month view of the calendar with events and today's agenda">
+      <p><b>Calendar beside your mail.</b> Month and agenda views, <a href="#other-calendars">Google, Outlook and iCloud calendars</a> pulled in, and <a href="#reservation-pages">booking pages</a> people can pick a slot from.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/phone.webp" alt="Zimail on a phone: the inbox in light mode and an open message in dark mode">
+      <p><b>At home on a phone.</b> Install it to your home screen, with a bottom bar in thumb reach, push notifications and the same shortcuts on a keyboard.</p>
+    </td>
+  </tr>
+</table>
+
+### Make it yours
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/custom-theme.webp" alt="The inbox in dark mode with the Midnight colour preset and a violet accent">
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/personalise.webp" alt="Settings, Personalise: accent colours, colour presets and the palette editor">
+    </td>
+  </tr>
+</table>
+
+**Settings → Appearance → Personalise** changes the accent, the whole palette
+for light and dark, density, text size, font, corners and pane widths. Drag the
+sidebar and list edges to resize them, share a theme as a file, or go further
+with your own CSS and the built-in guide to what it can style. Everything
+follows your account to every device.
+
+Prefer a denser, more traditional layout? Switch to the **Classic** interface in
+the same place.
+
+<img src="docs/screenshots/classic.webp" alt="The Classic interface: a single-row inbox with checkboxes, stars and inbox tabs">
 
 ## Features
 
