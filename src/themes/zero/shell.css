@@ -2311,14 +2311,6 @@
 		border-bottom: none;
 	}
 
-	[data-ui-theme='zero'] .z-root.settings .z-mobile-nav {
-		display: none;
-	}
-
-	[data-ui-theme='zero'] .z-root.settings {
-		padding-bottom: 0;
-	}
-
 	[data-ui-theme='zero'] .z-root.settings[data-mobile-open='true'] .z-sidebar {
 		padding-bottom: 0.5rem;
 	}
