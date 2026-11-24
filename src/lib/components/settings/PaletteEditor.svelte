@@ -369,5 +369,10 @@
 			width: var(--touch-target);
 			height: var(--touch-target);
 		}
+
+		.modes button,
+		.slot-hex {
+			min-height: var(--touch-target);
+		}
 	}
 </style>

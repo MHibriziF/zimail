@@ -2487,3 +2487,60 @@
 		--z-tabs-fade-end: 0px;
 	}
 }
+
+/* After the base rules, which would otherwise win at the same specificity. */
+@media (pointer: coarse) {
+	/* Buttons people press with a thumb get the full target. */
+	[data-ui-theme='zero'] .z-action-btn,
+	[data-ui-theme='zero'] .z-send,
+	[data-ui-theme='zero'] .z-add,
+	[data-ui-theme='zero'] .z-composer-foot .z-text-btn,
+	[data-ui-theme='zero'] .z-composer-foot .icon-btn,
+	[data-ui-theme='zero'] .z-attach-file {
+		min-height: var(--touch-target);
+	}
+
+	[data-ui-theme='zero'] .z-composer-link {
+		min-width: var(--touch-target);
+		min-height: var(--touch-target);
+	}
+
+	[data-ui-theme='zero'] .z-composer-row {
+		min-height: var(--touch-target);
+		padding-block: 0;
+	}
+
+	[data-ui-theme='zero'] .z-composer-input,
+	[data-ui-theme='zero'] .z-composer-row .field-input {
+		align-self: stretch;
+		min-height: var(--touch-target);
+	}
+
+	/* Chips and tabs keep their size; an invisible margin takes the tap. */
+	[data-ui-theme='zero'] .z-chip,
+	[data-ui-theme='zero'] .z-details,
+	[data-ui-theme='zero'] .z-msg-more,
+	[data-ui-theme='zero'] .z-thread-labels .label-chip {
+		position: relative;
+		overflow: visible;
+	}
+
+	[data-ui-theme='zero'] .z-chip::after,
+	[data-ui-theme='zero'] .z-details::after {
+		content: '';
+		position: absolute;
+		inset: -0.375rem -0.125rem;
+	}
+
+	[data-ui-theme='zero'] .z-msg-more::after {
+		content: '';
+		position: absolute;
+		inset: -0.5rem;
+	}
+
+	[data-ui-theme='zero'] .z-thread-labels .label-chip::after {
+		content: '';
+		position: absolute;
+		inset: -0.875rem -0.125rem;
+	}
+}

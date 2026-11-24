@@ -85,4 +85,10 @@
 		color: var(--color-on-accent);
 		background: var(--color-accent);
 	}
+
+	@media (pointer: coarse) {
+		.inbox-tab {
+			min-height: var(--touch-target);
+		}
+	}
 </style>

@@ -270,7 +270,7 @@
 	}
 </script>
 
-<div class="z-overlay" bind:this={overlay} onkeydown={onKey} role="dialog" aria-modal="true" tabindex="-1">
+<div class="z-overlay" bind:this={overlay} onkeydown={onKey} role="dialog" aria-modal="true" aria-label={t('nav.newMessage')} tabindex="-1">
 	<div class="z-compose-stage">
 		<button type="button" class="z-esc" aria-label={t('common.close')} onclick={close}>
 			<Icon name="X" size={14} />
@@ -321,13 +321,14 @@
 					/>
 				{/if}
 				<div class="z-composer-row">
-						<span class="z-composer-label">{t('compose.subjectColon')}</span>
-						<input class="z-composer-input" bind:value={subject} required placeholder={t('compose.subject')} />
+						<label class="z-composer-label" for="z-subject">{t('compose.subjectColon')}</label>
+						<input id="z-subject" class="z-composer-input" bind:value={subject} required placeholder={t('compose.subject')} />
 				</div>
 				{#if addresses.length > 1}
 					<div class="z-composer-row">
-						<span class="z-composer-label">{t('compose.fromColon')}</span>
+						<label class="z-composer-label" for="z-from">{t('compose.fromColon')}</label>
 						<select
+							id="z-from"
 							class="z-composer-input"
 							value={fromAddressId}
 							onchange={(event) => chooseFrom(event.currentTarget.value)}

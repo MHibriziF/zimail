@@ -14,8 +14,8 @@ export const EMPTY_PALETTES: Palettes = { light: {}, dark: {} };
 /** What each theme shows when a slot is unset; used for the editor's swatches and contrast checks. */
 export const THEME_DEFAULTS: Record<string, Record<Mode, Required<Palette>>> = {
 	zero: {
-		light: { background: '#fafafa', surface: '#ffffff', raised: '#f5f5f5', text: '#09090b', muted: '#71717a', border: '#e7e7e7' },
-		dark: { background: '#141414', surface: '#1a1a1a', raised: '#202020', text: '#fafafa', muted: '#898989', border: '#252525' }
+		light: { background: '#fafafa', surface: '#ffffff', raised: '#f5f5f5', text: '#09090b', muted: '#696972', border: '#e7e7e7' },
+		dark: { background: '#141414', surface: '#1a1a1a', raised: '#202020', text: '#fafafa', muted: '#a3a3a3', border: '#252525' }
 	},
 	classic: {
 		light: { background: '#fafafa', surface: '#ffffff', raised: '#f5f5f5', text: '#0a0a0a', muted: '#525252', border: '#ededed' },

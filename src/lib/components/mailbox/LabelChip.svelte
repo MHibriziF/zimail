@@ -25,7 +25,8 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		text-decoration: none;
-		color: color-mix(in srgb, var(--label-color) 78%, var(--color-text));
+		/* Enough of the text colour that every label colour reads at 4.5:1 or better, light and dark. */
+		color: color-mix(in srgb, var(--label-color) 62%, var(--color-text));
 		background: color-mix(in srgb, var(--label-color) 16%, transparent);
 	}
 
