@@ -383,4 +383,10 @@
 	:global(html[data-theme='dark']) .frame.rich:not(.light-only) {
 		background: transparent;
 	}
+
+	@media (pointer: coarse) {
+		.colours-toggle {
+			min-height: var(--touch-target);
+		}
+	}
 </style>

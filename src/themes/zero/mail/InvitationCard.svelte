@@ -283,6 +283,12 @@
 		background: var(--z-chip);
 	}
 
+	@media (pointer: coarse) {
+		.z-invite-btn {
+			height: var(--touch-target);
+		}
+	}
+
 	.z-invite-btn:hover:not(:disabled) {
 		background: var(--z-hover);
 	}
