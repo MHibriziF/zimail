@@ -42,13 +42,18 @@
 		view,
 		onClose,
 		onCompose,
-		onRead
+		onRead,
+		replyWith = null,
+		onReplyStarted
 	}: {
 		id: string | null;
 		view: MailboxView;
 		onClose: () => void;
 		onCompose?: () => void;
 		onRead?: (threadId: string) => void;
+		/** Starts this reply as soon as the conversation has loaded, for Reply chosen from the list. */
+		replyWith?: 'reply' | 'replyAll' | 'forward' | null;
+		onReplyStarted?: () => void;
 	} = $props();
 
 	type ThreadPayload = {
@@ -170,6 +175,14 @@
 	});
 
 	const latest = $derived(thread?.messages[thread.messages.length - 1] ?? null);
+
+	$effect(() => {
+		if (!replyWith || loading || !latest) return;
+		const mode = replyWith;
+		const message = latest;
+		untrack(() => startReply(mode, message));
+		onReplyStarted?.();
+	});
 
 	// A message still waiting in the outbox. Recalling it turns it back into a
 	// draft, so the writing survives the schedule being cancelled.

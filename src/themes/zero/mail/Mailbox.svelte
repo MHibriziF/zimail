@@ -117,8 +117,71 @@
 		});
 	});
 
+	/** Copies to the clipboard, falling back to a hidden field where the async API is blocked. */
+	async function copyText(text: string): Promise<boolean> {
+		try {
+			await navigator.clipboard.writeText(text);
+			return true;
+		} catch {
+			const input = document.createElement('textarea');
+			input.value = text;
+			document.body.append(input);
+			input.select();
+			const ok = document.execCommand('copy');
+			input.remove();
+			return ok;
+		}
+	}
+
+	let notice = $state('');
+	let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+	function announce(message: string) {
+		notice = message;
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => (notice = ''), 2400);
+	}
+
+	/** Opens the conversation and starts a reply in it, as r, a and f would there. */
+	let replyIntent = $state<{ id: string; mode: 'reply' | 'replyAll' | 'forward' } | null>(null);
+
+	/** Actions that open or look something up, rather than change the conversation. */
+	async function onNavigateAction(action: RowAction, thread: ThreadSummary) {
+		const person = thread.participants.find((participant) => !participant.self);
+		switch (action) {
+			case 'open':
+				setThread(thread.latest_id);
+				return;
+			case 'editDraft':
+				void goto(draftHref(thread));
+				return;
+			case 'openTab':
+				window.open(threadHref(thread.latest_id), '_blank', 'noopener');
+				return;
+			case 'reply':
+			case 'replyAll':
+			case 'forward':
+				replyIntent = { id: thread.latest_id, mode: action };
+				setThread(thread.latest_id);
+				return;
+			case 'copySender':
+				if (person && (await copyText(person.address))) announce(t('mailbox.senderCopied', { email: person.address }));
+				return;
+			case 'withSender':
+				if (person) void goto(`/all?q=${encodeURIComponent(person.address)}`);
+				return;
+		}
+	}
+
+	const NAVIGATE_ACTIONS = new Set<RowAction>(['open', 'editDraft', 'openTab', 'reply', 'replyAll', 'forward', 'copySender', 'withSender']);
+
 	/** After an action takes a row out of this list, focus moves on to the row that took its place. */
-	async function onRowAction(action: RowAction, thread: ThreadSummary) {
+	async function onRowAction(action: RowAction, threads: ThreadSummary[]) {
+		const [thread] = threads;
+		if (!thread) return;
+		if (NAVIGATE_ACTIONS.has(action)) {
+			await onNavigateAction(action, thread);
+			return;
+		}
 		if (action === 'label') {
 			const anchor = menuAnchor?.isConnected ? menuAnchor.getBoundingClientRect() : null;
 			if (!anchor) return;
@@ -131,10 +194,28 @@
 			return;
 		}
 		const index = items.findIndex((item) => item.thread_id === thread.thread_id);
-		await act(action, [thread.latest_id]);
+		await act(action, threads.map((item) => item.latest_id));
+		if (threads.length > 1) selected = [];
 		await tick();
 		if (document.activeElement && document.activeElement !== document.body) return;
 		focusRow(thread.thread_id, index);
+	}
+
+	/**
+	 * Right-click on a row: the actions menu at the pointer, for the whole selection
+	 * when the row is part of one. Shift keeps the browser's own menu, for its link items.
+	 */
+	function onRowContextMenu(thread: ThreadSummary, event: MouseEvent) {
+		if (event.shiftKey) return;
+		event.preventDefault();
+		const row = event.currentTarget as HTMLElement;
+		const opener = row.querySelector<HTMLElement>('.z-row-open') ?? row;
+		menuAnchor = row.querySelector<HTMLElement>('.z-row-more') ?? opener;
+		const inSelection = selected.length > 1 && selected.includes(thread.thread_id);
+		const targets = inSelection ? items.filter((item) => selected.includes(item.thread_id)) : [thread];
+		// A keyboard-opened context menu reports no pointer position.
+		const fromPointer = event.clientX !== 0 || event.clientY !== 0;
+		void actionsMenu?.openAt(targets, opener, fromPointer ? { x: event.clientX, y: event.clientY } : null);
 	}
 
 	function markThreadRead(threadId: string) {
@@ -347,6 +428,8 @@
 			{:else}
 				{#each items as thread (thread.thread_id)}
 					{@const name = participantName(thread.participants, view, $page.data.locale)}
+					<!-- The row is reached through its link; the menu key on it fires contextmenu, which bubbles here. -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
 						class="z-row"
 						data-thread-id={thread.thread_id}
@@ -354,6 +437,7 @@
 						class:unread={!thread.is_read}
 						class:read={thread.is_read}
 						class:menu-open={menuFor === thread.thread_id}
+						oncontextmenu={(event) => onRowContextMenu(thread, event)}
 					>
 						<a
 							class="z-row-open"
@@ -495,11 +579,18 @@
 			onClose={() => setThread(null)}
 			onCompose={openCompose}
 			onRead={markThreadRead}
+			replyWith={replyIntent?.id === threadId ? replyIntent.mode : null}
+			onReplyStarted={() => (replyIntent = null)}
 		/>
 	</section>
 </div>
 
 <RowActionsMenu bind:this={actionsMenu} bind:openFor={menuFor} {view} onAction={onRowAction} />
+
+<div class="z-sr-only" role="status">{notice}</div>
+{#if notice}
+	<div class="z-notice" aria-hidden="true">{notice}</div>
+{/if}
 
 {#if labelling}
 	<LabelPicker
