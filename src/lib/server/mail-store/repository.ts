@@ -3,6 +3,7 @@ import { MAILBOX_PAGE_SIZE } from '$lib/constants';
 import { MAIL_CATEGORIES, type MailCategory } from '$lib/mail/categories';
 import { deliveryStatusesBefore } from '$lib/mail/delivery-status';
 import { TRASH_CANCELS_SCHEDULE, withLocationRules } from './location';
+import { ftsQueryAll } from './fts-query';
 import type {
 	DeliveryStatus,
 	EmailAttachmentMeta,
@@ -68,6 +69,8 @@ export type MailboxQuery = {
 	terms?: string[];
 	/** Any one of `terms` is enough. */
 	anyTerm?: boolean;
+	/** Match `q` / `terms` through the full-text index instead of scanning with LIKE. */
+	textIndex?: boolean;
 	/** Sender address or display name contains this. */
 	from?: string | null;
 	/** `YYYY-MM-DD` (UTC), inclusive. */
@@ -128,7 +131,12 @@ function likePattern(term: string): string {
 function addTextFilters(query: MailboxQuery, filters: string[], bindings: unknown[]) {
 	const phrase = query.q?.trim();
 	const terms = query.terms ?? (phrase ? [phrase] : []);
-	const groups = terms.map((term) => {
+	const match = query.textIndex ? ftsQueryAll(terms, query.anyTerm) : null;
+	if (match) {
+		filters.push('e.id IN (SELECT email_id FROM emails_fts WHERE emails_fts MATCH ?)');
+		bindings.push(match);
+	}
+	const groups = (match ? [] : terms).map((term) => {
 		const like = likePattern(term);
 		bindings.push(like, like, like, like);
 		return String.raw`(e.subject LIKE ? ESCAPE '\' OR e.from_addr LIKE ? ESCAPE '\'
@@ -300,6 +308,8 @@ export type MailStoreRepository = {
 	): Promise<ThreadMessageRow[]>;
 	/** Newest matching messages one by one, not grouped into conversations. */
 	searchMessages(userId: string, query: MailboxQuery, limit: number): Promise<ThreadMessageRow[]>;
+	/** True once every message written before the search index existed has been indexed. */
+	searchIndexReady(): Promise<boolean>;
 
 	getCursorCounts(
 		userId: string,
@@ -587,6 +597,15 @@ export function createD1MailStoreRepository(db: D1Database): MailStoreRepository
 				.bind(...bindings, limit)
 				.all<ThreadMessageRow>();
 			return results;
+		},
+
+		async searchIndexReady() {
+			// A database from before the index (a test, a half-run migration) simply keeps the LIKE scan.
+			const row = await db
+				.prepare('SELECT ready FROM search_index_state WHERE id = 1')
+				.first<{ ready: number }>()
+				.catch(() => null);
+			return row?.ready === 1;
 		},
 
 		async getCursorCounts(userId, domainId) {
