@@ -460,6 +460,11 @@
 		"title": "Buscar",
 		"placeholder": "Buscar correo o ir a…",
 		"typeToSearch": "Escribe para buscar",
+		"allFor": "Buscar «{query}» en todo el correo",
+		"goTo": "Ir a",
+		"messages": "Mensajes",
+		"searching": "Buscando…",
+		"failed": "La búsqueda falló. Revisa tu conexión e inténtalo de nuevo.",
 		"noMatches": "Sin coincidencias"
 	},
 	"settings": {

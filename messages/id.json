@@ -460,6 +460,11 @@
 		"title": "Cari",
 		"placeholder": "Cari surel atau lompat ke…",
 		"typeToSearch": "Ketik untuk mencari",
+		"allFor": "Cari “{query}” di semua email",
+		"goTo": "Buka",
+		"messages": "Pesan",
+		"searching": "Mencari…",
+		"failed": "Pencarian gagal. Periksa koneksi Anda lalu coba lagi.",
 		"noMatches": "Tidak ada yang cocok"
 	},
 	"settings": {

@@ -460,6 +460,11 @@
 		"title": "Search",
 		"placeholder": "Search mail or jump to…",
 		"typeToSearch": "Type to search",
+		"allFor": "Search all mail for “{query}”",
+		"goTo": "Go to",
+		"messages": "Messages",
+		"searching": "Searching…",
+		"failed": "Search didn’t work. Check your connection and try again.",
 		"noMatches": "No matches"
 	},
 	"settings": {

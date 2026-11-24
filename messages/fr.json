@@ -460,6 +460,11 @@
 		"title": "Recherche",
 		"placeholder": "Rechercher un message ou y aller…",
 		"typeToSearch": "Tapez pour rechercher",
+		"allFor": "Rechercher « {query} » dans tous les messages",
+		"goTo": "Aller à",
+		"messages": "Messages",
+		"searching": "Recherche…",
+		"failed": "La recherche a échoué. Vérifiez votre connexion et réessayez.",
 		"noMatches": "Aucun résultat"
 	},
 	"settings": {
