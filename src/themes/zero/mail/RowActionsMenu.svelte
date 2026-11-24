@@ -31,13 +31,16 @@
 	let trigger: HTMLElement | null = null;
 
 	const sender = (thread: ThreadSummary) => thread.participants.find((person) => !person.self) ?? null;
-	const sections = $derived<MenuSections>(
-		targets.length > 1
-			? selectionMenu(view, targets)
-			: targets[0]
-				? rowMenu(view, targets[0], sender(targets[0]) !== null)
-				: []
-	);
+	const sections = $derived.by<MenuSections>(() => {
+		if (targets.length > 1) return selectionMenu(view, targets);
+		const [only] = targets;
+		return only ? rowMenu(view, only, sender(only) !== null) : [];
+	});
+	const menuLabel = $derived.by(() => {
+		if (targets.length > 1) return t('mailbox.selectionActions', { count: targets.length });
+		const [only] = targets;
+		return only ? t('mailbox.actionsFor', { subject: only.subject || t('mailbox.noSubject') }) : undefined;
+	});
 
 	const LABELS: Record<RowAction, () => string> = {
 		open: () => t('common.open'),
@@ -188,11 +191,7 @@
 	popover="manual"
 	role="menu"
 	tabindex="-1"
-	aria-label={targets.length > 1
-		? t('mailbox.selectionActions', { count: targets.length })
-		: targets[0]
-			? t('mailbox.actionsFor', { subject: targets[0].subject || t('mailbox.noSubject') })
-			: undefined}
+	aria-label={menuLabel}
 	onkeydown={onKeydown}
 	oncontextmenu={(event) => event.preventDefault()}
 >

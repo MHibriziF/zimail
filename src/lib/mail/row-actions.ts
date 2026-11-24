@@ -38,6 +38,12 @@ function spamAction(view: MailboxView, thread: RowState): RowAction | null {
 	return 'spam';
 }
 
+/** The read toggle, or nothing where there is no read state. */
+function readAction(view: MailboxView, thread: RowState): RowAction | null {
+	if (!hasReadState(view, thread)) return null;
+	return thread.is_read ? 'unread' : 'read';
+}
+
 function binActions(view: MailboxView): RowAction[] {
 	return view === 'trash' ? ['restore', 'delete'] : ['trash'];
 }
@@ -60,7 +66,7 @@ export function rowMenu(view: MailboxView, thread: RowState, hasSender: boolean)
 		[
 			thread.is_starred ? 'unstar' : 'star',
 			'label',
-			hasReadState(view, thread) ? (thread.is_read ? 'unread' : 'read') : null,
+			readAction(view, thread),
 			view === 'archive' ? 'unarchive' : 'archive'
 		],
 		hasSender && !draft ? ['copySender', 'withSender'] : [],
@@ -76,11 +82,13 @@ export function selectionMenu(view: MailboxView, threads: RowState[]): MenuSecti
 	const anyUnstarred = threads.some((thread) => !thread.is_starred);
 	const readable = threads.filter((thread) => hasReadState(view, thread));
 	const anyUnread = readable.some((thread) => !thread.is_read);
+	let read: RowAction | null = null;
+	if (readable.length > 0) read = anyUnread ? 'read' : 'unread';
 	const spam = threads.every((thread) => spamAction(view, thread) !== null) ? spamAction(view, threads[0]) : null;
 	return compact([
 		[
 			anyUnstarred ? 'star' : 'unstar',
-			readable.length > 0 ? (anyUnread ? 'read' : 'unread') : null,
+			read,
 			view === 'archive' ? 'unarchive' : 'archive'
 		],
 		// Deleting for good asks about one message at a time, so a selection can only be restored.
