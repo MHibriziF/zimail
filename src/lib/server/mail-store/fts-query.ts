@@ -30,5 +30,6 @@ export function ftsQueryAll(terms: string[], any = false): string | null {
 		if (!part) return null;
 		parts.push(`(${part})`);
 	}
-	return parts.length > 0 ? parts.join(any ? ' OR ' : ' AND ') : null;
+	if (parts.length === 0) return null;
+	return parts.join(any ? ' OR ' : ' AND ');
 }
