@@ -1892,11 +1892,95 @@
 	text-align: left;
 	cursor: pointer;
 	font-size: 0.875rem;
+	--icon-color: var(--z-muted);
 }
 
-[data-ui-theme='zero'] .z-palette-item:hover,
+/* Arrow keys move this; it has to be seen without a pointer over it. */
 [data-ui-theme='zero'] .z-palette-item.active {
-	background: var(--z-hover);
+	background: color-mix(in srgb, var(--z-fg) 8%, transparent);
+}
+
+[data-ui-theme='zero'] .z-palette-main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 0.1rem;
+	min-width: 0;
+}
+
+[data-ui-theme='zero'] .z-palette-line {
+	display: flex;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+[data-ui-theme='zero'] .z-palette-who {
+	flex-shrink: 0;
+	max-width: 40%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 500;
+}
+
+[data-ui-theme='zero'] .z-palette-subject,
+[data-ui-theme='zero'] .z-palette-snippet {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+[data-ui-theme='zero'] .z-palette-snippet,
+[data-ui-theme='zero'] .z-palette-meta {
+	font-size: 0.75rem;
+	color: var(--z-muted);
+}
+
+[data-ui-theme='zero'] .z-palette-meta {
+	display: flex;
+	flex-shrink: 0;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 0.1rem;
+	align-self: flex-start;
+	white-space: nowrap;
+}
+
+[data-ui-theme='zero'] .z-palette-place {
+	padding: 0 0.35rem;
+	border-radius: calc(0.3rem * var(--radius-scale, 1));
+	background: var(--z-well);
+}
+
+[data-ui-theme='zero'] .z-palette-heading {
+	padding: 0.6rem 0.6rem 0.25rem;
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--z-muted);
+}
+
+[data-ui-theme='zero'] .z-palette-enter {
+	padding: 0 0.35rem;
+	border-radius: calc(0.3rem * var(--radius-scale, 1));
+	background: var(--z-key);
+	color: var(--z-muted);
+	font-family: var(--font-geist-mono);
+	font-size: 0.75rem;
+}
+
+[data-ui-theme='zero'] .z-palette-item:not(.active) .z-palette-enter {
+	visibility: hidden;
+}
+
+[data-ui-theme='zero'] .z-palette-note {
+	margin: 0;
+	padding: 0.75rem 0.6rem;
+	font-size: 0.875rem;
+	color: var(--z-muted);
+}
+
+[data-ui-theme='zero'] .z-palette-note.failed {
+	color: var(--z-danger);
 }
 
 [data-ui-theme='zero'] .z-sheet {

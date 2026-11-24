@@ -460,6 +460,11 @@
 		"title": "搜索",
 		"placeholder": "搜索邮件或跳转…",
 		"typeToSearch": "输入以搜索",
+		"allFor": "在所有邮件中搜索“{query}”",
+		"goTo": "前往",
+		"messages": "邮件",
+		"searching": "正在搜索…",
+		"failed": "搜索失败。请检查网络连接后重试。",
 		"noMatches": "无匹配结果"
 	},
 	"settings": {
