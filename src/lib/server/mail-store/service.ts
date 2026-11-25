@@ -196,6 +196,18 @@ export type MailStoreServiceDeps = {
 export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreService {
 	const { repo, resolveThread, labelsFor } = deps;
 
+	/**
+	 * Text searches go through the full-text index once it holds every message. When it finds
+	 * nothing, the LIKE scan runs as before: it still matches part of a word, and scripts
+	 * written without spaces (Chinese), which the index keeps as one long word.
+	 */
+	async function withTextIndex<T>(query: MailboxQuery, run: (query: MailboxQuery) => Promise<T>, found: (result: T) => boolean): Promise<T> {
+		const hasText = Boolean(query.q?.trim()) || (query.terms?.length ?? 0) > 0;
+		if (!hasText || !(await repo.searchIndexReady())) return run(query);
+		const indexed = await run({ ...query, textIndex: true });
+		return found(indexed) ? indexed : run(query);
+	}
+
 	async function insertEmail(input: InsertEmailInput): Promise<string> {
 		const id = crypto.randomUUID();
 		const bodyText = truncate(input.bodyText ?? null);
@@ -301,7 +313,11 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 		getEmailForUser: (userId, emailId) => repo.getForUser(userId, emailId),
 
 		async listMailbox(userId, query) {
-			const { threads, total, page, pageCount, pageSize } = await repo.listMailboxRows(userId, query);
+			const { threads, total, page, pageCount, pageSize } = await withTextIndex(
+				query,
+				(next) => repo.listMailboxRows(userId, next),
+				(rows) => rows.total > 0
+			);
 			const conversationIds = threads.map((messages) => messages[0].thread_id);
 			const labels =
 				labelsFor && conversationIds.length > 0 ? await labelsFor(userId, conversationIds) : new Map<string, Label[]>();
@@ -318,7 +334,12 @@ export function createMailStoreService(deps: MailStoreServiceDeps): MailStoreSer
 			const rows = await repo.listFlatRows(userId, options);
 			return rows.map(toEmailSummary);
 		},
-		searchMessages: (userId, query, limit) => repo.searchMessages(userId, query, limit),
+		searchMessages: (userId, query, limit) =>
+			withTextIndex(
+				query,
+				(next) => repo.searchMessages(userId, next, limit),
+				(rows) => rows.length > 0
+			),
 
 		async getMailboxCursor(userId, domainId) {
 			const { messageCount, latestRowid } = await repo.getCursorCounts(userId, domainId);

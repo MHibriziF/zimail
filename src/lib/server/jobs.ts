@@ -3,6 +3,7 @@ import { ensureSchema } from './migrations/migrate';
 import { runDueBookingReminders } from './reservations';
 import { runDueScheduledSends } from './scheduled-send';
 import { runDueFeedSyncs } from './calendar-feeds';
+import { runSearchIndexBackfill } from './mail-store/search-index';
 
 /**
  * The once-a-minute work: what the Worker's cron trigger runs, and what the
@@ -38,5 +39,12 @@ export async function runScheduledJobs(platform: App.Platform): Promise<void> {
 		if (synced || failed) console.log(`calendar feeds: ${synced} synced, ${failed} failed`);
 	} catch (error) {
 		console.error('calendar feed sync failed', error);
+	}
+	// Self-limiting: a small batch every ten minutes until the mail from before the index is in.
+	try {
+		const result = await runSearchIndexBackfill(env.DB);
+		if (result) console.log(`search index: ${result.indexed} indexed${result.done ? ', done' : ''}`);
+	} catch (error) {
+		console.error('search index backfill failed', error);
 	}
 }

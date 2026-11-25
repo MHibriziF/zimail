@@ -720,6 +720,7 @@ migrations/          D1 schema, applied in order
 | "The calendar address was refused" | Google answers 404 for a `/public/` address unless the calendar is public — use the **secret** address, or see [Workspace accounts](#other-calendars) |
 | Other calendar stuck at its last sync | Google republishes its iCal feed every few hours; **Sync now** fetches what it currently offers |
 | "Meeting room" option greyed out | Set the three `LIVEKIT_*` secrets from [Video meetings](#video-meetings-optional) |
+| `wrangler d1 export` refuses the database (virtual tables) | Mail search uses an FTS5 index, and D1 can't export one. Remove it together with its triggers (on their own they would stop new mail from being stored): `wrangler d1 execute <name> --remote --command "DROP TRIGGER emails_fts_insert; DROP TRIGGER emails_fts_update; DROP TRIGGER emails_fts_delete; DROP TABLE emails_fts; DROP TABLE search_index_state;"`. Export, then put it back with `wrangler d1 execute <name> --remote --file migrations/0061_mail_search_index.sql`. Search uses the slower scan until the cron has re-indexed your mail, about 4,300 messages a day. |
 
 ## License
 
