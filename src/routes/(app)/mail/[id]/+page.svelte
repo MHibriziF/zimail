@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { goto, invalidate, invalidateAll } from '$app/navigation';
+	import { untrack } from 'svelte';
+	import { goto, invalidate, invalidateAll, replaceState } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { holdSend, restored, takeRestored } from '$lib/mail/undo-send';
 	import { markThreadReadInSnapshots } from '$lib/mail/mailbox-cache';
@@ -248,6 +249,20 @@
 		if (forwardOpen && isHtmlEmpty(forwardHtml)) forwardHtml = replyBody();
 		error = '';
 	}
+
+	// The list's right-click menu links here with ?compose=reply or forward. The
+	// parameter is dropped once used, so Back or a reload doesn't reopen it.
+	$effect(() => {
+		const wanted = $page.url.searchParams.get('compose');
+		if (wanted !== 'reply' && wanted !== 'forward') return;
+		untrack(() => {
+			if (wanted === 'reply' && !replyOpen) openReply();
+			if (wanted === 'forward' && !forwardOpen) openForward();
+			const url = new URL($page.url);
+			url.searchParams.delete('compose');
+			replaceState(url, $page.state);
+		});
+	});
 
 	/** Forwards the newest message in the conversation, files included. */
 	async function sendForward(event: SubmitEvent) {
