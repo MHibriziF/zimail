@@ -596,6 +596,42 @@ describe('ReservationsService slots and booking', () => {
 		assert.equal(await service.rescheduleBooking('owner', 'no-such-event', taken, end), 'not_found');
 	});
 
+	test('the host can move a booking outside the page’s hours, and the guest is emailed', async () => {
+		const { service, bookings, notified } = await withPage();
+		await service.book('office-hours', guest, BASE);
+		const eventId = bookings[0].eventId;
+		// 22:00 UTC is well outside the page's hours; the host decides.
+		const start = '2026-10-02T22:00:00.000Z';
+		const end = '2026-10-02T23:30:00.000Z';
+
+		assert.equal(await service.moveByHost('owner', eventId, start, end), 'ok');
+		assert.equal(bookings[0].start, start);
+		assert.equal(bookings[0].end, end);
+		assert.equal(notified[1].kind, 'moved');
+		assert.equal(notified[1].booking.start.toISOString(), start);
+	});
+
+	test('moving a booking to the time it already has sends nothing', async () => {
+		const { service, bookings, notified } = await withPage();
+		await service.book('office-hours', guest, BASE);
+		assert.equal(await service.moveByHost('owner', bookings[0].eventId, bookings[0].start, bookings[0].end), 'ok');
+		assert.equal(notified.length, 1);
+	});
+
+	test('the host can’t move a booking into the past, backwards, past a day, or onto another booking', async () => {
+		const { service, bookings } = await withPage();
+		await service.book('office-hours', guest, BASE);
+		await service.book('office-hours', { ...guest, email: 'bo@example.com', start: '2026-09-28T03:00:00.000Z' }, BASE);
+		const eventId = bookings[0].eventId;
+
+		assert.equal(await service.moveByHost('owner', eventId, '2026-09-20T10:00:00.000Z', '2026-09-20T11:00:00.000Z'), 'in_past');
+		assert.equal(await service.moveByHost('owner', eventId, '2026-10-02T11:00:00.000Z', '2026-10-02T10:00:00.000Z'), 'invalid_time');
+		assert.equal(await service.moveByHost('owner', eventId, '2026-10-02T10:00:00.000Z', '2026-10-03T10:30:00.000Z'), 'invalid_time');
+		assert.equal(await service.moveByHost('owner', eventId, 'soon', 'later'), 'invalid_time');
+		assert.equal(await service.moveByHost('owner', eventId, bookings[1].start, bookings[1].end), 'slot_taken');
+		assert.equal(await service.moveByHost('stranger', eventId, '2026-10-02T10:00:00.000Z', '2026-10-02T11:00:00.000Z'), 'not_found');
+	});
+
 	test('a failed cancellation email still cancels', async () => {
 		const { service, bookings } = await withPage({ notifyFails: true });
 		await service.book('office-hours', guest, BASE);

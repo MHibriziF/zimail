@@ -43,6 +43,16 @@ export async function saveEvent(input: CalendarEventInput, id?: string): Promise
 	return (await readJson<{ event: CalendarEvent }>(response, 'Could not save the event')).event;
 }
 
+/** Moves a booking to a new time; the guest is emailed the change. */
+export async function moveBooking(id: string, start: string, end: string): Promise<void> {
+	const response = await fetch(`/api/calendar/events/${encodeURIComponent(id)}/move`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ start, end })
+	});
+	await readJson(response, 'Could not move the booking');
+}
+
 export async function deleteEvent(id: string): Promise<void> {
 	const response = await fetch(`/api/calendar/events/${encodeURIComponent(id)}`, { method: 'DELETE' });
 	await readJson(response, 'Could not delete the event');

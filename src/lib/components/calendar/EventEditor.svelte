@@ -25,7 +25,9 @@
 		guests = [],
 		meetingCode = null,
 		meetingsAvailable = false,
+		movable = false,
 		onsave,
+		onmove,
 		ondelete,
 		oncancel
 	}: {
@@ -42,13 +44,43 @@
 		guests?: EventGuest[];
 		meetingCode?: string | null;
 		meetingsAvailable?: boolean;
+		/** A booking: read-only, except that its time can be moved. */
+		movable?: boolean;
 		onsave: (draft: EventDraft) => void;
+		onmove?: (draft: EventDraft) => void;
 		ondelete: () => void;
 		oncancel: () => void;
 	} = $props();
 
 	let draft = $state(untrack(() => ({ ...initial })));
 	let confirmingDelete = $state(false);
+	let confirmingMove = $state(false);
+
+	const timeLocked = $derived(readOnly && !movable);
+
+	// A refused move goes back to picking a time, with the reason showing.
+	$effect(() => {
+		if (error) confirmingMove = false;
+	});
+
+	/** A booking keeps its length when its start moves, so only the start needs picking. */
+	const wallMs = (date: string, time: string) => Date.parse(`${date}T${time}:00Z`);
+	function keepLength() {
+		if (!movable) return;
+		const start = wallMs(draft.startDate, draft.startTime);
+		const length = wallMs(initial.endDate, initial.endTime) - wallMs(initial.startDate, initial.startTime);
+		if (Number.isNaN(start) || Number.isNaN(length)) return;
+		const end = new Date(start + length).toISOString();
+		draft.endDate = end.slice(0, 10);
+		draft.endTime = end.slice(11, 16);
+	}
+	const moved = $derived(
+		movable &&
+			(draft.startDate !== initial.startDate ||
+				draft.startTime !== initial.startTime ||
+				draft.endDate !== initial.endDate ||
+				draft.endTime !== initial.endTime)
+	);
 	let guestText = $state('');
 	let guestError = $state('');
 
@@ -153,7 +185,8 @@
 
 	function submit(event: SubmitEvent) {
 		event.preventDefault();
-		if (!readOnly && commitGuests()) onsave({ ...draft, guests: draft.guests && [...draft.guests] });
+		if (moved) confirmingMove = true;
+		else if (!readOnly && commitGuests()) onsave({ ...draft, guests: draft.guests && [...draft.guests] });
 	}
 
 	function onKey(event: KeyboardEvent) {
@@ -206,18 +239,18 @@
 			<label class="cal-field">
 				<span>{t('calendar.starts')}</span>
 				<div class="cal-when-row">
-					<input class="cal-input" type="date" bind:value={draft.startDate} disabled={readOnly} required />
+					<input class="cal-input" type="date" bind:value={draft.startDate} disabled={timeLocked} onchange={keepLength} required />
 					{#if !draft.allDay}
-						<input class="cal-input" type="time" bind:value={draft.startTime} disabled={readOnly} required />
+						<input class="cal-input" type="time" bind:value={draft.startTime} disabled={timeLocked} onchange={keepLength} required />
 					{/if}
 				</div>
 			</label>
 			<label class="cal-field">
 				<span>{t('calendar.ends')}</span>
 				<div class="cal-when-row">
-					<input class="cal-input" type="date" bind:value={draft.endDate} disabled={readOnly} required />
+					<input class="cal-input" type="date" bind:value={draft.endDate} disabled={timeLocked} required />
 					{#if !draft.allDay}
-						<input class="cal-input" type="time" bind:value={draft.endTime} disabled={readOnly} required />
+						<input class="cal-input" type="time" bind:value={draft.endTime} disabled={timeLocked} required />
 					{/if}
 				</div>
 			</label>
@@ -334,7 +367,17 @@
 
 		{#if error}<p class="cal-error" role="alert">{error}</p>{/if}
 
-		{#if confirmingDelete}
+		{#if confirmingMove}
+			<div class="cal-confirm" role="alert">
+				<span>{t('calendar.moveBookingConfirm')}</span>
+				<div class="cal-actions">
+					<button type="button" class="btn-ghost" onclick={() => (confirmingMove = false)}>{t('common.cancel')}</button>
+					<button type="button" class="btn-primary" disabled={busy} onclick={() => onmove?.({ ...draft })}>
+						{busy ? t('calendar.moving') : t('calendar.moveBookingAndEmail')}
+					</button>
+				</div>
+			</div>
+		{:else if confirmingDelete}
 			<div class="cal-confirm" role="alert">
 				<span>{removal.confirm}</span>
 				<div class="cal-actions">
@@ -352,9 +395,11 @@
 				{/if}
 				<span class="cal-spacer"></span>
 				<button type="button" class="btn-ghost" onclick={oncancel}>
-					{readOnly ? t('common.close') : t('common.cancel')}
+					{readOnly && !moved ? t('common.close') : t('common.cancel')}
 				</button>
-				{#if !readOnly}
+				{#if moved}
+					<button type="submit" class="btn-primary">{t('calendar.moveBooking')}</button>
+				{:else if !readOnly}
 					<button type="submit" class="btn-primary" disabled={busy}>
 						{busy ? t('common.saving') : t('common.save')}
 					</button>
@@ -449,8 +494,11 @@
 		box-shadow: inset 0 0 0 1px var(--color-focus-line), 0 0 0 3px var(--color-focus-halo);
 	}
 
+	/* Locked fields read as text, so the ones that can still change (a booking's time) stand out. */
 	.cal-input:disabled {
-		opacity: 0.8;
+		color: var(--color-text-secondary);
+		background: transparent;
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-line) 60%, transparent);
 	}
 
 	.cal-check {

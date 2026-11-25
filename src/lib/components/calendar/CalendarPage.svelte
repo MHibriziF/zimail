@@ -26,7 +26,7 @@
 		type YearMonth
 	} from '$lib/calendar/grid';
 	import { draftForNew, draftFromEvent, draftToInput, type EventDraft } from '$lib/calendar/editor';
-	import { deleteEvent, fetchEventDetails, fetchEvents, saveEvent } from '$lib/calendar/client';
+	import { deleteEvent, fetchEventDetails, fetchEvents, moveBooking, saveEvent } from '$lib/calendar/client';
 
 	/** `guests` carries each guest's answer, which the draft (just addresses) doesn't. */
 	type Editing = { event: CalendarEvent | null; draft: EventDraft; guests: EventGuest[] };
@@ -160,19 +160,27 @@
 		}
 	}
 
-	async function remove() {
+	/** Runs one write on the open event, then closes the editor and reloads; a failure stays in the editor. */
+	async function write(work: (id: string) => Promise<unknown>) {
 		const id = editing?.event?.id;
 		if (!id || saving) return;
 		saving = true;
 		saveError = '';
 		try {
-			await deleteEvent(id);
+			await work(id);
 			await afterWrite();
 		} catch (failure) {
 			saveError = failure instanceof Error ? failure.message : t('common.networkError');
 		} finally {
 			saving = false;
 		}
+	}
+
+	const remove = () => write(deleteEvent);
+
+	function move(draft: EventDraft) {
+		const { start, end } = draftToInput(draft, timeZone);
+		return write((id) => moveBooking(id, start, end));
 	}
 </script>
 
@@ -338,9 +346,11 @@
 		guests={editing.guests}
 		meetingCode={editing.event?.meetingCode ?? null}
 		{meetingsAvailable}
+		movable={editing.event?.source === 'reservation'}
 		busy={saving}
 		error={saveError}
 		onsave={save}
+		onmove={move}
 		ondelete={remove}
 		oncancel={() => (editing = null)}
 	/>
