@@ -65,6 +65,11 @@ export type GuestChangeOutcome =
 	| { type: 'day_full' }
 	| { type: GuestChangeBlock };
 
+export type HostMoveOutcome = 'ok' | 'not_found' | 'slot_taken' | 'invalid_time' | 'in_past';
+
+/** The longest a moved booking may run; a booking is a slot, not a stay. */
+export const MAX_HOST_MOVE_MS = 24 * 60 * 60_000;
+
 export type BookingOutcome =
 	| { type: 'ok'; start: string; end: string; meetingUrl: string | null; manageUrl: string }
 	| { type: 'not_found' }
@@ -100,6 +105,13 @@ export type ReservationsService = {
 	 * another booking already in that slot still is.
 	 */
 	rescheduleBooking(userId: string, eventId: string, start: Date, end: Date): Promise<'ok' | 'not_found' | 'slot_taken'>;
+	/**
+	 * The host moving a booking themselves, to any time, such as one the guest
+	 * asked for by email but couldn't pick from the page. Same rules and email as
+	 * `rescheduleBooking`, for times sent by the browser: they must make sense
+	 * and be ahead. Moving it to the time it already has changes nothing.
+	 */
+	moveByHost(userId: string, eventId: string, start: string, end: string): Promise<HostMoveOutcome>;
 	/** The booking behind a guest's link, as they see it; `null` for a link that matches none. */
 	managedBooking(token: string): Promise<ManagedBookingView | null>;
 	/** Free slots to move it to; its own current time is left out. */
@@ -315,6 +327,24 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 		await deps.meetings?.reschedule?.(userId, code, { start: start.toISOString(), end: end.toISOString() }).catch(() => undefined);
 	}
 
+	/** The host moves a booking: page hours don't apply, another booking in the slot still does. */
+	async function moveForHost(userId: string, eventId: string, start: Date, end: Date): Promise<'ok' | 'not_found' | 'slot_taken'> {
+		const booking = await repo.getBookingByEvent(userId, eventId);
+		if (!booking) return 'not_found';
+		// No change, so no email saying it moved.
+		if (booking.start === start.toISOString() && booking.end === end.toISOString()) return 'ok';
+		try {
+			const reminder = firstReminder(start, booking.reminders, now());
+			if (!(await repo.moveBooking(userId, eventId, start.toISOString(), end.toISOString(), false, reminder))) return 'not_found';
+		} catch (error) {
+			if (isUniqueConstraintError(error)) return 'slot_taken';
+			throw error;
+		}
+		await moveRoom(userId, booking.meetingCode, start, end);
+		await tellGuest(userId, 'moved', detailsFor(eventId, booking, { start, end }));
+		return 'ok';
+	}
+
 	/** Sends one claimed reminder. A failure costs this one reminder rather than risking a second copy. */
 	async function deliverReminder(due: DueReminder, kind: ReminderKind): Promise<boolean> {
 		if (!deps.remind) return false;
@@ -504,19 +534,15 @@ export function createReservationsService(deps: ReservationsServiceDeps): Reserv
 			return true;
 		},
 
-		async rescheduleBooking(userId, eventId, start, end) {
-			const booking = await repo.getBookingByEvent(userId, eventId);
-			if (!booking) return 'not_found';
-			try {
-				const reminder = firstReminder(start, booking.reminders, now());
-				if (!(await repo.moveBooking(userId, eventId, start.toISOString(), end.toISOString(), false, reminder))) return 'not_found';
-			} catch (error) {
-				if (isUniqueConstraintError(error)) return 'slot_taken';
-				throw error;
-			}
-			await moveRoom(userId, booking.meetingCode, start, end);
-			await tellGuest(userId, 'moved', detailsFor(eventId, booking, { start, end }));
-			return 'ok';
+		rescheduleBooking: moveForHost,
+
+		async moveByHost(userId, eventId, startText, endText) {
+			const start = new Date(startText);
+			const end = new Date(endText);
+			const length = end.getTime() - start.getTime();
+			if (Number.isNaN(length) || length <= 0 || length > MAX_HOST_MOVE_MS) return 'invalid_time';
+			if (start <= now()) return 'in_past';
+			return moveForHost(userId, eventId, start, end);
 		},
 
 		async managedBooking(token) {
