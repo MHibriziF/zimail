@@ -22,7 +22,8 @@
 		onPointerDown,
 		onPointerUp,
 		onPointerCancel,
-		onPointerMove
+		onPointerMove,
+		onContextMenu
 	}: {
 		thread: ThreadSummary;
 		view: MailboxView;
@@ -37,6 +38,7 @@
 		onPointerUp: () => void;
 		onPointerCancel: () => void;
 		onPointerMove: (event: PointerEvent) => void;
+		onContextMenu: (event: MouseEvent) => void;
 	} = $props();
 
 	/** The identity a conversation arrived on — shown only when it disambiguates. */
@@ -115,7 +117,7 @@
 	}
 </script>
 
-<li class="row" class:unread={!thread.is_read} class:checked={selected}>
+<li class="row" class:unread={!thread.is_read} class:checked={selected} oncontextmenu={onContextMenu}>
 	<SwipeRow disabled={selecting} left={swipeRightAction()} right={swipeLeftAction()} onLeft={onSwipeRight} onRight={onSwipeLeft}>
 		<Check label={`Select conversation with ${people()}`} checked={selected} onchange={onToggle} />
 

@@ -15,6 +15,10 @@
 	import { haptic, isPrimaryTab } from '$lib/app-chrome';
 	import type { Label } from '$lib/mail/labels';
 	import InboxTabs from './InboxTabs.svelte';
+	import LabelPicker from './LabelPicker.svelte';
+	import RowContextMenu from './RowContextMenu.svelte';
+	import type { RowAction } from '$lib/mail/row-actions';
+	import { senderOf } from '$lib/mail/row-action-labels';
 	import type { MailAddress, MailboxFilters, MailboxPage, MailboxView, ThreadSummary } from '$lib/types';
 
 	let {
@@ -149,6 +153,91 @@
 			event.preventDefault();
 			if (selecting) toggle(thread.latest_id);
 		}
+	}
+
+	let rowMenu = $state<ReturnType<typeof RowContextMenu> | null>(null);
+	let menuRow: HTMLElement | null = null;
+	let labelling = $state<{ thread: ThreadSummary; anchor: { top: number; bottom: number; right: number } } | null>(null);
+	let labelOpen = $state(false);
+	let notice = $state('');
+	let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function announce(message: string) {
+		notice = message;
+		clearTimeout(noticeTimer);
+		noticeTimer = setTimeout(() => (notice = ''), 2400);
+	}
+
+	async function copySender(thread: ThreadSummary) {
+		const person = senderOf(thread);
+		if (!person) return;
+		try {
+			await navigator.clipboard.writeText(person.address);
+			announce(t('mailbox.senderCopied', { email: person.address }));
+		} catch {
+			// The clipboard can be blocked; the address is still on the row.
+		}
+	}
+
+	/** Actions that open or look something up, rather than change the conversation. */
+	function navigate(action: RowAction, thread: ThreadSummary): boolean {
+		const reader = `/mail/${thread.latest_id}`;
+		const person = senderOf(thread);
+		switch (action) {
+			case 'open':
+				void goto(reader);
+				return true;
+			case 'editDraft':
+				void goto(`/compose?draft=${thread.latest_id}`);
+				return true;
+			case 'openTab':
+				window.open(reader, '_blank', 'noopener');
+				return true;
+			case 'reply':
+			case 'forward':
+				// The reader opens its reply or forward box when it sees this.
+				void goto(`${reader}?compose=${action}`);
+				return true;
+			case 'withSender':
+				if (person) void goto(`/all?q=${encodeURIComponent(person.address)}`);
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	function onRowAction(action: RowAction, threads: ThreadSummary[]) {
+		const [thread] = threads;
+		if (!thread || navigate(action, thread)) return;
+		if (action === 'copySender') {
+			void copySender(thread);
+		} else if (action === 'label') {
+			const rect = menuRow?.isConnected ? menuRow.getBoundingClientRect() : null;
+			if (!rect) return;
+			labelling = { thread, anchor: { top: rect.top, bottom: rect.bottom, right: rect.right } };
+			labelOpen = true;
+		} else {
+			run(action, threads.map((item) => item.latest_id));
+		}
+	}
+
+	/**
+	 * Right-click on a row: the actions menu at the pointer, for the whole selection
+	 * when the row is part of one. Shift keeps the browser's own menu, for its link items.
+	 */
+	function onRowContextMenu(thread: ThreadSummary, event: MouseEvent) {
+		if (event.shiftKey) return;
+		event.preventDefault();
+		// A long press on a phone selects the row instead.
+		if (longPressFired || (event as PointerEvent).pointerType === 'touch') return;
+		const row = event.currentTarget as HTMLElement;
+		const opener = row.querySelector<HTMLElement>('.row-link') ?? row;
+		menuRow = opener;
+		const inSelection = selected.length > 1 && selected.includes(thread.latest_id);
+		const targets = inSelection ? items.filter((item) => selected.includes(item.latest_id)) : [thread];
+		// A keyboard-opened context menu reports no pointer position.
+		const fromPointer = event.clientX !== 0 || event.clientY !== 0;
+		void rowMenu?.openAt(targets, opener, fromPointer ? { x: event.clientX, y: event.clientY } : null);
 	}
 
 	async function toggleStar(thread: ThreadSummary) {
@@ -363,6 +452,7 @@
 						onPointerUp={cancelLongPress}
 						onPointerCancel={cancelLongPress}
 						onPointerMove={moveLongPress}
+						onContextMenu={(event) => onRowContextMenu(thread, event)}
 					/>
 				{/each}
 			</ul>
@@ -376,6 +466,28 @@
 	{/if}
 </section>
 </PullToRefresh>
+
+<RowContextMenu bind:this={rowMenu} {view} onAction={onRowAction} />
+
+{#if labelling}
+	<LabelPicker
+		emailId={labelling.thread.latest_id}
+		labels={($currentPage.data.labels ?? []) as Label[]}
+		applied={labelling.thread.labels}
+		trigger={false}
+		bind:open={labelOpen}
+		anchor={labelling.anchor}
+		onchange={(next) => {
+			if (labelling) labelling = { ...labelling, thread: { ...labelling.thread, labels: next } };
+			void invalidateAll();
+		}}
+	/>
+{/if}
+
+<div class="notice-status" role="status">{notice}</div>
+{#if notice}
+	<div class="notice" aria-hidden="true">{notice}</div>
+{/if}
 
 <ConfirmDialog
 	open={confirming !== null}
@@ -559,6 +671,47 @@
 		font-size: 0.75rem;
 		color: var(--color-muted);
 		box-shadow: inset 0 1px 0 var(--color-line);
+	}
+
+	.notice-status {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+	}
+
+	.notice {
+		position: fixed;
+		left: 50%;
+		bottom: 1.5rem;
+		z-index: 60;
+		translate: -50% 0;
+		max-width: calc(100vw - 2rem);
+		padding: 0.5rem 0.875rem;
+		border-radius: calc(0.625rem * var(--radius-scale, 1));
+		background: var(--color-text);
+		color: var(--color-surface);
+		font-size: 0.8125rem;
+		box-shadow: var(--shadow-md);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		pointer-events: none;
+		animation: notice-in 160ms cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	@keyframes notice-in {
+		from {
+			opacity: 0;
+			translate: -50% 0.375rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.notice {
+			animation: none;
+		}
 	}
 
 	@media (max-width: 900px) {
