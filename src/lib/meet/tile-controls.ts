@@ -13,6 +13,11 @@ export type TileControlOptions = { zoomable: boolean; labels: TileControlLabels 
 /** Past this a press is a drag, not a click. */
 const DRAG_THRESHOLD_PX = 4;
 
+/** Marks the element that goes full screen in place of a tile, when the tile sits inside one. */
+export const FULLSCREEN_HOST = 'data-call-fullscreen';
+/** The tile filling that element while it is full screen. */
+export const FULLSCREEN_TILE = 'call-tile-full';
+
 function glyph(icon: string): HTMLElement {
 	const el = document.createElement('i');
 	el.className = icon;
@@ -46,10 +51,25 @@ export function tileControls(tile: HTMLElement, options: TileControlOptions) {
 	const fullscreen = iconButton('call-tile-fullscreen', 'ri-fullscreen-line', labels.fullscreen);
 	// An iPhone can only put a <video> itself full screen, and has no fullscreenEnabled at all.
 	fullscreen.hidden = !document.fullscreenEnabled;
-	const isFullscreen = () => document.fullscreenElement === tile;
+	// The whole call goes full screen with this tile filling it, so the call's own controls come along.
+	const screen = () => tile.closest<HTMLElement>(`[${FULLSCREEN_HOST}]`) ?? tile;
+	const isFullscreen = () => {
+		const host = screen();
+		return document.fullscreenElement === host && (host === tile || tile.classList.contains(FULLSCREEN_TILE));
+	};
 	fullscreen.addEventListener('click', () => {
-		if (isFullscreen()) void document.exitFullscreen().catch(() => undefined);
-		else void tile.requestFullscreen().catch(() => undefined);
+		if (isFullscreen()) {
+			void document.exitFullscreen().catch(() => undefined);
+			return;
+		}
+		const host = screen();
+		if (host !== tile) {
+			for (const other of host.querySelectorAll(`.${FULLSCREEN_TILE}`)) other.classList.remove(FULLSCREEN_TILE);
+			tile.classList.add(FULLSCREEN_TILE);
+		}
+		if (document.fullscreenElement !== host) {
+			void host.requestFullscreen().catch(() => tile.classList.remove(FULLSCREEN_TILE));
+		}
 	});
 	const showFullscreenState = () => {
 		const on = isFullscreen();
@@ -58,7 +78,12 @@ export function tileControls(tile: HTMLElement, options: TileControlOptions) {
 		fullscreen.setAttribute('aria-label', label);
 		fullscreen.replaceChildren(glyph(on ? 'ri-fullscreen-exit-line' : 'ri-fullscreen-line'));
 	};
-	tile.addEventListener('fullscreenchange', showFullscreenState);
+	const onFullscreenChange = () => {
+		if (!document.fullscreenElement) tile.classList.remove(FULLSCREEN_TILE);
+		showFullscreenState();
+		onFullscreenLeft();
+	};
+	document.addEventListener('fullscreenchange', onFullscreenChange);
 
 	let view: ZoomView = NO_ZOOM;
 	const zoomGroup = document.createElement('div');
@@ -125,6 +150,7 @@ export function tileControls(tile: HTMLElement, options: TileControlOptions) {
 	// A share moved off the stage goes back to showing all of itself.
 	const leftStage = new MutationObserver(() => {
 		if (view.scale > 1 && !zoomable()) show(NO_ZOOM);
+		showFullscreenState();
 	});
 	leftStage.observe(tile, { attributes: true, attributeFilter: ['class'] });
 	const onFullscreenLeft = () => {
@@ -139,7 +165,6 @@ export function tileControls(tile: HTMLElement, options: TileControlOptions) {
 		tile.addEventListener('pointerup', onPointerUp);
 		tile.addEventListener('pointercancel', onPointerUp);
 		tile.addEventListener('click', onClickCapture, { capture: true });
-		tile.addEventListener('fullscreenchange', onFullscreenLeft);
 	}
 	bar.append(fullscreen);
 	// The tile's own click puts it on the stage; a press on these buttons is not that.
@@ -152,8 +177,8 @@ export function tileControls(tile: HTMLElement, options: TileControlOptions) {
 			bar.remove();
 			if (media) media.style.transform = '';
 			tile.classList.remove('call-tile-zoomed');
-			tile.removeEventListener('fullscreenchange', showFullscreenState);
-			tile.removeEventListener('fullscreenchange', onFullscreenLeft);
+			document.removeEventListener('fullscreenchange', onFullscreenChange);
+			tile.classList.remove(FULLSCREEN_TILE);
 			tile.removeEventListener('wheel', onWheel);
 			tile.removeEventListener('pointerdown', onPointerDown);
 			tile.removeEventListener('pointermove', onPointerMove);

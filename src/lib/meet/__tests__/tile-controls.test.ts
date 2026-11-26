@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import { Window as HappyWindow } from 'happy-dom';
-import { tileControls } from '../tile-controls';
+import { FULLSCREEN_HOST, FULLSCREEN_TILE, tileControls } from '../tile-controls';
 
 const labels = {
 	fullscreen: 'Full screen',
@@ -93,6 +93,35 @@ describe('a tile’s full-screen button', () => {
 		button(tile, 'Exit full screen').click();
 		await flush();
 		assert.equal(fullscreenElement, null);
+		assert.ok(button(tile, 'Full screen'));
+	});
+
+	test('inside a call, the whole call goes full screen with that tile filling it', async () => {
+		const call = window.document.createElement('div');
+		call.setAttribute(FULLSCREEN_HOST, '');
+		call.requestFullscreen = async () => {
+			fullscreenElement = call;
+			call.dispatchEvent(new window.Event('fullscreenchange', { bubbles: true }));
+		};
+		window.document.body.append(call);
+		const { tile } = makeTile(false);
+		const other = makeTile(false).tile;
+		call.append(tile, other);
+		tileControls(tile, { zoomable: false, labels });
+		tileControls(other, { zoomable: false, labels });
+
+		button(tile, 'Full screen').click();
+		await flush();
+		assert.equal(fullscreenElement, call, 'the call, with its controls, is what fills the screen');
+		assert.ok(tile.classList.contains(FULLSCREEN_TILE));
+		assert.ok(!other.classList.contains(FULLSCREEN_TILE));
+		assert.ok(button(tile, 'Exit full screen'));
+		assert.ok(button(other, 'Full screen'), 'only the tile filling the screen offers the way back');
+
+		button(tile, 'Exit full screen').click();
+		await flush();
+		assert.equal(fullscreenElement, null);
+		assert.ok(!tile.classList.contains(FULLSCREEN_TILE));
 		assert.ok(button(tile, 'Full screen'));
 	});
 

@@ -949,6 +949,7 @@
 	onDestroy(() => {
 		// However the call ends — Leave, a dropped connection, closing the page — keep what was recorded.
 		void recorder.finish();
+		if (idleTimer) clearTimeout(idleTimer);
 		room?.disconnect();
 		speakers.stop();
 		pip.close();
@@ -1045,6 +1046,25 @@
 		if (target?.closest('input, textarea, [contenteditable="true"]')) return;
 		event.preventDefault();
 		toggleHand();
+	}
+
+	let stageEl = $state<HTMLDivElement>();
+	/** A tile's full-screen button puts the whole call full screen, so its controls stay in reach. */
+	let fullscreen = $state(false);
+	/** In full screen the controls float over the picture and fade after a few still seconds. */
+	let controlsIdle = $state(false);
+	let idleTimer: ReturnType<typeof setTimeout> | null = null;
+	const CONTROLS_IDLE_MS = 3000;
+
+	function wakeControls() {
+		controlsIdle = false;
+		if (idleTimer) clearTimeout(idleTimer);
+		idleTimer = fullscreen ? setTimeout(() => (controlsIdle = true), CONTROLS_IDLE_MS) : null;
+	}
+
+	function onFullscreenChange() {
+		fullscreen = !!stageEl && document.fullscreenElement === stageEl;
+		wakeControls();
 	}
 
 	function showReaction(emoji: Reaction, name: string) {
@@ -1484,8 +1504,19 @@
 </script>
 
 <svelte:window onkeydown={handleShortcut} />
+<svelte:document onfullscreenchange={onFullscreenChange} />
 
-<div class="call-stage">
+<div
+	class="call-stage"
+	class:call-stage-full={fullscreen}
+	class:call-stage-idle={fullscreen && controlsIdle && panel === 'none' && !showBackgroundPicker}
+	bind:this={stageEl}
+	data-call-fullscreen
+	onpointermove={wakeControls}
+	onpointerdown={wakeControls}
+	onkeydown={wakeControls}
+	role="presentation"
+>
 	<div class="call-header">
 		<span class="call-header-name">{localName}</span>
 		{#if screenShareRequested}
@@ -1754,17 +1785,18 @@
 		onLeave={() => leave()}
 		onEndMeeting={meetingId ? endMeeting : undefined}
 	/>
-</div>
 
-{#if showBackgroundPicker}
-	<BackgroundPickerModal
-		cameraDeviceId={devices.cameraId}
-		initialOption={backgroundOption}
-		{isLoggedIn}
-		onapply={(option) => void applyBackground(option)}
-		onclose={() => (showBackgroundPicker = false)}
-	/>
-{/if}
+	<!-- Inside the stage, which may be the full-screen element: anything outside it isn't drawn then. -->
+	{#if showBackgroundPicker}
+		<BackgroundPickerModal
+			cameraDeviceId={devices.cameraId}
+			initialOption={backgroundOption}
+			{isLoggedIn}
+			onapply={(option) => void applyBackground(option)}
+			onclose={() => (showBackgroundPicker = false)}
+		/>
+	{/if}
+</div>
 
 <style>
 	.call-stage {
@@ -1778,6 +1810,103 @@
 		background: #0b0b0d;
 		color: #fff;
 		box-sizing: border-box;
+	}
+
+	/* Full screen: the tile takes the whole screen and the call's own bars float over it. */
+	.call-stage-full {
+		--call-dock: 5rem;
+		padding: 0;
+		gap: 0;
+	}
+
+	.call-stage-full .call-header,
+	.call-stage-full .call-captions,
+	.call-stage-full > :global(.call-controls) {
+		position: absolute;
+		left: 0;
+		right: 0;
+		z-index: 3;
+		transition: opacity 0.2s ease;
+	}
+
+	.call-stage-full .call-header {
+		top: 0;
+		padding: 1rem 1.25rem 2rem;
+		background: linear-gradient(rgba(0, 0, 0, 0.55), transparent);
+	}
+
+	.call-stage-full > :global(.call-controls) {
+		bottom: 0;
+		padding: 2rem 1rem 0.75rem;
+		background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+	}
+
+	.call-stage-full .call-captions {
+		bottom: var(--call-dock);
+		min-height: 0;
+		pointer-events: none;
+		transition: bottom 0.2s ease;
+	}
+
+	.call-stage-full .call-body > :global(.call-panel) {
+		position: relative;
+		z-index: 4;
+		margin: 3.5rem 1rem var(--call-dock) 0;
+	}
+
+	.call-stage-full :global(.call-tile-full) {
+		top: 0 !important;
+		left: 0 !important;
+		width: 100% !important;
+		height: 100% !important;
+		z-index: 2;
+		border-radius: 0;
+		background: #000;
+		transition: none;
+	}
+
+	.call-stage-full:has(:global(.call-tile-full)) .call-page-dots {
+		display: none;
+	}
+
+	.call-stage-full :global(.call-tile-full .call-tile-name),
+	.call-stage-full :global(.call-tile-full .call-tile-controls) {
+		bottom: calc(var(--call-dock) + 0.5rem);
+		transition:
+			bottom 0.2s ease,
+			opacity 0.2s ease;
+	}
+
+	/* Still for a while: only the picture, and what others must always see (a recording, captions). */
+	.call-stage-idle {
+		cursor: none;
+	}
+
+	.call-stage-idle > :global(.call-controls:not(:hover)),
+	.call-stage-idle :global(.call-tile-full .call-tile-controls),
+	.call-stage-idle .call-header-name {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.call-stage-idle .call-header {
+		background: none;
+	}
+
+	.call-stage-idle .call-captions {
+		bottom: 1rem;
+	}
+
+	.call-stage-idle :global(.call-tile-full .call-tile-name) {
+		bottom: 0.75rem;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.call-stage-full .call-captions,
+		.call-stage-full :global(.call-tile-full .call-tile-name),
+		.call-stage-full :global(.call-tile-full .call-tile-controls) {
+			transition: opacity 0.2s ease;
+		}
 	}
 
 	.call-header {
@@ -2322,7 +2451,7 @@
 
 	:global(.call-tile:hover .call-tile-controls),
 	:global(.call-tile:focus-within .call-tile-controls),
-	:global(.call-tile:fullscreen .call-tile-controls) {
+	:global(.call-tile-full .call-tile-controls) {
 		opacity: 1;
 	}
 
@@ -2339,7 +2468,7 @@
 	}
 
 	:global(.call-tile-featured .call-tile-zoom),
-	:global(.call-tile:fullscreen .call-tile-zoom) {
+	:global(.call-tile-full .call-tile-zoom) {
 		display: flex;
 	}
 
