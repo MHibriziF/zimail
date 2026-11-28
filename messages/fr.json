@@ -927,6 +927,8 @@
 		"endForAll": "Mettre fin à l’appel pour tous",
 		"endForAllHint": "Tout le monde est déconnecté. Le lien reste valable pour la prochaine fois.",
 		"deleteMeeting": "Terminer et supprimer la réunion",
+		"endingCall": "Fin de l’appel…",
+		"deletingMeeting": "Suppression de la réunion…",
 		"deleteMeetingHint": "Tout le monde est déconnecté et le lien ne fonctionne plus.",
 		"deleteMeetingConfirm": "Tout le monde sera déconnecté et la réunion supprimée définitivement. Son lien ne fonctionnera plus.",
 		"endFailed": "Impossible de mettre fin à la réunion. Réessayez.",

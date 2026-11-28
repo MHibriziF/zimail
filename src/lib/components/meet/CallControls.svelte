@@ -105,21 +105,31 @@
 		onSendReaction: (emoji: Reaction) => void;
 		onLeave: () => void;
 		/** Host only: ends the call for everyone, and with `remove` deletes the meeting. */
-		onEndMeeting?: (remove: boolean) => void;
+		onEndMeeting?: (remove: boolean) => Promise<void> | void;
 	} = $props();
 
 	let leaveMenuOpen = $state(false);
 	let confirmDelete = $state(false);
 	let leaveEl = $state<HTMLDivElement>();
 
+	/** Which end request is out; the menu stays open on it, so the wait reads as work, not a freeze. */
+	let ending = $state<'end' | 'delete' | null>(null);
+
 	function toggleLeaveMenu() {
+		if (ending) return;
 		leaveMenuOpen = !leaveMenuOpen;
 		confirmDelete = false;
 	}
 
-	function endMeeting(remove: boolean) {
-		leaveMenuOpen = false;
-		onEndMeeting?.(remove);
+	async function endMeeting(remove: boolean) {
+		if (ending) return;
+		ending = remove ? 'delete' : 'end';
+		try {
+			await onEndMeeting?.(remove);
+		} finally {
+			ending = null;
+			leaveMenuOpen = false;
+		}
 	}
 
 	let reactionMenuOpen = $state(false);
@@ -132,13 +142,13 @@
 		const target = event.target as Node;
 		if (reactionMenuOpen && !reactionEl?.contains(target)) reactionMenuOpen = false;
 		if (moreMenuOpen && !moreEl?.contains(target)) moreMenuOpen = false;
-		if (leaveMenuOpen && !leaveEl?.contains(target)) leaveMenuOpen = false;
+		if (leaveMenuOpen && !ending && !leaveEl?.contains(target)) leaveMenuOpen = false;
 	}
 
 	function closeMenus() {
 		reactionMenuOpen = false;
 		moreMenuOpen = false;
-		leaveMenuOpen = false;
+		if (!ending) leaveMenuOpen = false;
 	}
 
 	const handLabel = $derived(`${handRaised ? t('meet.lowerHand') : t('meet.raiseHand')} (Ctrl+Alt+H)`);
@@ -427,24 +437,54 @@
 						<div class="call-menu-section">
 							{#if confirmDelete}
 								<p class="call-menu-confirm">{t('meet.deleteMeetingConfirm')}</p>
-								<button type="button" role="menuitem" class="call-menu-alert" onclick={() => endMeeting(true)}>
-									<Icon name="delete-bin-line" size={18} />
-									<span>{t('meet.deleteMeeting')}</span>
+								<button
+									type="button"
+									role="menuitem"
+									class="call-menu-alert"
+									aria-busy={ending === 'delete'}
+									disabled={ending !== null}
+									onclick={() => endMeeting(true)}
+								>
+									{#if ending === 'delete'}
+										<i class="call-menu-spinner" aria-hidden="true"></i>
+										<span role="status">{t('meet.deletingMeeting')}</span>
+									{:else}
+										<Icon name="delete-bin-line" size={18} />
+										<span>{t('meet.deleteMeeting')}</span>
+									{/if}
 								</button>
-								<button type="button" role="menuitem" onclick={() => (confirmDelete = false)}>
+								<button type="button" role="menuitem" disabled={ending !== null} onclick={() => (confirmDelete = false)}>
 									<Icon name="arrow-left-line" size={18} />
 									<span>{t('common.cancel')}</span>
 								</button>
 							{:else}
-								<button type="button" role="menuitem" onclick={onLeave}>
+								<button type="button" role="menuitem" disabled={ending !== null} onclick={onLeave}>
 									<Icon name="logout-box-r-line" size={18} />
 									<span>{t('meet.leaveCall')}<small>{t('meet.leaveCallHint')}</small></span>
 								</button>
-								<button type="button" role="menuitem" class="call-menu-alert" onclick={() => endMeeting(false)}>
-									<Icon name="phone-line" size={18} />
-									<span>{t('meet.endForAll')}<small>{t('meet.endForAllHint')}</small></span>
+								<button
+									type="button"
+									role="menuitem"
+									class="call-menu-alert"
+									aria-busy={ending === 'end'}
+									disabled={ending !== null}
+									onclick={() => endMeeting(false)}
+								>
+									{#if ending === 'end'}
+										<i class="call-menu-spinner" aria-hidden="true"></i>
+										<span role="status">{t('meet.endingCall')}</span>
+									{:else}
+										<Icon name="phone-line" size={18} />
+										<span>{t('meet.endForAll')}<small>{t('meet.endForAllHint')}</small></span>
+									{/if}
 								</button>
-								<button type="button" role="menuitem" class="call-menu-alert" onclick={() => (confirmDelete = true)}>
+								<button
+									type="button"
+									role="menuitem"
+									class="call-menu-alert"
+									disabled={ending !== null}
+									onclick={() => (confirmDelete = true)}
+								>
 									<Icon name="delete-bin-line" size={18} />
 									<span>{t('meet.deleteMeeting')}<small>{t('meet.deleteMeetingHint')}</small></span>
 								</button>
@@ -696,6 +736,37 @@
 
 	.call-menu-section > .call-menu-alert {
 		color: #f87171;
+	}
+
+	.call-menu-section > button:disabled {
+		cursor: default;
+	}
+
+	.call-menu-section > button:disabled:not([aria-busy='true']) {
+		opacity: 0.45;
+	}
+
+	.call-menu-spinner {
+		flex-shrink: 0;
+		width: 1.125rem;
+		height: 1.125rem;
+		box-sizing: border-box;
+		border: 2px solid rgba(248, 113, 113, 0.3);
+		border-top-color: currentColor;
+		border-radius: 50%;
+		animation: call-menu-spin 0.8s linear infinite;
+	}
+
+	@keyframes call-menu-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.call-menu-spinner {
+			animation-duration: 2.4s;
+		}
 	}
 
 	.call-menu-confirm {

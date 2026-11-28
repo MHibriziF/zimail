@@ -927,6 +927,8 @@
 		"endForAll": "为所有人结束通话",
 		"endForAllHint": "所有人都会被移出，链接下次仍可使用。",
 		"deleteMeeting": "结束并删除会议",
+		"endingCall": "正在结束通话…",
+		"deletingMeeting": "正在删除会议…",
 		"deleteMeetingHint": "所有人都会被移出，链接将失效。",
 		"deleteMeetingConfirm": "这会移出所有人并永久删除会议，其链接将无法再使用。",
 		"endFailed": "无法结束会议，请重试。",

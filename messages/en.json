@@ -927,6 +927,8 @@
 		"endForAll": "End the call for everyone",
 		"endForAllHint": "Everyone is removed. The link still works for next time.",
 		"deleteMeeting": "End and delete meeting",
+		"endingCall": "Ending the call…",
+		"deletingMeeting": "Deleting the meeting…",
 		"deleteMeetingHint": "Everyone is removed and the link stops working.",
 		"deleteMeetingConfirm": "This removes everyone and deletes the meeting for good. Its link won’t work again.",
 		"endFailed": "Couldn’t end the meeting. Try again.",

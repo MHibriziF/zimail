@@ -409,8 +409,10 @@
 										type="button"
 										class="meetings-btn meetings-btn-danger"
 										disabled={busyId === meeting.id}
+										aria-busy={busyId === meeting.id}
 										onclick={() => confirmDelete(meeting.id)}
 									>
+										{#if busyId === meeting.id}<span class="meetings-spinner" aria-hidden="true"></span>{/if}
 										{busyId === meeting.id ? t('meetings.deleting') : t('meetings.deleteAction')}
 									</button>
 								</div>
@@ -597,7 +599,8 @@
 		background: var(--color-surface-hover);
 	}
 
-	.meetings-btn:disabled {
+	/* A busy button stays solid: its spinner is the signal, not a faded look. */
+	.meetings-btn:disabled:not([aria-busy='true']) {
 		opacity: 0.45;
 	}
 
@@ -816,8 +819,34 @@
 		background: var(--color-danger-hover);
 	}
 
-	.meetings-btn-danger:disabled {
+	.meetings-btn-danger:disabled:not([aria-busy='true']) {
 		opacity: 0.6;
+	}
+
+	.meetings-btn-danger[aria-busy='true'] {
+		cursor: progress;
+	}
+
+	.meetings-spinner {
+		width: 0.875rem;
+		height: 0.875rem;
+		box-sizing: border-box;
+		border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+		border-top-color: currentColor;
+		border-radius: 50%;
+		animation: meetings-spin 0.8s linear infinite;
+	}
+
+	@keyframes meetings-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.meetings-spinner {
+			animation-duration: 2.4s;
+		}
 	}
 
 	.meetings-more {

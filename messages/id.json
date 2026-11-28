@@ -927,6 +927,8 @@
 		"endForAll": "Akhiri panggilan untuk semua",
 		"endForAllHint": "Semua peserta dikeluarkan. Tautan tetap bisa dipakai lagi.",
 		"deleteMeeting": "Akhiri dan hapus rapat",
+		"endingCall": "Mengakhiri panggilan…",
+		"deletingMeeting": "Menghapus rapat…",
 		"deleteMeetingHint": "Semua peserta dikeluarkan dan tautan tidak berlaku lagi.",
 		"deleteMeetingConfirm": "Ini mengeluarkan semua peserta dan menghapus rapat secara permanen. Tautannya tidak akan berfungsi lagi.",
 		"endFailed": "Gagal mengakhiri rapat. Coba lagi.",
